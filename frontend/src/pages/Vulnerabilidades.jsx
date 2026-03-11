@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -37,13 +38,26 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Plus,
   Search,
-  Download,
   Upload,
   Pencil,
   Trash2,
@@ -51,6 +65,9 @@ import {
   Eye,
   ChevronLeft,
   ChevronRight,
+  X,
+  ChevronsUpDown,
+  Check,
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -85,6 +102,74 @@ const StatusBadge = ({ status }) => {
   );
 };
 
+// Multi-select component for applications
+const MultiSelectApps = ({ options, selected, onChange, placeholder }) => {
+  const [open, setOpen] = useState(false);
+
+  const handleSelect = (app) => {
+    if (selected.includes(app)) {
+      onChange(selected.filter((s) => s !== app));
+    } else {
+      onChange([...selected, app]);
+    }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between bg-black/20 border-zinc-700 text-white hover:bg-zinc-800"
+        >
+          {selected.length > 0 ? (
+            <span className="flex gap-1 flex-wrap">
+              {selected.length <= 3 ? (
+                selected.map((app) => (
+                  <Badge key={app} variant="secondary" className="bg-indigo-500/20 text-indigo-300 text-xs">
+                    {app}
+                  </Badge>
+                ))
+              ) : (
+                <span>{selected.length} aplicaciones seleccionadas</span>
+              )}
+            </span>
+          ) : (
+            <span className="text-zinc-500">{placeholder}</span>
+          )}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-full p-0 bg-zinc-900 border-zinc-700">
+        <Command className="bg-zinc-900">
+          <CommandInput placeholder="Buscar aplicación..." className="text-white" />
+          <CommandList>
+            <CommandEmpty className="text-zinc-500 text-sm py-4 text-center">No se encontraron aplicaciones</CommandEmpty>
+            <CommandGroup>
+              <ScrollArea className="h-[200px]">
+                {options.map((app) => (
+                  <CommandItem
+                    key={app}
+                    onSelect={() => handleSelect(app)}
+                    className="text-white cursor-pointer"
+                  >
+                    <Checkbox
+                      checked={selected.includes(app)}
+                      className="mr-2"
+                    />
+                    {app}
+                  </CommandItem>
+                ))}
+              </ScrollArea>
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 export default function Vulnerabilidades() {
   const { isAdmin, canCreate, canEdit, canDelete } = useAuth();
   const [vulnerabilidades, setVulnerabilidades] = useState([]);
@@ -94,6 +179,7 @@ export default function Vulnerabilidades() {
   const [filterSeveridad, setFilterSeveridad] = useState("");
   const [filterEstatus, setFilterEstatus] = useState("");
   const [filterInstitucion, setFilterInstitucion] = useState("");
+  const [filterAño, setFilterAño] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingVuln, setViewingVuln] = useState(null);
@@ -106,7 +192,7 @@ export default function Vulnerabilidades() {
   const [formData, setFormData] = useState({
     fecha_hallazgo: "",
     institucion: "",
-    aplicacion: "",
+    aplicaciones: [],
     vulnerabilidad: "",
     recomendaciones: "",
     severidad: "",
@@ -140,6 +226,7 @@ export default function Vulnerabilidades() {
       if (filterSeveridad && filterSeveridad !== "all") params.append("severidad", filterSeveridad);
       if (filterEstatus && filterEstatus !== "all") params.append("estatus", filterEstatus);
       if (filterInstitucion && filterInstitucion !== "all") params.append("institucion", filterInstitucion);
+      if (filterAño && filterAño !== "all") params.append("año", filterAño);
 
       const response = await axios.get(`${API}/vulnerabilidades?${params.toString()}`);
       setVulnerabilidades(response.data);
@@ -150,7 +237,7 @@ export default function Vulnerabilidades() {
     } finally {
       setLoading(false);
     }
-  }, [search, filterSeveridad, filterEstatus, filterInstitucion]);
+  }, [search, filterSeveridad, filterEstatus, filterInstitucion, filterAño]);
 
   useEffect(() => {
     fetchOptions();
@@ -171,13 +258,16 @@ export default function Vulnerabilidades() {
   const handleOpenModal = (vuln = null) => {
     if (vuln) {
       setEditingVuln(vuln);
-      setFormData({ ...vuln });
+      setFormData({ 
+        ...vuln,
+        aplicaciones: vuln.aplicaciones || []
+      });
     } else {
       setEditingVuln(null);
       setFormData({
         fecha_hallazgo: "",
         institucion: "",
-        aplicacion: "",
+        aplicaciones: [],
         vulnerabilidad: "",
         recomendaciones: "",
         severidad: "",
@@ -272,6 +362,13 @@ export default function Vulnerabilidades() {
     }
   };
 
+  // Helper to display applications
+  const formatAplicaciones = (vuln) => {
+    const apps = vuln.aplicaciones || [];
+    if (apps.length === 0) return vuln.aplicacion || "-";
+    return apps.join(", ");
+  };
+
   const paginatedData = vulnerabilidades.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
@@ -331,8 +428,20 @@ export default function Vulnerabilidades() {
 
             {/* Filters */}
             <div className="flex flex-wrap gap-2">
+              <Select value={filterAño} onValueChange={setFilterAño}>
+                <SelectTrigger className="w-[100px] bg-black/20 border-zinc-700 text-white" data-testid="filter-año">
+                  <SelectValue placeholder="Año" />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-900 border-zinc-700">
+                  <SelectItem value="all">Todos</SelectItem>
+                  {options?.años?.map((año) => (
+                    <SelectItem key={año} value={String(año)}>{año}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
               <Select value={filterSeveridad} onValueChange={setFilterSeveridad}>
-                <SelectTrigger className="w-[140px] bg-black/20 border-zinc-700 text-white" data-testid="filter-severidad">
+                <SelectTrigger className="w-[120px] bg-black/20 border-zinc-700 text-white" data-testid="filter-severidad">
                   <SelectValue placeholder="Severidad" />
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-900 border-zinc-700">
@@ -344,7 +453,7 @@ export default function Vulnerabilidades() {
               </Select>
 
               <Select value={filterEstatus} onValueChange={setFilterEstatus}>
-                <SelectTrigger className="w-[140px] bg-black/20 border-zinc-700 text-white" data-testid="filter-estatus">
+                <SelectTrigger className="w-[130px] bg-black/20 border-zinc-700 text-white" data-testid="filter-estatus">
                   <SelectValue placeholder="Estatus" />
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-900 border-zinc-700">
@@ -356,7 +465,7 @@ export default function Vulnerabilidades() {
               </Select>
 
               <Select value={filterInstitucion} onValueChange={setFilterInstitucion}>
-                <SelectTrigger className="w-[160px] bg-black/20 border-zinc-700 text-white" data-testid="filter-institucion">
+                <SelectTrigger className="w-[140px] bg-black/20 border-zinc-700 text-white" data-testid="filter-institucion">
                   <SelectValue placeholder="Institución" />
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-900 border-zinc-700">
@@ -428,7 +537,7 @@ export default function Vulnerabilidades() {
                 <TableRow className="border-zinc-700 hover:bg-transparent">
                   <TableHead className="text-zinc-400">Fecha</TableHead>
                   <TableHead className="text-zinc-400">Institución</TableHead>
-                  <TableHead className="text-zinc-400">Aplicación</TableHead>
+                  <TableHead className="text-zinc-400">Aplicaciones</TableHead>
                   <TableHead className="text-zinc-400 min-w-[200px]">Vulnerabilidad</TableHead>
                   <TableHead className="text-zinc-400">Severidad</TableHead>
                   <TableHead className="text-zinc-400">Estatus</TableHead>
@@ -454,7 +563,11 @@ export default function Vulnerabilidades() {
                         {vuln.fecha_hallazgo || "-"}
                       </TableCell>
                       <TableCell className="text-zinc-300">{vuln.institucion || "-"}</TableCell>
-                      <TableCell className="text-zinc-300">{vuln.aplicacion || "-"}</TableCell>
+                      <TableCell className="text-zinc-300 max-w-[150px]">
+                        <span className="truncate block" title={formatAplicaciones(vuln)}>
+                          {formatAplicaciones(vuln)}
+                        </span>
+                      </TableCell>
                       <TableCell className="text-zinc-100 max-w-[300px] truncate">
                         {vuln.vulnerabilidad || "-"}
                       </TableCell>
@@ -568,9 +681,19 @@ export default function Vulnerabilidades() {
                     <p className="text-xs text-zinc-500 uppercase tracking-wide">Institución</p>
                     <p className="text-white">{viewingVuln.institucion || "-"}</p>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Aplicación</p>
-                    <p className="text-white">{viewingVuln.aplicacion || "-"}</p>
+                  <div className="space-y-1 col-span-2">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Aplicaciones</p>
+                    <div className="flex flex-wrap gap-1">
+                      {(viewingVuln.aplicaciones || []).length > 0 ? (
+                        viewingVuln.aplicaciones.map((app) => (
+                          <Badge key={app} variant="secondary" className="bg-indigo-500/20 text-indigo-300">
+                            {app}
+                          </Badge>
+                        ))
+                      ) : (
+                        <p className="text-white">{viewingVuln.aplicacion || "-"}</p>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs text-zinc-500 uppercase tracking-wide">Responsable</p>
@@ -689,14 +812,32 @@ export default function Vulnerabilidades() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="text-zinc-400">Aplicación</Label>
-                  <Input
-                    value={formData.aplicacion || ""}
-                    onChange={(e) => setFormData({ ...formData, aplicacion: e.target.value })}
-                    className="bg-black/20 border-zinc-700 text-white"
-                    data-testid="input-aplicacion"
+                <div className="space-y-2 md:col-span-2">
+                  <Label className="text-zinc-400">Aplicaciones</Label>
+                  <MultiSelectApps
+                    options={options?.aplicaciones || []}
+                    selected={formData.aplicaciones || []}
+                    onChange={(apps) => setFormData({ ...formData, aplicaciones: apps })}
+                    placeholder="Seleccionar aplicaciones..."
                   />
+                  {formData.aplicaciones?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {formData.aplicaciones.map((app) => (
+                        <Badge 
+                          key={app} 
+                          variant="secondary" 
+                          className="bg-indigo-500/20 text-indigo-300 cursor-pointer hover:bg-red-500/20 hover:text-red-300"
+                          onClick={() => setFormData({ 
+                            ...formData, 
+                            aplicaciones: formData.aplicaciones.filter(a => a !== app) 
+                          })}
+                        >
+                          {app}
+                          <X className="w-3 h-3 ml-1" />
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -710,6 +851,23 @@ export default function Vulnerabilidades() {
                     </SelectTrigger>
                     <SelectContent className="bg-zinc-900 border-zinc-700">
                       {options?.severidades?.map((s) => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-zinc-400">Estatus</Label>
+                  <Select
+                    value={formData.estatus || ""}
+                    onValueChange={(v) => setFormData({ ...formData, estatus: v })}
+                  >
+                    <SelectTrigger className="bg-black/20 border-zinc-700 text-white" data-testid="input-estatus">
+                      <SelectValue placeholder="Seleccionar..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-900 border-zinc-700">
+                      {options?.estatus?.map((s) => (
                         <SelectItem key={s} value={s}>{s}</SelectItem>
                       ))}
                     </SelectContent>
@@ -778,23 +936,6 @@ export default function Vulnerabilidades() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-zinc-400">Estatus</Label>
-                  <Select
-                    value={formData.estatus || ""}
-                    onValueChange={(v) => setFormData({ ...formData, estatus: v })}
-                  >
-                    <SelectTrigger className="bg-black/20 border-zinc-700 text-white" data-testid="input-estatus">
-                      <SelectValue placeholder="Seleccionar..." />
-                    </SelectTrigger>
-                    <SelectContent className="bg-zinc-900 border-zinc-700">
-                      {options?.estatus?.map((s) => (
-                        <SelectItem key={s} value={s}>{s}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
                   <Label className="text-zinc-400">Resultado Re Test</Label>
                   <Select
                     value={formData.resultado_re_test || ""}
@@ -813,15 +954,22 @@ export default function Vulnerabilidades() {
 
                 <div className="space-y-2">
                   <Label className="text-zinc-400">Proveedor</Label>
-                  <Input
+                  <Select
                     value={formData.proveedor || ""}
-                    onChange={(e) => setFormData({ ...formData, proveedor: e.target.value })}
-                    className="bg-black/20 border-zinc-700 text-white"
-                    data-testid="input-proveedor"
-                  />
+                    onValueChange={(v) => setFormData({ ...formData, proveedor: v })}
+                  >
+                    <SelectTrigger className="bg-black/20 border-zinc-700 text-white" data-testid="input-proveedor">
+                      <SelectValue placeholder="Seleccionar..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-900 border-zinc-700">
+                      {options?.proveedores?.map((p) => (
+                        <SelectItem key={p} value={p}>{p}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                <div className="space-y-2 md:col-span-2">
+                <div className="space-y-2">
                   <Label className="text-zinc-400">Nombre Informe Pentest</Label>
                   <Input
                     value={formData.nombre_informe_pentest || ""}

@@ -112,7 +112,7 @@ class CurrentUser(BaseModel):
 class VulnerabilidadBase(BaseModel):
     fecha_hallazgo: Optional[str] = None
     institucion: Optional[str] = None
-    aplicacion: Optional[str] = None
+    aplicaciones: Optional[List[str]] = None  # Changed to list
     vulnerabilidad: Optional[str] = None
     recomendaciones: Optional[str] = None
     severidad: Optional[str] = None
@@ -153,10 +153,41 @@ class InstitucionUpdate(BaseModel):
     nombre: Optional[str] = None
     activo: Optional[bool] = None
 
+# Application model
+class Aplicacion(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    nombre: str
+    activo: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class AplicacionCreate(BaseModel):
+    nombre: str
+
+class AplicacionUpdate(BaseModel):
+    nombre: Optional[str] = None
+    activo: Optional[bool] = None
+
+# Provider model
+class Proveedor(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    nombre: str
+    activo: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ProveedorCreate(BaseModel):
+    nombre: str
+
+class ProveedorUpdate(BaseModel):
+    nombre: Optional[str] = None
+    activo: Optional[bool] = None
+
 class DropdownOptions(BaseModel):
     severidades: List[str]
     estatus: List[str]
     instituciones: List[str]
+    aplicaciones: List[str]
     resultado_retest: List[str]
     informes_pentest: List[str]
     años: List[int]
@@ -480,6 +511,102 @@ async def delete_institucion(inst_id: str, current_user: CurrentUser = Depends(g
         raise HTTPException(status_code=404, detail="Institución no encontrada")
     return {"message": "Institución eliminada exitosamente"}
 
+# ============ APPLICATION CONFIGURATION ROUTES ============
+
+@api_router.get("/config/aplicaciones", response_model=List[Aplicacion])
+async def get_aplicaciones(current_user: CurrentUser = Depends(get_current_user)):
+    aplicaciones = await db.aplicaciones.find({}, {"_id": 0}).to_list(1000)
+    return aplicaciones
+
+@api_router.post("/config/aplicaciones", response_model=Aplicacion)
+async def create_aplicacion(data: AplicacionCreate, current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.configuracion.crear:
+        raise HTTPException(status_code=403, detail="No tiene permisos para crear aplicaciones")
+    
+    existing = await db.aplicaciones.find_one({"nombre": data.nombre})
+    if existing:
+        raise HTTPException(status_code=400, detail="La aplicación ya existe")
+    
+    app = Aplicacion(nombre=data.nombre)
+    doc = app.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.aplicaciones.insert_one(doc)
+    return app
+
+@api_router.put("/config/aplicaciones/{app_id}", response_model=Aplicacion)
+async def update_aplicacion(app_id: str, data: AplicacionUpdate, current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.configuracion.editar:
+        raise HTTPException(status_code=403, detail="No tiene permisos para editar aplicaciones")
+    
+    existing = await db.aplicaciones.find_one({"id": app_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Aplicación no encontrada")
+    
+    update_dict = data.model_dump(exclude_unset=True)
+    if update_dict:
+        await db.aplicaciones.update_one({"id": app_id}, {"$set": update_dict})
+    
+    updated = await db.aplicaciones.find_one({"id": app_id}, {"_id": 0})
+    return updated
+
+@api_router.delete("/config/aplicaciones/{app_id}")
+async def delete_aplicacion(app_id: str, current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.configuracion.eliminar:
+        raise HTTPException(status_code=403, detail="No tiene permisos para eliminar aplicaciones")
+    
+    result = await db.aplicaciones.delete_one({"id": app_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Aplicación no encontrada")
+    return {"message": "Aplicación eliminada exitosamente"}
+
+# ============ PROVIDER CONFIGURATION ROUTES ============
+
+@api_router.get("/config/proveedores", response_model=List[Proveedor])
+async def get_proveedores(current_user: CurrentUser = Depends(get_current_user)):
+    proveedores = await db.proveedores.find({}, {"_id": 0}).to_list(1000)
+    return proveedores
+
+@api_router.post("/config/proveedores", response_model=Proveedor)
+async def create_proveedor(data: ProveedorCreate, current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.configuracion.crear:
+        raise HTTPException(status_code=403, detail="No tiene permisos para crear proveedores")
+    
+    existing = await db.proveedores.find_one({"nombre": data.nombre})
+    if existing:
+        raise HTTPException(status_code=400, detail="El proveedor ya existe")
+    
+    prov = Proveedor(nombre=data.nombre)
+    doc = prov.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.proveedores.insert_one(doc)
+    return prov
+
+@api_router.put("/config/proveedores/{prov_id}", response_model=Proveedor)
+async def update_proveedor(prov_id: str, data: ProveedorUpdate, current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.configuracion.editar:
+        raise HTTPException(status_code=403, detail="No tiene permisos para editar proveedores")
+    
+    existing = await db.proveedores.find_one({"id": prov_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
+    
+    update_dict = data.model_dump(exclude_unset=True)
+    if update_dict:
+        await db.proveedores.update_one({"id": prov_id}, {"$set": update_dict})
+    
+    updated = await db.proveedores.find_one({"id": prov_id}, {"_id": 0})
+    return updated
+
+@api_router.delete("/config/proveedores/{prov_id}")
+async def delete_proveedor(prov_id: str, current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.configuracion.eliminar:
+        raise HTTPException(status_code=403, detail="No tiene permisos para eliminar proveedores")
+    
+    result = await db.proveedores.delete_one({"id": prov_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
+    return {"message": "Proveedor eliminado exitosamente"}
+
 # Initialize default institutions if none exist
 async def init_instituciones():
     count = await db.instituciones.count_documents({})
@@ -491,6 +618,82 @@ async def init_instituciones():
                 doc = inst.model_dump()
                 doc['created_at'] = doc['created_at'].isoformat()
                 await db.instituciones.insert_one(doc)
+
+# Initialize applications from existing vulnerabilities
+async def init_aplicaciones():
+    count = await db.aplicaciones.count_documents({})
+    if count == 0:
+        # Get all unique application strings from vulnerabilities
+        vulns = await db.vulnerabilidades.find({}, {"aplicacion": 1, "aplicaciones": 1, "_id": 0}).to_list(10000)
+        
+        unique_apps = set()
+        for v in vulns:
+            # Check old 'aplicacion' field (string)
+            app_str = v.get("aplicacion")
+            if app_str:
+                # Split by _ and /
+                import re
+                parts = re.split(r'[_/]', app_str)
+                for part in parts:
+                    part = part.strip()
+                    if part and len(part) > 0:
+                        unique_apps.add(part)
+            
+            # Check new 'aplicaciones' field (list)
+            apps_list = v.get("aplicaciones")
+            if apps_list and isinstance(apps_list, list):
+                for app in apps_list:
+                    if app and len(app.strip()) > 0:
+                        unique_apps.add(app.strip())
+        
+        # Insert unique applications
+        for nombre in sorted(unique_apps):
+            if nombre:
+                app = Aplicacion(nombre=nombre)
+                doc = app.model_dump()
+                doc['created_at'] = doc['created_at'].isoformat()
+                await db.aplicaciones.insert_one(doc)
+        
+        logging.info(f"Initialized {len(unique_apps)} applications from vulnerabilities")
+
+# Initialize providers from existing vulnerabilities
+async def init_proveedores():
+    count = await db.proveedores.count_documents({})
+    if count == 0:
+        unique_proveedores = await db.vulnerabilidades.distinct("proveedor")
+        for nombre in unique_proveedores:
+            if nombre and nombre.strip():
+                prov = Proveedor(nombre=nombre.strip())
+                doc = prov.model_dump()
+                doc['created_at'] = doc['created_at'].isoformat()
+                await db.proveedores.insert_one(doc)
+        
+        logging.info(f"Initialized {len([p for p in unique_proveedores if p])} providers from vulnerabilities")
+
+# Migrate old 'aplicacion' field to new 'aplicaciones' array
+async def migrate_aplicaciones():
+    # Find vulnerabilities with old 'aplicacion' field but no 'aplicaciones'
+    vulns = await db.vulnerabilidades.find(
+        {"aplicacion": {"$exists": True, "$ne": None}, "aplicaciones": {"$exists": False}},
+        {"_id": 0, "id": 1, "aplicacion": 1}
+    ).to_list(10000)
+    
+    import re
+    for v in vulns:
+        app_str = v.get("aplicacion", "")
+        if app_str:
+            # Split by _ and /
+            parts = re.split(r'[_/]', app_str)
+            apps_list = [p.strip() for p in parts if p.strip()]
+            
+            if apps_list:
+                await db.vulnerabilidades.update_one(
+                    {"id": v["id"]},
+                    {"$set": {"aplicaciones": apps_list}}
+                )
+    
+    if vulns:
+        logging.info(f"Migrated {len(vulns)} vulnerabilities to new aplicaciones format")
 
 # Initialize admin user
 async def init_admin_user():
@@ -528,6 +731,19 @@ async def get_dropdown_options():
         instituciones = await db.vulnerabilidades.distinct("institucion")
         instituciones = [i for i in instituciones if i]
     
+    # Get applications from catalog
+    aplicaciones_docs = await db.aplicaciones.find({"activo": True}, {"_id": 0}).to_list(1000)
+    aplicaciones = [a["nombre"] for a in aplicaciones_docs] if aplicaciones_docs else []
+    
+    # Get providers from catalog
+    proveedores_docs = await db.proveedores.find({"activo": True}, {"_id": 0}).to_list(1000)
+    proveedores = [p["nombre"] for p in proveedores_docs] if proveedores_docs else []
+    
+    # Fallback to distinct values from vulnerabilities if no catalog exists
+    if not proveedores:
+        proveedores = await db.vulnerabilidades.distinct("proveedor")
+        proveedores = [p for p in proveedores if p]
+    
     informes = await db.vulnerabilidades.distinct("nombre_informe_pentest")
     informes = sorted([i for i in informes if i])
     
@@ -543,17 +759,15 @@ async def get_dropdown_options():
             except:
                 pass
     
-    proveedores = await db.vulnerabilidades.distinct("proveedor")
-    proveedores = sorted([p for p in proveedores if p])
-    
     return DropdownOptions(
         severidades=DEFAULT_SEVERIDADES,
         estatus=DEFAULT_ESTATUS,
         instituciones=sorted(instituciones),
+        aplicaciones=sorted(aplicaciones),
         resultado_retest=DEFAULT_RESULTADO_RETEST,
         informes_pentest=informes,
         años=sorted(list(años), reverse=True),
-        proveedores=proveedores
+        proveedores=sorted(proveedores)
     )
 
 # ============ VULNERABILIDADES ENDPOINTS ============
@@ -563,6 +777,7 @@ async def get_vulnerabilidades(
     severidad: Optional[str] = None,
     estatus: Optional[str] = None,
     institucion: Optional[str] = None,
+    aplicacion: Optional[str] = None,
     search: Optional[str] = None,
     año: Optional[int] = None,
     informe_pentest: Optional[str] = None,
@@ -579,6 +794,8 @@ async def get_vulnerabilidades(
         query["estatus"] = estatus
     if institucion:
         query["institucion"] = institucion
+    if aplicacion:
+        query["aplicaciones"] = aplicacion  # Search in array
     if proveedor:
         query["proveedor"] = proveedor
     if informe_pentest:
@@ -588,7 +805,7 @@ async def get_vulnerabilidades(
     if search:
         query["$or"] = [
             {"vulnerabilidad": {"$regex": search, "$options": "i"}},
-            {"aplicacion": {"$regex": search, "$options": "i"}},
+            {"aplicaciones": {"$regex": search, "$options": "i"}},
             {"responsable": {"$regex": search, "$options": "i"}},
             {"nombre_informe_pentest": {"$regex": search, "$options": "i"}}
         ]
@@ -1010,6 +1227,9 @@ logger = logging.getLogger(__name__)
 @app.on_event("startup")
 async def startup_event():
     await init_instituciones()
+    await init_aplicaciones()
+    await init_proveedores()
+    await migrate_aplicaciones()
     await init_admin_user()
 
 @app.on_event("shutdown")

@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, Users } from "lucide-react";
+import { Building2, Users, AppWindow, Truck } from "lucide-react";
 import Instituciones from "@/pages/Instituciones";
 import Usuarios from "@/pages/Usuarios";
+import Aplicaciones from "@/pages/Aplicaciones";
+import Proveedores from "@/pages/Proveedores";
 
 export default function Configuracion() {
   const { isAdmin, canView } = useAuth();
@@ -34,6 +36,22 @@ export default function Configuracion() {
             <Building2 className="w-4 h-4 mr-2" />
             Instituciones
           </TabsTrigger>
+          <TabsTrigger 
+            value="aplicaciones" 
+            className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white"
+            data-testid="tab-aplicaciones"
+          >
+            <AppWindow className="w-4 h-4 mr-2" />
+            Aplicaciones
+          </TabsTrigger>
+          <TabsTrigger 
+            value="proveedores" 
+            className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white"
+            data-testid="tab-proveedores"
+          >
+            <Truck className="w-4 h-4 mr-2" />
+            Proveedores
+          </TabsTrigger>
           {canViewUsers && (
             <TabsTrigger 
               value="usuarios" 
@@ -48,6 +66,14 @@ export default function Configuracion() {
 
         <TabsContent value="instituciones" className="mt-6">
           <Instituciones />
+        </TabsContent>
+
+        <TabsContent value="aplicaciones" className="mt-6">
+          <Aplicaciones />
+        </TabsContent>
+
+        <TabsContent value="proveedores" className="mt-6">
+          <Proveedores />
         </TabsContent>
 
         {canViewUsers && (
