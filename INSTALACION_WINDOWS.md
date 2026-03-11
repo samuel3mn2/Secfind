@@ -27,7 +27,7 @@ Python es el lenguaje de programación que usa el servidor de la aplicación.
 
 4. **Instalar Python:**
    - Ve a tu carpeta de **Descargas**
-   - Haz **doble clic** en el archivo `python-3.12.x-amd64.exe`
+   - Haz **doble clic** en el archivo `python-3.xx.x-amd64.exe`
    - **MUY IMPORTANTE:** En la primera pantalla, marca la casilla que dice:
      ```
      ☑ Add python.exe to PATH
@@ -409,6 +409,19 @@ Si tienes problemas que no puedes resolver:
 1. Toma una captura de pantalla del error
 2. Anota qué paso estabas realizando
 3. Contacta al equipo de soporte
+
+---
+
+## CREDENCIALES DE ACCESO
+
+La aplicación crea automáticamente un usuario administrador al iniciar:
+
+| Campo | Valor |
+|-------|-------|
+| **Usuario** | `admin` |
+| **Contraseña** | `admin123` |
+
+> **IMPORTANTE:** Cambia la contraseña del administrador después del primer inicio de sesión desde Configuración > Usuarios.
 
 ---
 
