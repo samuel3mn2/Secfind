@@ -985,7 +985,11 @@ async def get_dashboard_stats(
     corregidas_query = {**base_query, "estatus": {"$in": ["Corregido", "Cerrado"]}}
     corregidas = await db.vulnerabilidades.count_documents(corregidas_query)
     
-    pendientes_query = {**base_query, "estatus": {"$in": ["Pendiente", "En Proceso", "Para Re Test"]}}
+    # Pendientes: incluye estatus explícitos + sin estatus (null/vacío) - excluye cerradas y desestimadas
+    pendientes_query = {
+        **base_query, 
+        "estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]}
+    }
     pendientes = await db.vulnerabilidades.count_documents(pendientes_query)
     
     severidad_pipeline = [
@@ -1011,8 +1015,8 @@ async def get_dashboard_stats(
     estatus_cursor = db.vulnerabilidades.aggregate(estatus_pipeline)
     por_estatus = {}
     async for doc in estatus_cursor:
-        if doc["_id"]:
-            por_estatus[doc["_id"]] = doc["count"]
+        estatus_name = doc["_id"] if doc["_id"] else "Sin clasificar"
+        por_estatus[estatus_name] = doc["count"]
     
     institucion_pipeline = [
         {"$match": base_query} if base_query else {"$match": {}},
