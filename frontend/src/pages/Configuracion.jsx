@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, Users, AppWindow, Truck } from "lucide-react";
+import { Building2, Users, AppWindow, Truck, FileText } from "lucide-react";
 import Instituciones from "@/pages/Instituciones";
 import Usuarios from "@/pages/Usuarios";
 import Aplicaciones from "@/pages/Aplicaciones";
 import Proveedores from "@/pages/Proveedores";
+import InformesPentest from "@/pages/InformesPentest";
 
 export default function Configuracion() {
   const { isAdmin, canView } = useAuth();
@@ -27,7 +28,7 @@ export default function Configuracion() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-[#18181b] border border-[#27272a] p-1">
+        <TabsList className="bg-[#18181b] border border-[#27272a] p-1 flex-wrap h-auto">
           <TabsTrigger 
             value="instituciones" 
             className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white"
@@ -52,6 +53,14 @@ export default function Configuracion() {
             <Truck className="w-4 h-4 mr-2" />
             Proveedores
           </TabsTrigger>
+          <TabsTrigger 
+            value="informes" 
+            className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white"
+            data-testid="tab-informes"
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            Informes Pentest
+          </TabsTrigger>
           {canViewUsers && (
             <TabsTrigger 
               value="usuarios" 
@@ -74,6 +83,10 @@ export default function Configuracion() {
 
         <TabsContent value="proveedores" className="mt-6">
           <Proveedores />
+        </TabsContent>
+
+        <TabsContent value="informes" className="mt-6">
+          <InformesPentest />
         </TabsContent>
 
         {canViewUsers && (

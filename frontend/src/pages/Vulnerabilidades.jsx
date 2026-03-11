@@ -180,6 +180,7 @@ export default function Vulnerabilidades() {
   const [filterEstatus, setFilterEstatus] = useState("");
   const [filterInstitucion, setFilterInstitucion] = useState("");
   const [filterAño, setFilterAño] = useState("");
+  const [filterAplicacion, setFilterAplicacion] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingVuln, setViewingVuln] = useState(null);
@@ -227,6 +228,7 @@ export default function Vulnerabilidades() {
       if (filterEstatus && filterEstatus !== "all") params.append("estatus", filterEstatus);
       if (filterInstitucion && filterInstitucion !== "all") params.append("institucion", filterInstitucion);
       if (filterAño && filterAño !== "all") params.append("año", filterAño);
+      if (filterAplicacion && filterAplicacion !== "all") params.append("aplicacion", filterAplicacion);
 
       const response = await axios.get(`${API}/vulnerabilidades?${params.toString()}`);
       setVulnerabilidades(response.data);
@@ -237,7 +239,7 @@ export default function Vulnerabilidades() {
     } finally {
       setLoading(false);
     }
-  }, [search, filterSeveridad, filterEstatus, filterInstitucion, filterAño]);
+  }, [search, filterSeveridad, filterEstatus, filterInstitucion, filterAño, filterAplicacion]);
 
   useEffect(() => {
     fetchOptions();
@@ -472,6 +474,18 @@ export default function Vulnerabilidades() {
                   <SelectItem value="all">Todas</SelectItem>
                   {options?.instituciones?.map((i) => (
                     <SelectItem key={i} value={i}>{i}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={filterAplicacion} onValueChange={setFilterAplicacion}>
+                <SelectTrigger className="w-[140px] bg-black/20 border-zinc-700 text-white" data-testid="filter-aplicacion">
+                  <SelectValue placeholder="Aplicación" />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-900 border-zinc-700 max-h-[300px]">
+                  <SelectItem value="all">Todas</SelectItem>
+                  {options?.aplicaciones?.map((a) => (
+                    <SelectItem key={a} value={a}>{a}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -971,12 +985,19 @@ export default function Vulnerabilidades() {
 
                 <div className="space-y-2">
                   <Label className="text-zinc-400">Nombre Informe Pentest</Label>
-                  <Input
+                  <Select
                     value={formData.nombre_informe_pentest || ""}
-                    onChange={(e) => setFormData({ ...formData, nombre_informe_pentest: e.target.value })}
-                    className="bg-black/20 border-zinc-700 text-white"
-                    data-testid="input-nombre-informe"
-                  />
+                    onValueChange={(v) => setFormData({ ...formData, nombre_informe_pentest: v })}
+                  >
+                    <SelectTrigger className="bg-black/20 border-zinc-700 text-white" data-testid="input-nombre-informe">
+                      <SelectValue placeholder="Seleccionar..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-900 border-zinc-700 max-h-[300px]">
+                      {options?.informes_pentest?.map((i) => (
+                        <SelectItem key={i} value={i}>{i}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 

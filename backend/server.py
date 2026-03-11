@@ -183,6 +183,21 @@ class ProveedorUpdate(BaseModel):
     nombre: Optional[str] = None
     activo: Optional[bool] = None
 
+# Informe Pentest model
+class InformePentest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    nombre: str
+    activo: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class InformePentestCreate(BaseModel):
+    nombre: str
+
+class InformePentestUpdate(BaseModel):
+    nombre: Optional[str] = None
+    activo: Optional[bool] = None
+
 class DropdownOptions(BaseModel):
     severidades: List[str]
     estatus: List[str]
@@ -607,6 +622,54 @@ async def delete_proveedor(prov_id: str, current_user: CurrentUser = Depends(get
         raise HTTPException(status_code=404, detail="Proveedor no encontrado")
     return {"message": "Proveedor eliminado exitosamente"}
 
+# ============ INFORME PENTEST CONFIGURATION ROUTES ============
+
+@api_router.get("/config/informes-pentest", response_model=List[InformePentest])
+async def get_informes_pentest(current_user: CurrentUser = Depends(get_current_user)):
+    informes = await db.informes_pentest.find({}, {"_id": 0}).to_list(1000)
+    return informes
+
+@api_router.post("/config/informes-pentest", response_model=InformePentest)
+async def create_informe_pentest(data: InformePentestCreate, current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.configuracion.crear:
+        raise HTTPException(status_code=403, detail="No tiene permisos para crear informes")
+    
+    existing = await db.informes_pentest.find_one({"nombre": data.nombre})
+    if existing:
+        raise HTTPException(status_code=400, detail="El informe ya existe")
+    
+    informe = InformePentest(nombre=data.nombre)
+    doc = informe.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.informes_pentest.insert_one(doc)
+    return informe
+
+@api_router.put("/config/informes-pentest/{informe_id}", response_model=InformePentest)
+async def update_informe_pentest(informe_id: str, data: InformePentestUpdate, current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.configuracion.editar:
+        raise HTTPException(status_code=403, detail="No tiene permisos para editar informes")
+    
+    existing = await db.informes_pentest.find_one({"id": informe_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Informe no encontrado")
+    
+    update_dict = data.model_dump(exclude_unset=True)
+    if update_dict:
+        await db.informes_pentest.update_one({"id": informe_id}, {"$set": update_dict})
+    
+    updated = await db.informes_pentest.find_one({"id": informe_id}, {"_id": 0})
+    return updated
+
+@api_router.delete("/config/informes-pentest/{informe_id}")
+async def delete_informe_pentest(informe_id: str, current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.configuracion.eliminar:
+        raise HTTPException(status_code=403, detail="No tiene permisos para eliminar informes")
+    
+    result = await db.informes_pentest.delete_one({"id": informe_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Informe no encontrado")
+    return {"message": "Informe eliminado exitosamente"}
+
 # Initialize default institutions if none exist
 async def init_instituciones():
     count = await db.instituciones.count_documents({})
@@ -669,6 +732,20 @@ async def init_proveedores():
                 await db.proveedores.insert_one(doc)
         
         logging.info(f"Initialized {len([p for p in unique_proveedores if p])} providers from vulnerabilities")
+
+# Initialize informes pentest from existing vulnerabilities
+async def init_informes_pentest():
+    count = await db.informes_pentest.count_documents({})
+    if count == 0:
+        unique_informes = await db.vulnerabilidades.distinct("nombre_informe_pentest")
+        for nombre in unique_informes:
+            if nombre and nombre.strip():
+                informe = InformePentest(nombre=nombre.strip())
+                doc = informe.model_dump()
+                doc['created_at'] = doc['created_at'].isoformat()
+                await db.informes_pentest.insert_one(doc)
+        
+        logging.info(f"Initialized {len([i for i in unique_informes if i])} informes pentest from vulnerabilities")
 
 # Migrate old 'aplicacion' field to new 'aplicaciones' array
 async def migrate_aplicaciones():
@@ -744,8 +821,14 @@ async def get_dropdown_options():
         proveedores = await db.vulnerabilidades.distinct("proveedor")
         proveedores = [p for p in proveedores if p]
     
-    informes = await db.vulnerabilidades.distinct("nombre_informe_pentest")
-    informes = sorted([i for i in informes if i])
+    # Get informes pentest from catalog
+    informes_docs = await db.informes_pentest.find({"activo": True}, {"_id": 0}).to_list(1000)
+    informes = [i["nombre"] for i in informes_docs] if informes_docs else []
+    
+    # Fallback to distinct values
+    if not informes:
+        informes = await db.vulnerabilidades.distinct("nombre_informe_pentest")
+        informes = [i for i in informes if i]
     
     años = set()
     vulns = await db.vulnerabilidades.find({}, {"fecha_hallazgo": 1, "_id": 0}).to_list(10000)
@@ -765,7 +848,7 @@ async def get_dropdown_options():
         instituciones=sorted(instituciones),
         aplicaciones=sorted(aplicaciones),
         resultado_retest=DEFAULT_RESULTADO_RETEST,
-        informes_pentest=informes,
+        informes_pentest=sorted(informes),
         años=sorted(list(años), reverse=True),
         proveedores=sorted(proveedores)
     )
@@ -1047,7 +1130,135 @@ async def get_kpi_detail(
     vulnerabilidades = await db.vulnerabilidades.find(query, {"_id": 0}).to_list(10000)
     return vulnerabilidades
 
-# ============ EXPORT/IMPORT ENDPOINTS ============
+# ============ RISK TRACKING ENDPOINTS ============
+
+@api_router.get("/seguimiento-riesgos")
+async def get_seguimiento_riesgos(
+    filtro: Optional[str] = None,  # "vencidas", "proximas", "todas"
+    severidad: Optional[str] = None,
+    institucion: Optional[str] = None,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Get vulnerabilities with fecha_compromiso for risk tracking.
+    - vencidas: past due date, not resolved
+    - proximas: due within next 30 days
+    - todas: all with fecha_compromiso
+    """
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos para ver el seguimiento de riesgos")
+    
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    future_30 = (datetime.now(timezone.utc) + timedelta(days=30)).strftime("%Y-%m-%d")
+    
+    # Base query: has fecha_compromiso and not resolved
+    query = {
+        "fecha_compromiso": {"$exists": True, "$ne": None, "$ne": ""},
+        "estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]}
+    }
+    
+    if filtro == "vencidas":
+        query["fecha_compromiso"] = {"$lt": today, "$ne": None, "$ne": ""}
+    elif filtro == "proximas":
+        query["$and"] = [
+            {"fecha_compromiso": {"$gte": today}},
+            {"fecha_compromiso": {"$lte": future_30}}
+        ]
+    
+    if severidad:
+        query["severidad"] = severidad
+    if institucion:
+        query["institucion"] = institucion
+    
+    vulns = await db.vulnerabilidades.find(query, {"_id": 0}).to_list(10000)
+    
+    # Add computed status for each vulnerability
+    result = []
+    for v in vulns:
+        fecha_comp = v.get("fecha_compromiso", "")
+        dias_restantes = None
+        estado_seguimiento = "sin_fecha"
+        
+        if fecha_comp:
+            try:
+                fecha_dt = datetime.strptime(fecha_comp, "%Y-%m-%d")
+                today_dt = datetime.now(timezone.utc).replace(tzinfo=None)
+                dias_restantes = (fecha_dt - today_dt).days
+                
+                if dias_restantes < 0:
+                    estado_seguimiento = "vencida"
+                elif dias_restantes <= 7:
+                    estado_seguimiento = "critico"
+                elif dias_restantes <= 30:
+                    estado_seguimiento = "proximo"
+                else:
+                    estado_seguimiento = "ok"
+            except:
+                pass
+        
+        result.append({
+            **v,
+            "dias_restantes": dias_restantes,
+            "estado_seguimiento": estado_seguimiento
+        })
+    
+    # Sort by dias_restantes (most urgent first)
+    result.sort(key=lambda x: (x["dias_restantes"] is None, x["dias_restantes"] or 9999))
+    
+    return result
+
+@api_router.get("/seguimiento-riesgos/resumen")
+async def get_seguimiento_resumen(current_user: CurrentUser = Depends(get_current_user)):
+    """Get summary statistics for risk tracking dashboard"""
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos")
+    
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    future_7 = (datetime.now(timezone.utc) + timedelta(days=7)).strftime("%Y-%m-%d")
+    future_30 = (datetime.now(timezone.utc) + timedelta(days=30)).strftime("%Y-%m-%d")
+    
+    base_query = {
+        "fecha_compromiso": {"$exists": True, "$ne": None, "$ne": ""},
+        "estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]}
+    }
+    
+    # Count overdue
+    vencidas = await db.vulnerabilidades.count_documents({
+        **base_query,
+        "fecha_compromiso": {"$lt": today, "$ne": None, "$ne": ""}
+    })
+    
+    # Count critical (due within 7 days)
+    criticas_query = {
+        "fecha_compromiso": {"$exists": True, "$ne": None, "$ne": ""},
+        "estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]},
+        "$and": [
+            {"fecha_compromiso": {"$gte": today}},
+            {"fecha_compromiso": {"$lte": future_7}}
+        ]
+    }
+    criticas = await db.vulnerabilidades.count_documents(criticas_query)
+    
+    # Count upcoming (due within 30 days)
+    proximas_query = {
+        "fecha_compromiso": {"$exists": True, "$ne": None, "$ne": ""},
+        "estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]},
+        "$and": [
+            {"fecha_compromiso": {"$gt": future_7}},
+            {"fecha_compromiso": {"$lte": future_30}}
+        ]
+    }
+    proximas = await db.vulnerabilidades.count_documents(proximas_query)
+    
+    # Total with fecha_compromiso pending
+    total_pendientes = await db.vulnerabilidades.count_documents(base_query)
+    
+    return {
+        "vencidas": vencidas,
+        "criticas_7_dias": criticas,
+        "proximas_30_dias": proximas,
+        "total_pendientes": total_pendientes
+    }
 
 @api_router.get("/export/csv")
 async def export_csv(current_user: CurrentUser = Depends(get_current_user)):
@@ -1229,6 +1440,7 @@ async def startup_event():
     await init_instituciones()
     await init_aplicaciones()
     await init_proveedores()
+    await init_informes_pentest()
     await migrate_aplicaciones()
     await init_admin_user()
 
