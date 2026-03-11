@@ -516,6 +516,9 @@ export default function Vulnerabilidades() {
             <DialogTitle className="text-xl">
               {editingVuln ? "Editar Vulnerabilidad" : "Nueva Vulnerabilidad"}
             </DialogTitle>
+            <p className="text-sm text-zinc-500">
+              Complete los campos del formulario para {editingVuln ? "actualizar" : "registrar"} la vulnerabilidad
+            </p>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh] pr-4">
             <form onSubmit={handleSubmit} className="space-y-4">
