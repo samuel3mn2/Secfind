@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from "react-router-dom";
-import { Shield, LayoutDashboard, List, Menu, X } from "lucide-react";
+import { Shield, LayoutDashboard, List, Menu, X, Settings } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -9,6 +9,7 @@ export const Layout = () => {
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/vulnerabilidades", icon: List, label: "Vulnerabilidades" },
+    { to: "/configuracion", icon: Settings, label: "Configuración" },
   ];
 
   return (

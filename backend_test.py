@@ -208,6 +208,97 @@ class VulnerabilityAPITester:
                 print(f"   ⚠️  Error parsing dashboard stats: {e}")
         return False
 
+    def test_dashboard_filters(self):
+        """Test dashboard stats with filters"""
+        # Test with año filter
+        params = {'año': 2024}
+        success1, response1 = self.run_test("Dashboard Stats with Año Filter", "GET", "/dashboard/stats", 200, params=params)
+        
+        # Test with institución filter
+        params = {'institucion': 'BHD IB'}
+        success2, response2 = self.run_test("Dashboard Stats with Institución Filter", "GET", "/dashboard/stats", 200, params=params)
+        
+        # Test with multiple filters
+        params = {'año': 2024, 'severidad': 'Critica', 'institucion': 'BHD IB'}
+        success3, response3 = self.run_test("Dashboard Stats with Multiple Filters", "GET", "/dashboard/stats", 200, params=params)
+        
+        if success1 and response1:
+            try:
+                data = response1.json()
+                print(f"   📊 Filtered by año 2024 - Total: {data.get('total_vulnerabilidades', 0)}")
+            except Exception as e:
+                print(f"   ⚠️  Error parsing filtered stats: {e}")
+                
+        if success3 and response3:
+            try:
+                data = response3.json()
+                print(f"   📊 Multi-filter result - Total: {data.get('total_vulnerabilidades', 0)}")
+            except Exception as e:
+                print(f"   ⚠️  Error parsing multi-filter stats: {e}")
+
+        return success1 and success2 and success3
+
+    def test_instituciones_config(self):
+        """Test institutions configuration CRUD"""
+        # Get all institutions
+        success1, response1 = self.run_test("Get Instituciones", "GET", "/config/instituciones", 200)
+        
+        # Create a new institution
+        test_inst_data = {
+            "nombre": f"Test Institution {uuid.uuid4().hex[:8]}"
+        }
+        success2, response2 = self.run_test("Create Institución", "POST", "/config/instituciones", 200, data=test_inst_data)
+        
+        institution_id = None
+        if success2 and response2:
+            try:
+                data = response2.json()
+                institution_id = data.get('id')
+                print(f"   ➕ Created institution with ID: {institution_id}")
+            except Exception as e:
+                print(f"   ⚠️  Error parsing created institution: {e}")
+        
+        # Update institution if created successfully
+        success3 = False
+        if institution_id:
+            update_data = {"nombre": "Updated Test Institution", "activo": False}
+            success3, response3 = self.run_test("Update Institución", "PUT", f"/config/instituciones/{institution_id}", 200, data=update_data)
+            if success3:
+                print(f"   ✏️  Updated institution status to inactive")
+        
+        # Delete the test institution
+        success4 = False
+        if institution_id:
+            success4, response4 = self.run_test("Delete Institución", "DELETE", f"/config/instituciones/{institution_id}", 200)
+            if success4:
+                print(f"   🗑️  Deleted test institution: {institution_id}")
+        
+        return success1 and success2 and success3 and success4
+
+    def test_dropdown_options_enhanced(self):
+        """Test enhanced dropdown options with new fields"""
+        success, response = self.run_test("Enhanced Dropdown Options", "GET", "/dropdown-options", 200)
+        if success and response:
+            try:
+                data = response.json()
+                required_keys = ['severidades', 'estatus', 'instituciones', 'resultado_retest', 'informes_pentest', 'años', 'proveedores']
+                missing_keys = [key for key in required_keys if key not in data]
+                
+                if not missing_keys:
+                    print(f"   📋 Enhanced options loaded:")
+                    print(f"       - {len(data['severidades'])} severidades")
+                    print(f"       - {len(data['estatus'])} estatus")  
+                    print(f"       - {len(data['instituciones'])} instituciones")
+                    print(f"       - {len(data.get('informes_pentest', []))} informes pentest")
+                    print(f"       - {len(data.get('años', []))} años available")
+                    print(f"       - {len(data.get('proveedores', []))} proveedores")
+                    return True
+                else:
+                    print(f"   ⚠️  Missing required keys: {missing_keys}")
+            except Exception as e:
+                print(f"   ⚠️  Error parsing enhanced dropdown options: {e}")
+        return False
+
     def test_export_excel(self):
         """Test Excel export"""
         try:
@@ -271,6 +362,10 @@ class VulnerabilityAPITester:
         # Basic endpoint tests
         self.test_root_endpoint()
         self.test_dropdown_options()
+        self.test_dropdown_options_enhanced()
+
+        # Configuration module tests (NEW FEATURES)
+        self.test_instituciones_config()
 
         # Vulnerabilidades CRUD tests
         vulnerabilidades = self.test_get_vulnerabilidades()
@@ -280,8 +375,9 @@ class VulnerabilityAPITester:
         self.test_get_single_vulnerabilidad()
         self.test_update_vulnerabilidad()
 
-        # Dashboard and export tests
+        # Dashboard and export tests (ENHANCED)
         self.test_dashboard_stats()
+        self.test_dashboard_filters()
         self.test_export_excel()
         self.test_export_csv()
 

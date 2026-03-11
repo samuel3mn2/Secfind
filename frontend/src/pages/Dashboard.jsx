@@ -1,7 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, AlertTriangle, CheckCircle2, Clock, TrendingUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Shield, AlertTriangle, CheckCircle2, Clock, TrendingUp, Filter, X } from "lucide-react";
 import {
   PieChart,
   Pie,
@@ -33,7 +41,7 @@ const STATUS_COLORS = {
   Desestimado: "#71717a",
 };
 
-const INSTITUTION_COLORS = ["#6366f1", "#06b6d4", "#f97316", "#22c55e", "#ef4444"];
+const INSTITUTION_COLORS = ["#6366f1", "#06b6d4", "#f97316", "#22c55e", "#ef4444", "#8b5cf6", "#ec4899"];
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
@@ -50,21 +58,60 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [options, setOptions] = useState(null);
+  
+  // Filters
+  const [filterAño, setFilterAño] = useState("");
+  const [filterInstitucion, setFilterInstitucion] = useState("");
+  const [filterInforme, setFilterInforme] = useState("");
+  const [filterSeveridad, setFilterSeveridad] = useState("");
+  const [filterProveedor, setFilterProveedor] = useState("");
 
   useEffect(() => {
-    fetchStats();
+    fetchOptions();
   }, []);
 
-  const fetchStats = async () => {
+  const fetchOptions = async () => {
     try {
-      const response = await axios.get(`${API}/dashboard/stats`);
+      const response = await axios.get(`${API}/dropdown-options`);
+      setOptions(response.data);
+    } catch (error) {
+      console.error("Error fetching options:", error);
+    }
+  };
+
+  const fetchStats = useCallback(async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams();
+      if (filterAño && filterAño !== "all") params.append("año", filterAño);
+      if (filterInstitucion && filterInstitucion !== "all") params.append("institucion", filterInstitucion);
+      if (filterInforme && filterInforme !== "all") params.append("informe_pentest", filterInforme);
+      if (filterSeveridad && filterSeveridad !== "all") params.append("severidad", filterSeveridad);
+      if (filterProveedor && filterProveedor !== "all") params.append("proveedor", filterProveedor);
+      
+      const response = await axios.get(`${API}/dashboard/stats?${params.toString()}`);
       setStats(response.data);
     } catch (error) {
       console.error("Error fetching stats:", error);
     } finally {
       setLoading(false);
     }
+  }, [filterAño, filterInstitucion, filterInforme, filterSeveridad, filterProveedor]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  const clearFilters = () => {
+    setFilterAño("");
+    setFilterInstitucion("");
+    setFilterInforme("");
+    setFilterSeveridad("");
+    setFilterProveedor("");
   };
+
+  const hasActiveFilters = filterAño || filterInstitucion || filterInforme || filterSeveridad || filterProveedor;
 
   const formatSeverityData = () => {
     if (!stats?.por_severidad) return [];
@@ -93,7 +140,7 @@ export default function Dashboard() {
     }));
   };
 
-  if (loading) {
+  if (loading && !stats) {
     return (
       <div className="p-6 md:p-8 lg:p-12">
         <div className="animate-pulse space-y-6">
@@ -109,7 +156,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="p-6 md:p-8 lg:p-12 space-y-8" data-testid="dashboard-page">
+    <div className="p-6 md:p-8 lg:p-12 space-y-6" data-testid="dashboard-page">
       {/* Header */}
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
@@ -119,6 +166,113 @@ export default function Dashboard() {
           Vista general del estado de seguridad
         </p>
       </div>
+
+      {/* Filters Card */}
+      <Card className="bg-[#18181b] border-[#27272a]">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base text-white flex items-center gap-2">
+            <Filter className="w-4 h-4 text-indigo-500" />
+            Filtros del Dashboard
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="ml-auto text-zinc-400 hover:text-white"
+                data-testid="clear-filters-btn"
+              >
+                <X className="w-4 h-4 mr-1" />
+                Limpiar filtros
+              </Button>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            {/* Año Filter */}
+            <div className="space-y-1.5">
+              <label className="text-xs text-zinc-500 font-medium">Año</label>
+              <Select value={filterAño} onValueChange={setFilterAño}>
+                <SelectTrigger className="bg-black/20 border-zinc-700 text-white" data-testid="filter-año">
+                  <SelectValue placeholder="Todos los años" />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-900 border-zinc-700">
+                  <SelectItem value="all">Todos los años</SelectItem>
+                  {options?.años?.map((año) => (
+                    <SelectItem key={año} value={String(año)}>{año}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Institución Filter */}
+            <div className="space-y-1.5">
+              <label className="text-xs text-zinc-500 font-medium">Institución</label>
+              <Select value={filterInstitucion} onValueChange={setFilterInstitucion}>
+                <SelectTrigger className="bg-black/20 border-zinc-700 text-white" data-testid="filter-institucion">
+                  <SelectValue placeholder="Todas" />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-900 border-zinc-700">
+                  <SelectItem value="all">Todas las instituciones</SelectItem>
+                  {options?.instituciones?.map((inst) => (
+                    <SelectItem key={inst} value={inst}>{inst}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Informe Pentest Filter */}
+            <div className="space-y-1.5">
+              <label className="text-xs text-zinc-500 font-medium">Informe Pentest</label>
+              <Select value={filterInforme} onValueChange={setFilterInforme}>
+                <SelectTrigger className="bg-black/20 border-zinc-700 text-white" data-testid="filter-informe">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-900 border-zinc-700 max-h-[300px]">
+                  <SelectItem value="all">Todos los informes</SelectItem>
+                  {options?.informes_pentest?.map((informe) => (
+                    <SelectItem key={informe} value={informe} className="text-xs">
+                      {informe.length > 40 ? `${informe.substring(0, 40)}...` : informe}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Severidad Filter */}
+            <div className="space-y-1.5">
+              <label className="text-xs text-zinc-500 font-medium">Severidad</label>
+              <Select value={filterSeveridad} onValueChange={setFilterSeveridad}>
+                <SelectTrigger className="bg-black/20 border-zinc-700 text-white" data-testid="filter-severidad">
+                  <SelectValue placeholder="Todas" />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-900 border-zinc-700">
+                  <SelectItem value="all">Todas las severidades</SelectItem>
+                  {options?.severidades?.map((sev) => (
+                    <SelectItem key={sev} value={sev}>{sev}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Proveedor Filter */}
+            <div className="space-y-1.5">
+              <label className="text-xs text-zinc-500 font-medium">Proveedor</label>
+              <Select value={filterProveedor} onValueChange={setFilterProveedor}>
+                <SelectTrigger className="bg-black/20 border-zinc-700 text-white" data-testid="filter-proveedor">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-900 border-zinc-700">
+                  <SelectItem value="all">Todos los proveedores</SelectItem>
+                  {options?.proveedores?.map((prov) => (
+                    <SelectItem key={prov} value={prov}>{prov}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -199,27 +353,33 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="h-[280px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={formatSeverityData()}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={90}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {formatSeverityData().map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend
-                    formatter={(value) => <span className="text-zinc-400 text-sm">{value}</span>}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              {formatSeverityData().length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={formatSeverityData()}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {formatSeverityData().map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend
+                      formatter={(value) => <span className="text-zinc-400 text-sm">{value}</span>}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-zinc-500">
+                  Sin datos para mostrar
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -234,21 +394,27 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="h-[280px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={formatStatusData()} layout="vertical">
-                  <XAxis type="number" stroke="#71717a" fontSize={12} />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    stroke="#71717a"
-                    fontSize={11}
-                    width={90}
-                    tickLine={false}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="value" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {formatStatusData().length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={formatStatusData()} layout="vertical">
+                    <XAxis type="number" stroke="#71717a" fontSize={12} />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      stroke="#71717a"
+                      fontSize={11}
+                      width={90}
+                      tickLine={false}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="value" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-zinc-500">
+                  Sin datos para mostrar
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -263,22 +429,28 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="h-[280px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={formatInstitutionData()}>
-                  <XAxis
-                    dataKey="name"
-                    stroke="#71717a"
-                    fontSize={10}
-                    tickLine={false}
-                    angle={-20}
-                    textAnchor="end"
-                    height={60}
-                  />
-                  <YAxis stroke="#71717a" fontSize={12} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="value" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {formatInstitutionData().length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={formatInstitutionData()}>
+                    <XAxis
+                      dataKey="name"
+                      stroke="#71717a"
+                      fontSize={10}
+                      tickLine={false}
+                      angle={-20}
+                      textAnchor="end"
+                      height={60}
+                    />
+                    <YAxis stroke="#71717a" fontSize={12} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="value" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-zinc-500">
+                  Sin datos para mostrar
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

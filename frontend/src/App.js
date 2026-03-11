@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import Dashboard from "@/pages/Dashboard";
 import Vulnerabilidades from "@/pages/Vulnerabilidades";
+import Configuracion from "@/pages/Configuracion";
 import Layout from "@/components/Layout";
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
           <Route path="/" element={<Layout />}>
             <Route index element={<Dashboard />} />
             <Route path="vulnerabilidades" element={<Vulnerabilidades />} />
+            <Route path="configuracion" element={<Configuracion />} />
           </Route>
         </Routes>
       </BrowserRouter>
