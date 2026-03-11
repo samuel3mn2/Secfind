@@ -9,7 +9,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Shield, AlertTriangle, CheckCircle2, Clock, TrendingUp, Filter, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Shield, AlertTriangle, CheckCircle2, Clock, TrendingUp, Filter, X, ExternalLink } from "lucide-react";
 import {
   PieChart,
   Pie,
@@ -21,6 +36,9 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  LineChart,
+  Line,
+  CartesianGrid,
 } from "recharts";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -43,6 +61,13 @@ const STATUS_COLORS = {
 
 const INSTITUTION_COLORS = ["#6366f1", "#06b6d4", "#f97316", "#22c55e", "#ef4444", "#8b5cf6", "#ec4899"];
 
+const TREND_COLORS = {
+  total: "#6366f1",
+  criticas: "#ef4444",
+  corregidas: "#22c55e",
+  pendientes: "#eab308",
+};
+
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
@@ -55,10 +80,56 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
+const TrendTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 shadow-lg">
+        <p className="text-white text-sm font-medium mb-1">{label}</p>
+        {payload.map((entry, index) => (
+          <p key={index} className="text-sm" style={{ color: entry.color }}>
+            {entry.name}: {entry.value}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
+const SeverityBadge = ({ severity }) => {
+  const classes = {
+    Critica: "bg-red-500/15 text-red-500 border-red-500/30",
+    Alta: "bg-orange-500/15 text-orange-500 border-orange-500/30",
+    Media: "bg-yellow-500/15 text-yellow-500 border-yellow-500/30",
+    Baja: "bg-blue-500/15 text-blue-500 border-blue-500/30",
+  };
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${classes[severity] || ""}`}>
+      {severity}
+    </span>
+  );
+};
+
+const StatusBadge = ({ status }) => {
+  const getClass = (s) => {
+    if (["Cerrado", "Corregido"].includes(s)) return "bg-green-500/15 text-green-500 border-green-500/30";
+    if (["Pendiente", "En Proceso"].includes(s)) return "bg-yellow-500/15 text-yellow-500 border-yellow-500/30";
+    if (s === "Para Re Test") return "bg-blue-500/15 text-blue-500 border-blue-500/30";
+    return "bg-zinc-500/15 text-zinc-400 border-zinc-500/30";
+  };
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getClass(status)}`}>
+      {status}
+    </span>
+  );
+};
+
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
+  const [tendencias, setTendencias] = useState([]);
   const [loading, setLoading] = useState(true);
   const [options, setOptions] = useState(null);
+  const [tipoTendencia, setTipoTendencia] = useState("mensual");
   
   // Filters
   const [filterAño, setFilterAño] = useState("");
@@ -67,9 +138,21 @@ export default function Dashboard() {
   const [filterSeveridad, setFilterSeveridad] = useState("");
   const [filterProveedor, setFilterProveedor] = useState("");
 
+  // KPI Detail Modal
+  const [showKpiModal, setShowKpiModal] = useState(false);
+  const [kpiType, setKpiType] = useState("");
+  const [kpiTitle, setKpiTitle] = useState("");
+  const [kpiData, setKpiData] = useState([]);
+  const [loadingKpi, setLoadingKpi] = useState(false);
+
   useEffect(() => {
     fetchOptions();
+    fetchTendencias();
   }, []);
+
+  useEffect(() => {
+    fetchTendencias();
+  }, [tipoTendencia]);
 
   const fetchOptions = async () => {
     try {
@@ -77,6 +160,15 @@ export default function Dashboard() {
       setOptions(response.data);
     } catch (error) {
       console.error("Error fetching options:", error);
+    }
+  };
+
+  const fetchTendencias = async () => {
+    try {
+      const response = await axios.get(`${API}/dashboard/tendencias?tipo=${tipoTendencia}`);
+      setTendencias(response.data);
+    } catch (error) {
+      console.error("Error fetching tendencias:", error);
     }
   };
 
@@ -102,6 +194,31 @@ export default function Dashboard() {
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
+
+  const handleKpiClick = async (tipo, titulo) => {
+    setKpiType(tipo);
+    setKpiTitle(titulo);
+    setShowKpiModal(true);
+    setLoadingKpi(true);
+    
+    try {
+      const params = new URLSearchParams();
+      params.append("tipo", tipo);
+      if (filterAño && filterAño !== "all") params.append("año", filterAño);
+      if (filterInstitucion && filterInstitucion !== "all") params.append("institucion", filterInstitucion);
+      if (filterInforme && filterInforme !== "all") params.append("informe_pentest", filterInforme);
+      if (filterSeveridad && filterSeveridad !== "all") params.append("severidad", filterSeveridad);
+      if (filterProveedor && filterProveedor !== "all") params.append("proveedor", filterProveedor);
+      
+      const response = await axios.get(`${API}/dashboard/kpi-detail?${params.toString()}`);
+      setKpiData(response.data);
+    } catch (error) {
+      console.error("Error fetching KPI detail:", error);
+      setKpiData([]);
+    } finally {
+      setLoadingKpi(false);
+    }
+  };
 
   const clearFilters = () => {
     setFilterAño("");
@@ -274,15 +391,22 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* KPI Cards */}
+      {/* KPI Cards - Clickable */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-[#18181b] border-[#27272a] kpi-card" data-testid="kpi-total">
+        <Card 
+          className="bg-[#18181b] border-[#27272a] kpi-card cursor-pointer hover:border-indigo-500/50 transition-colors" 
+          data-testid="kpi-total"
+          onClick={() => handleKpiClick("total", "Total Vulnerabilidades")}
+        >
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-zinc-500 text-sm font-medium">Total Vulnerabilidades</p>
                 <p className="text-3xl font-bold text-white mt-2">
                   {stats?.total_vulnerabilidades || 0}
+                </p>
+                <p className="text-xs text-indigo-400 mt-1 flex items-center gap-1">
+                  <ExternalLink className="w-3 h-3" /> Click para ver detalle
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-indigo-500/10">
@@ -292,13 +416,20 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="bg-[#18181b] border-[#27272a] kpi-card" data-testid="kpi-criticas">
+        <Card 
+          className="bg-[#18181b] border-[#27272a] kpi-card cursor-pointer hover:border-red-500/50 transition-colors" 
+          data-testid="kpi-criticas"
+          onClick={() => handleKpiClick("criticas_abiertas", "Críticas Abiertas")}
+        >
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-zinc-500 text-sm font-medium">Criticas Abiertas</p>
+                <p className="text-zinc-500 text-sm font-medium">Críticas Abiertas</p>
                 <p className="text-3xl font-bold text-red-500 mt-2">
                   {stats?.criticas_abiertas || 0}
+                </p>
+                <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
+                  <ExternalLink className="w-3 h-3" /> Click para ver detalle
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-red-500/10">
@@ -308,13 +439,20 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="bg-[#18181b] border-[#27272a] kpi-card" data-testid="kpi-corregidas">
+        <Card 
+          className="bg-[#18181b] border-[#27272a] kpi-card cursor-pointer hover:border-green-500/50 transition-colors" 
+          data-testid="kpi-corregidas"
+          onClick={() => handleKpiClick("corregidas", "Vulnerabilidades Corregidas")}
+        >
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-zinc-500 text-sm font-medium">Corregidas</p>
                 <p className="text-3xl font-bold text-green-500 mt-2">
                   {stats?.vulnerabilidades_corregidas || 0}
+                </p>
+                <p className="text-xs text-green-400 mt-1 flex items-center gap-1">
+                  <ExternalLink className="w-3 h-3" /> Click para ver detalle
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-green-500/10">
@@ -324,13 +462,20 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="bg-[#18181b] border-[#27272a] kpi-card" data-testid="kpi-pendientes">
+        <Card 
+          className="bg-[#18181b] border-[#27272a] kpi-card cursor-pointer hover:border-yellow-500/50 transition-colors" 
+          data-testid="kpi-pendientes"
+          onClick={() => handleKpiClick("pendientes", "Vulnerabilidades Pendientes")}
+        >
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-zinc-500 text-sm font-medium">Pendientes</p>
                 <p className="text-3xl font-bold text-yellow-500 mt-2">
                   {stats?.pendientes || 0}
+                </p>
+                <p className="text-xs text-yellow-400 mt-1 flex items-center gap-1">
+                  <ExternalLink className="w-3 h-3" /> Click para ver detalle
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-yellow-500/10">
@@ -340,6 +485,87 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Tendencias Chart - NEW */}
+      <Card className="bg-[#18181b] border-[#27272a]" data-testid="chart-tendencias">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg text-white flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-indigo-500" />
+              Evolución de Vulnerabilidades
+            </CardTitle>
+            <Select value={tipoTendencia} onValueChange={setTipoTendencia}>
+              <SelectTrigger className="w-[140px] bg-black/20 border-zinc-700 text-white" data-testid="tendencia-tipo">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-zinc-900 border-zinc-700">
+                <SelectItem value="mensual">Mensual</SelectItem>
+                <SelectItem value="trimestral">Trimestral</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px]">
+            {tendencias.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={tendencias}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                  <XAxis 
+                    dataKey="periodo" 
+                    stroke="#71717a" 
+                    fontSize={11}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                  />
+                  <YAxis stroke="#71717a" fontSize={12} />
+                  <Tooltip content={<TrendTooltip />} />
+                  <Legend 
+                    formatter={(value) => <span className="text-zinc-400 text-sm">{value}</span>}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="total" 
+                    name="Total"
+                    stroke={TREND_COLORS.total} 
+                    strokeWidth={2}
+                    dot={{ fill: TREND_COLORS.total, strokeWidth: 0, r: 4 }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="criticas" 
+                    name="Críticas"
+                    stroke={TREND_COLORS.criticas} 
+                    strokeWidth={2}
+                    dot={{ fill: TREND_COLORS.criticas, strokeWidth: 0, r: 4 }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="corregidas" 
+                    name="Corregidas"
+                    stroke={TREND_COLORS.corregidas} 
+                    strokeWidth={2}
+                    dot={{ fill: TREND_COLORS.corregidas, strokeWidth: 0, r: 4 }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="pendientes" 
+                    name="Pendientes"
+                    stroke={TREND_COLORS.pendientes} 
+                    strokeWidth={2}
+                    dot={{ fill: TREND_COLORS.pendientes, strokeWidth: 0, r: 4 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-zinc-500">
+                Sin datos de tendencias
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -424,7 +650,7 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle className="text-lg text-white flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-orange-500" />
-              Por Institucion
+              Por Institución
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -455,6 +681,72 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* KPI Detail Modal */}
+      <Dialog open={showKpiModal} onOpenChange={setShowKpiModal}>
+        <DialogContent className="bg-[#18181b] border-[#27272a] text-white max-w-5xl max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="text-xl flex items-center gap-2">
+              {kpiType === "criticas_abiertas" && <AlertTriangle className="w-5 h-5 text-red-500" />}
+              {kpiType === "pendientes" && <Clock className="w-5 h-5 text-yellow-500" />}
+              {kpiType === "corregidas" && <CheckCircle2 className="w-5 h-5 text-green-500" />}
+              {kpiType === "total" && <Shield className="w-5 h-5 text-indigo-500" />}
+              {kpiTitle}
+              <span className="text-zinc-500 text-base font-normal ml-2">
+                ({kpiData.length} registros)
+              </span>
+            </DialogTitle>
+          </DialogHeader>
+          
+          <ScrollArea className="h-[60vh]">
+            {loadingKpi ? (
+              <div className="flex items-center justify-center h-40">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500" />
+              </div>
+            ) : kpiData.length === 0 ? (
+              <div className="flex items-center justify-center h-40 text-zinc-500">
+                No hay vulnerabilidades en esta categoría
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-zinc-700 hover:bg-transparent">
+                    <TableHead className="text-zinc-400">Fecha</TableHead>
+                    <TableHead className="text-zinc-400">Institución</TableHead>
+                    <TableHead className="text-zinc-400">Aplicación</TableHead>
+                    <TableHead className="text-zinc-400 min-w-[250px]">Vulnerabilidad</TableHead>
+                    <TableHead className="text-zinc-400">Severidad</TableHead>
+                    <TableHead className="text-zinc-400">Estatus</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {kpiData.map((vuln, index) => (
+                    <TableRow 
+                      key={vuln.id || index} 
+                      className={`border-zinc-800 hover:bg-white/5 ${vuln.severidad === "Critica" ? "border-l-2 border-l-red-500" : ""}`}
+                    >
+                      <TableCell className="text-zinc-300 font-mono text-xs">
+                        {vuln.fecha_hallazgo || "-"}
+                      </TableCell>
+                      <TableCell className="text-zinc-300">{vuln.institucion || "-"}</TableCell>
+                      <TableCell className="text-zinc-300">{vuln.aplicacion || "-"}</TableCell>
+                      <TableCell className="text-zinc-100 text-sm">
+                        {vuln.vulnerabilidad || "-"}
+                      </TableCell>
+                      <TableCell>
+                        <SeverityBadge severity={vuln.severidad} />
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={vuln.estatus} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

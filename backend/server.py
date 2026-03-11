@@ -94,6 +94,13 @@ class DashboardStats(BaseModel):
     por_estatus: dict
     por_institucion: dict
 
+class TendenciaItem(BaseModel):
+    periodo: str
+    total: int
+    criticas: int
+    corregidas: int
+    pendientes: int
+
 class DashboardFilters(BaseModel):
     año: Optional[int] = None
     institucion: Optional[str] = None
@@ -365,6 +372,96 @@ async def get_dashboard_stats(
         "por_estatus": por_estatus,
         "por_institucion": por_institucion
     }
+
+@api_router.get("/dashboard/tendencias")
+async def get_dashboard_tendencias(
+    tipo: str = "mensual"  # mensual o trimestral
+):
+    """Get vulnerability trends by month or quarter"""
+    from collections import defaultdict
+    
+    vulns = await db.vulnerabilidades.find({}, {"fecha_hallazgo": 1, "severidad": 1, "estatus": 1, "_id": 0}).to_list(10000)
+    
+    tendencias = defaultdict(lambda: {"total": 0, "criticas": 0, "corregidas": 0, "pendientes": 0})
+    
+    for v in vulns:
+        fecha = v.get("fecha_hallazgo")
+        if not fecha:
+            continue
+        
+        try:
+            year = fecha[:4]
+            month = fecha[5:7] if len(fecha) >= 7 else "01"
+            
+            if tipo == "trimestral":
+                quarter = (int(month) - 1) // 3 + 1
+                periodo = f"{year}-Q{quarter}"
+            else:
+                periodo = f"{year}-{month}"
+            
+            tendencias[periodo]["total"] += 1
+            
+            if v.get("severidad") == "Critica":
+                tendencias[periodo]["criticas"] += 1
+            
+            estatus = v.get("estatus", "")
+            if estatus in ["Corregido", "Cerrado"]:
+                tendencias[periodo]["corregidas"] += 1
+            elif estatus in ["Pendiente", "En Proceso", "Para Re Test"]:
+                tendencias[periodo]["pendientes"] += 1
+                
+        except:
+            continue
+    
+    # Sort by period and return
+    result = []
+    for periodo in sorted(tendencias.keys()):
+        data = tendencias[periodo]
+        result.append({
+            "periodo": periodo,
+            "total": data["total"],
+            "criticas": data["criticas"],
+            "corregidas": data["corregidas"],
+            "pendientes": data["pendientes"]
+        })
+    
+    return result
+
+@api_router.get("/dashboard/kpi-detail")
+async def get_kpi_detail(
+    tipo: str,  # criticas_abiertas, pendientes, corregidas
+    año: Optional[int] = None,
+    institucion: Optional[str] = None,
+    informe_pentest: Optional[str] = None,
+    severidad: Optional[str] = None,
+    proveedor: Optional[str] = None
+):
+    """Get vulnerabilities for a specific KPI card"""
+    query = {}
+    
+    # Apply common filters
+    if año:
+        query["fecha_hallazgo"] = {"$regex": f"^{año}"}
+    if institucion:
+        query["institucion"] = institucion
+    if informe_pentest:
+        query["nombre_informe_pentest"] = informe_pentest
+    if severidad:
+        query["severidad"] = severidad
+    if proveedor:
+        query["proveedor"] = proveedor
+    
+    # Apply KPI-specific filters
+    if tipo == "criticas_abiertas":
+        query["severidad"] = "Critica"
+        query["estatus"] = {"$nin": ["Cerrado", "Corregido", "Desestimado"]}
+    elif tipo == "pendientes":
+        query["estatus"] = {"$in": ["Pendiente", "En Proceso", "Para Re Test"]}
+    elif tipo == "corregidas":
+        query["estatus"] = {"$in": ["Corregido", "Cerrado"]}
+    
+    vulnerabilidades = await db.vulnerabilidades.find(query, {"_id": 0}).to_list(10000)
+    return vulnerabilidades
 
 # ============ EXPORT/IMPORT ENDPOINTS ============
 
