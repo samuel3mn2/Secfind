@@ -6,7 +6,7 @@ Aplicación web para la Gestión de Vulnerabilidades de Ciberseguridad, reemplaz
 ## Arquitectura
 - **Backend**: FastAPI + MongoDB (Motor async)
 - **Frontend**: React + Shadcn UI + Recharts
-- **Base de datos**: MongoDB (colecciones: vulnerabilidades, instituciones, aplicaciones, proveedores, usuarios)
+- **Base de datos**: MongoDB (colecciones: vulnerabilidades, instituciones, aplicaciones, proveedores, informes_pentest, usuarios)
 - **Autenticación**: JWT con bcrypt
 
 ## Usuarios
@@ -24,23 +24,33 @@ Aplicación web para la Gestión de Vulnerabilidades de Ciberseguridad, reemplaz
 - [x] **Filtros dinámicos**: Año, Institución, Informe Pentest, Severidad, Proveedor
 - [x] Botón "Limpiar filtros"
 - [x] KPIs clickeables con modal de detalle
-- [x] KPIs y gráficos se actualizan con filtros
 
 ### Gestión de Vulnerabilidades
 - [x] Tabla CRUD con búsqueda y filtros
 - [x] Modal para crear/editar vulnerabilidades
 - [x] Eliminación con confirmación
 - [x] Campos dropdown predefinidos
-- [x] Filtro por Año
-- [x] Filtro por Aplicación
-- [x] **Campo Aplicaciones como multi-select**
-- [x] **Campo Proveedor como dropdown del catálogo**
+- [x] **Filtro por Año**
+- [x] **Filtro por Aplicación**
+- [x] Campo Aplicaciones como multi-select
+- [x] Campo Proveedor como dropdown del catálogo
+- [x] **Campo Informe Pentest como dropdown del catálogo**
 - [x] 225 vulnerabilidades importadas del Excel
+
+### Módulo de Seguimiento de Riesgos (NUEVO)
+- [x] **Página dedicada /seguimiento-riesgos**
+- [x] KPIs: Vencidas, Próximos 7 días, Próximos 30 días, Total Pendientes
+- [x] KPIs clickeables para filtrar la tabla
+- [x] Tabla con estado de seguimiento, días restantes, severidad
+- [x] Filtros por severidad e institución
+- [x] Modal de detalle de vulnerabilidad
+- [x] Cálculo automático de días restantes
 
 ### Módulo de Configuración
 - [x] CRUD de Instituciones
 - [x] CRUD de Aplicaciones
-- [x] **CRUD de Proveedores**
+- [x] CRUD de Proveedores
+- [x] **CRUD de Informes Pentest**
 - [x] CRUD de Usuarios
 - [x] Activar/Desactivar elementos de catálogo
 - [x] Catálogos dinámicos en todos los dropdowns
@@ -63,12 +73,19 @@ Aplicación web para la Gestión de Vulnerabilidades de Ciberseguridad, reemplaz
 
 ## Catálogos del Sistema
 - **Instituciones**: Extraídas de datos existentes (BHD)
-- **Aplicaciones**: 58 aplicaciones únicas extraídas y normalizadas
+- **Aplicaciones**: 49 aplicaciones únicas
 - **Proveedores**: F2TC, GBM, Pentraze, SISAP
+- **Informes Pentest**: 28 informes únicos extraídos
 
 ## Historial de Implementación
 
-### 11 Marzo 2026
+### 11 Marzo 2026 - Sesión 2
+- **Filtro por Aplicación** en página de Vulnerabilidades
+- **Catálogo de Informes Pentest** en Configuración
+- **Módulo de Seguimiento de Riesgos** para fechas de compromiso
+- Campo Informe Pentest cambiado a dropdown
+
+### 11 Marzo 2026 - Sesión 1
 - Dashboard con filtros avanzados (5 filtros)
 - Módulo de configuración para instituciones
 - Sistema de autenticación y permisos
@@ -78,8 +95,8 @@ Aplicación web para la Gestión de Vulnerabilidades de Ciberseguridad, reemplaz
 - Refactorización del campo `aplicacion` a `aplicaciones` (array)
 - Multi-select de aplicaciones en formulario
 - Filtro por año en vulnerabilidades
-- **Módulo de Proveedores en Configuración**
-- **Campo Proveedor como dropdown del catálogo**
+- Módulo de Proveedores en Configuración
+- Campo Proveedor como dropdown del catálogo
 
 ## Backlog
 
@@ -99,6 +116,13 @@ Aplicación web para la Gestión de Vulnerabilidades de Ciberseguridad, reemplaz
 ## Credenciales de Prueba
 - **Usuario**: admin
 - **Contraseña**: admin123
+
+## Rutas de la Aplicación
+- `/` - Dashboard
+- `/vulnerabilidades` - Gestión de Vulnerabilidades
+- `/seguimiento-riesgos` - Seguimiento de Riesgos
+- `/configuracion` - Configuración del Sistema
+- `/login` - Inicio de Sesión
 
 ## Documentación
 - `/app/README.md` - Guía general del proyecto
