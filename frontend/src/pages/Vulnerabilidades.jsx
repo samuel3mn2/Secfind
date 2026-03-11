@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,8 +48,7 @@ import {
   Pencil,
   Trash2,
   FileSpreadsheet,
-  FileText,
-  X,
+  Eye,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -86,6 +86,7 @@ const StatusBadge = ({ status }) => {
 };
 
 export default function Vulnerabilidades() {
+  const { isAdmin, canCreate, canEdit, canDelete } = useAuth();
   const [vulnerabilidades, setVulnerabilidades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [options, setOptions] = useState(null);
@@ -94,6 +95,8 @@ export default function Vulnerabilidades() {
   const [filterEstatus, setFilterEstatus] = useState("");
   const [filterInstitucion, setFilterInstitucion] = useState("");
   const [showModal, setShowModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewingVuln, setViewingVuln] = useState(null);
   const [editingVuln, setEditingVuln] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -116,6 +119,10 @@ export default function Vulnerabilidades() {
     nombre_informe_pentest: "",
     proveedor: "",
   });
+
+  const canModify = isAdmin || canEdit("vulnerabilidades");
+  const canRemove = isAdmin || canDelete("vulnerabilidades");
+  const canAdd = isAdmin || canCreate("vulnerabilidades");
 
   const fetchOptions = async () => {
     try {
@@ -155,6 +162,11 @@ export default function Vulnerabilidades() {
     }, 300);
     return () => clearTimeout(debounce);
   }, [fetchVulnerabilidades]);
+
+  const handleView = (vuln) => {
+    setViewingVuln(vuln);
+    setShowViewModal(true);
+  };
 
   const handleOpenModal = (vuln = null) => {
     if (vuln) {
@@ -289,14 +301,16 @@ export default function Vulnerabilidades() {
             {vulnerabilidades.length} registros encontrados
           </p>
         </div>
-        <Button
-          onClick={() => handleOpenModal()}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/20"
-          data-testid="add-vuln-btn"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Nueva Vulnerabilidad
-        </Button>
+        {canAdd && (
+          <Button
+            onClick={() => handleOpenModal()}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/20"
+            data-testid="add-vuln-btn"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Nueva Vulnerabilidad
+          </Button>
+        )}
       </div>
 
       {/* Filters & Actions */}
@@ -355,36 +369,40 @@ export default function Vulnerabilidades() {
 
               {/* Import/Export */}
               <div className="flex gap-2 ml-auto">
-                <label className="cursor-pointer">
-                  <input
-                    type="file"
-                    accept=".xlsx,.xls"
-                    className="hidden"
-                    onChange={(e) => handleImport(e, "excel")}
-                    disabled={uploading}
-                  />
-                  <Button variant="outline" size="sm" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800" asChild>
-                    <span data-testid="import-excel-btn">
-                      <Upload className="w-4 h-4 mr-1" />
-                      Excel
-                    </span>
-                  </Button>
-                </label>
-                <label className="cursor-pointer">
-                  <input
-                    type="file"
-                    accept=".csv"
-                    className="hidden"
-                    onChange={(e) => handleImport(e, "csv")}
-                    disabled={uploading}
-                  />
-                  <Button variant="outline" size="sm" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800" asChild>
-                    <span data-testid="import-csv-btn">
-                      <Upload className="w-4 h-4 mr-1" />
-                      CSV
-                    </span>
-                  </Button>
-                </label>
+                {canAdd && (
+                  <>
+                    <label className="cursor-pointer">
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls"
+                        className="hidden"
+                        onChange={(e) => handleImport(e, "excel")}
+                        disabled={uploading}
+                      />
+                      <Button variant="outline" size="sm" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800" asChild>
+                        <span data-testid="import-excel-btn">
+                          <Upload className="w-4 h-4 mr-1" />
+                          Excel
+                        </span>
+                      </Button>
+                    </label>
+                    <label className="cursor-pointer">
+                      <input
+                        type="file"
+                        accept=".csv"
+                        className="hidden"
+                        onChange={(e) => handleImport(e, "csv")}
+                        disabled={uploading}
+                      />
+                      <Button variant="outline" size="sm" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800" asChild>
+                        <span data-testid="import-csv-btn">
+                          <Upload className="w-4 h-4 mr-1" />
+                          CSV
+                        </span>
+                      </Button>
+                    </label>
+                  </>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -452,21 +470,34 @@ export default function Vulnerabilidades() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-zinc-700"
-                            onClick={() => handleOpenModal(vuln)}
-                            data-testid={`edit-btn-${vuln.id}`}
+                            className="h-8 w-8 text-zinc-400 hover:text-cyan-400 hover:bg-cyan-500/10"
+                            onClick={() => handleView(vuln)}
+                            data-testid={`view-btn-${vuln.id}`}
                           >
-                            <Pencil className="w-4 h-4" />
+                            <Eye className="w-4 h-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-zinc-400 hover:text-red-500 hover:bg-red-500/10"
-                            onClick={() => setDeleteId(vuln.id)}
-                            data-testid={`delete-btn-${vuln.id}`}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          {canModify && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-zinc-700"
+                              onClick={() => handleOpenModal(vuln)}
+                              data-testid={`edit-btn-${vuln.id}`}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {canRemove && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-zinc-400 hover:text-red-500 hover:bg-red-500/10"
+                              onClick={() => setDeleteId(vuln.id)}
+                              data-testid={`delete-btn-${vuln.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -508,6 +539,113 @@ export default function Vulnerabilidades() {
           )}
         </CardContent>
       </Card>
+
+      {/* View Modal */}
+      <Dialog open={showViewModal} onOpenChange={setShowViewModal}>
+        <DialogContent className="bg-[#18181b] border-[#27272a] text-white max-w-3xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="text-xl flex items-center gap-2">
+              <Eye className="w-5 h-5 text-cyan-500" />
+              Detalle de Vulnerabilidad
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[65vh] pr-4">
+            {viewingVuln && (
+              <div className="space-y-4">
+                {/* Header Info */}
+                <div className="flex flex-wrap gap-3">
+                  <SeverityBadge severity={viewingVuln.severidad} />
+                  <StatusBadge status={viewingVuln.estatus} />
+                </div>
+
+                {/* Grid Info */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Fecha Hallazgo</p>
+                    <p className="text-white font-mono">{viewingVuln.fecha_hallazgo || "-"}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Institución</p>
+                    <p className="text-white">{viewingVuln.institucion || "-"}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Aplicación</p>
+                    <p className="text-white">{viewingVuln.aplicacion || "-"}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Responsable</p>
+                    <p className="text-white">{viewingVuln.responsable || "-"}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Fecha Compromiso</p>
+                    <p className="text-white font-mono">{viewingVuln.fecha_compromiso || "-"}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Resultado Re Test</p>
+                    <p className="text-white">{viewingVuln.resultado_re_test || "-"}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Proveedor</p>
+                    <p className="text-white">{viewingVuln.proveedor || "-"}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Riesgo Asociado</p>
+                    <p className="text-white">{viewingVuln.riesgo_asociado || "-"}</p>
+                  </div>
+                </div>
+
+                {/* Full Width Fields */}
+                <div className="space-y-1">
+                  <p className="text-xs text-zinc-500 uppercase tracking-wide">Informe Pentest</p>
+                  <p className="text-white">{viewingVuln.nombre_informe_pentest || "-"}</p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-xs text-zinc-500 uppercase tracking-wide">Vulnerabilidad</p>
+                  <p className="text-white whitespace-pre-wrap bg-zinc-800/50 p-3 rounded-lg">
+                    {viewingVuln.vulnerabilidad || "-"}
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-xs text-zinc-500 uppercase tracking-wide">Descripción del Riesgo</p>
+                  <p className="text-white whitespace-pre-wrap bg-zinc-800/50 p-3 rounded-lg">
+                    {viewingVuln.descripcion_riesgo || "-"}
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-xs text-zinc-500 uppercase tracking-wide">Recomendaciones</p>
+                  <p className="text-white whitespace-pre-wrap bg-zinc-800/50 p-3 rounded-lg">
+                    {viewingVuln.recomendaciones || "-"}
+                  </p>
+                </div>
+              </div>
+            )}
+          </ScrollArea>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowViewModal(false)}
+              className="border-zinc-700 text-zinc-300"
+            >
+              Cerrar
+            </Button>
+            {canModify && (
+              <Button
+                onClick={() => {
+                  setShowViewModal(false);
+                  handleOpenModal(viewingVuln);
+                }}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                <Pencil className="w-4 h-4 mr-2" />
+                Editar
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Create/Edit Modal */}
       <Dialog open={showModal} onOpenChange={setShowModal}>

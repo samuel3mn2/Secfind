@@ -1,16 +1,47 @@
-import { Outlet, NavLink } from "react-router-dom";
-import { Shield, LayoutDashboard, List, Menu, X, Settings } from "lucide-react";
+import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
+import { Shield, LayoutDashboard, List, Menu, X, Settings, LogOut, User } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { user, logout, isAdmin, canView } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
 
   const navItems = [
-    { to: "/", icon: LayoutDashboard, label: "Dashboard" },
-    { to: "/vulnerabilidades", icon: List, label: "Vulnerabilidades" },
-    { to: "/configuracion", icon: Settings, label: "Configuración" },
-  ];
+    { 
+      to: "/", 
+      icon: LayoutDashboard, 
+      label: "Dashboard",
+      show: isAdmin || canView("dashboard")
+    },
+    { 
+      to: "/vulnerabilidades", 
+      icon: List, 
+      label: "Vulnerabilidades",
+      show: isAdmin || canView("vulnerabilidades")
+    },
+    { 
+      to: "/configuracion", 
+      icon: Settings, 
+      label: "Configuración",
+      show: isAdmin || canView("configuracion")
+    },
+  ].filter(item => item.show);
 
   return (
     <div className="flex min-h-screen bg-[#09090b]">
@@ -71,8 +102,41 @@ export const Layout = () => {
             ))}
           </nav>
 
+          {/* User Section */}
+          <div className="px-3 py-4 border-t border-[#27272a]">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-left hover:bg-white/5 transition-colors">
+                  <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center">
+                    <User className="w-4 h-4 text-indigo-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white truncate">{user?.nombre}</p>
+                    <p className="text-xs text-zinc-500 truncate">
+                      {user?.es_admin ? "Administrador" : "Usuario"}
+                    </p>
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56 bg-zinc-900 border-zinc-700">
+                <DropdownMenuLabel className="text-zinc-400">
+                  {user?.username}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-zinc-700" />
+                <DropdownMenuItem 
+                  className="text-red-400 focus:text-red-400 focus:bg-red-500/10 cursor-pointer"
+                  onClick={handleLogout}
+                  data-testid="logout-btn"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Cerrar Sesión
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-[#27272a]">
+          <div className="px-6 py-3 border-t border-[#27272a]">
             <p className="text-xs text-zinc-600">
               SecFind v1.0
             </p>
@@ -83,7 +147,7 @@ export const Layout = () => {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile header */}
-        <header className="lg:hidden flex items-center gap-4 px-4 py-3 bg-[#18181b] border-b border-[#27272a]">
+        <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-[#18181b] border-b border-[#27272a]">
           <Button
             variant="ghost"
             size="icon"
@@ -96,6 +160,26 @@ export const Layout = () => {
             <Shield className="w-5 h-5 text-indigo-500" />
             <span className="font-semibold">SecFind</span>
           </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <User className="w-5 h-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="bg-zinc-900 border-zinc-700">
+              <DropdownMenuLabel className="text-zinc-400">
+                {user?.nombre}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-zinc-700" />
+              <DropdownMenuItem 
+                className="text-red-400 focus:text-red-400 cursor-pointer"
+                onClick={handleLogout}
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Cerrar Sesión
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </header>
 
         {/* Page content */}

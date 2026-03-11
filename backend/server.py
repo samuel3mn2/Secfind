@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Query
+from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Query, Depends, Header
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -7,11 +7,13 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional
+from typing import List, Optional, Dict
 import uuid
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone, date, timedelta
 import pandas as pd
 import io
+import bcrypt
+import jwt
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -20,6 +22,11 @@ load_dotenv(ROOT_DIR / '.env')
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
+
+# JWT Configuration
+JWT_SECRET = os.environ.get('JWT_SECRET', 'secfind-secret-key-change-in-production')
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRATION_HOURS = 24
 
 # Create the main app without a prefix
 app = FastAPI()
@@ -32,7 +39,76 @@ DEFAULT_SEVERIDADES = ["Critica", "Alta", "Media", "Baja"]
 DEFAULT_ESTATUS = ["En Proceso", "Cerrado", "Pendiente", "Para Re Test", "Corregido", "Desestimado"]
 DEFAULT_RESULTADO_RETEST = ["Corregido", "Pendiente", "Impedimento", "Vulnerable", "Desestimado"]
 
-# Define Models
+# ============ PERMISSION MODELS ============
+
+class ModulePermissions(BaseModel):
+    ver: bool = False
+    crear: bool = False
+    editar: bool = False
+    eliminar: bool = False
+
+class UserPermissions(BaseModel):
+    dashboard: ModulePermissions = ModulePermissions(ver=True)
+    vulnerabilidades: ModulePermissions = ModulePermissions()
+    configuracion: ModulePermissions = ModulePermissions()
+
+class Usuario(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    username: str
+    password_hash: str = ""
+    nombre: str
+    email: Optional[str] = None
+    activo: bool = True
+    es_admin: bool = False
+    permisos: UserPermissions = UserPermissions()
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class UsuarioCreate(BaseModel):
+    username: str
+    password: str
+    nombre: str
+    email: Optional[str] = None
+    es_admin: bool = False
+    permisos: Optional[UserPermissions] = None
+
+class UsuarioUpdate(BaseModel):
+    username: Optional[str] = None
+    password: Optional[str] = None
+    nombre: Optional[str] = None
+    email: Optional[str] = None
+    activo: Optional[bool] = None
+    es_admin: Optional[bool] = None
+    permisos: Optional[UserPermissions] = None
+
+class UsuarioResponse(BaseModel):
+    id: str
+    username: str
+    nombre: str
+    email: Optional[str]
+    activo: bool
+    es_admin: bool
+    permisos: UserPermissions
+    created_at: datetime
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class LoginResponse(BaseModel):
+    token: str
+    usuario: UsuarioResponse
+
+class CurrentUser(BaseModel):
+    id: str
+    username: str
+    nombre: str
+    es_admin: bool
+    permisos: UserPermissions
+
+# ============ VULNERABILITY MODELS ============
+
 class VulnerabilidadBase(BaseModel):
     fecha_hallazgo: Optional[str] = None
     institucion: Optional[str] = None
@@ -61,7 +137,8 @@ class Vulnerabilidad(VulnerabilidadBase):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-# Configuration Models
+# ============ CONFIGURATION MODELS ============
+
 class Institucion(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -101,28 +178,272 @@ class TendenciaItem(BaseModel):
     corregidas: int
     pendientes: int
 
-class DashboardFilters(BaseModel):
-    año: Optional[int] = None
-    institucion: Optional[str] = None
-    informe_pentest: Optional[str] = None
-    severidad: Optional[str] = None
-    proveedor: Optional[str] = None
+# ============ AUTH HELPERS ============
 
-# Routes
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_password(password: str, password_hash: str) -> bool:
+    return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
+
+def create_token(user_id: str, username: str) -> str:
+    payload = {
+        "user_id": user_id,
+        "username": username,
+        "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def decode_token(token: str) -> dict:
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expirado")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+async def get_current_user(authorization: Optional[str] = Header(None)) -> CurrentUser:
+    if not authorization:
+        raise HTTPException(status_code=401, detail="No autorizado")
+    
+    try:
+        token = authorization.replace("Bearer ", "")
+        payload = decode_token(token)
+        user = await db.usuarios.find_one({"id": payload["user_id"]}, {"_id": 0})
+        
+        if not user:
+            raise HTTPException(status_code=401, detail="Usuario no encontrado")
+        
+        if not user.get("activo", False):
+            raise HTTPException(status_code=401, detail="Usuario desactivado")
+        
+        permisos = user.get("permisos", {})
+        return CurrentUser(
+            id=user["id"],
+            username=user["username"],
+            nombre=user["nombre"],
+            es_admin=user.get("es_admin", False),
+            permisos=UserPermissions(**permisos) if permisos else UserPermissions()
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="No autorizado")
+
+async def get_optional_user(authorization: Optional[str] = Header(None)) -> Optional[CurrentUser]:
+    if not authorization:
+        return None
+    try:
+        return await get_current_user(authorization)
+    except:
+        return None
+
+# ============ AUTH ROUTES ============
+
+@api_router.post("/auth/login", response_model=LoginResponse)
+async def login(credentials: LoginRequest):
+    user = await db.usuarios.find_one({"username": credentials.username}, {"_id": 0})
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+    
+    if not verify_password(credentials.password, user.get("password_hash", "")):
+        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+    
+    if not user.get("activo", False):
+        raise HTTPException(status_code=401, detail="Usuario desactivado")
+    
+    token = create_token(user["id"], user["username"])
+    
+    permisos = user.get("permisos", {})
+    return LoginResponse(
+        token=token,
+        usuario=UsuarioResponse(
+            id=user["id"],
+            username=user["username"],
+            nombre=user["nombre"],
+            email=user.get("email"),
+            activo=user["activo"],
+            es_admin=user.get("es_admin", False),
+            permisos=UserPermissions(**permisos) if permisos else UserPermissions(),
+            created_at=user.get("created_at", datetime.now(timezone.utc))
+        )
+    )
+
+@api_router.get("/auth/me", response_model=UsuarioResponse)
+async def get_me(current_user: CurrentUser = Depends(get_current_user)):
+    user = await db.usuarios.find_one({"id": current_user.id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    permisos = user.get("permisos", {})
+    return UsuarioResponse(
+        id=user["id"],
+        username=user["username"],
+        nombre=user["nombre"],
+        email=user.get("email"),
+        activo=user["activo"],
+        es_admin=user.get("es_admin", False),
+        permisos=UserPermissions(**permisos) if permisos else UserPermissions(),
+        created_at=user.get("created_at", datetime.now(timezone.utc))
+    )
+
+# ============ USER MANAGEMENT ROUTES ============
+
+@api_router.get("/config/usuarios", response_model=List[UsuarioResponse])
+async def get_usuarios(current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.configuracion.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos para ver usuarios")
+    
+    usuarios = await db.usuarios.find({}, {"_id": 0, "password_hash": 0}).to_list(1000)
+    result = []
+    for u in usuarios:
+        permisos = u.get("permisos", {})
+        result.append(UsuarioResponse(
+            id=u["id"],
+            username=u["username"],
+            nombre=u["nombre"],
+            email=u.get("email"),
+            activo=u.get("activo", True),
+            es_admin=u.get("es_admin", False),
+            permisos=UserPermissions(**permisos) if permisos else UserPermissions(),
+            created_at=u.get("created_at", datetime.now(timezone.utc))
+        ))
+    return result
+
+@api_router.post("/config/usuarios", response_model=UsuarioResponse)
+async def create_usuario(data: UsuarioCreate, current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.configuracion.crear:
+        raise HTTPException(status_code=403, detail="No tiene permisos para crear usuarios")
+    
+    # Check if username already exists
+    existing = await db.usuarios.find_one({"username": data.username})
+    if existing:
+        raise HTTPException(status_code=400, detail="El nombre de usuario ya existe")
+    
+    # Create default permissions if not provided
+    permisos = data.permisos if data.permisos else UserPermissions(
+        dashboard=ModulePermissions(ver=True),
+        vulnerabilidades=ModulePermissions(ver=True),
+        configuracion=ModulePermissions()
+    )
+    
+    usuario = Usuario(
+        username=data.username,
+        password_hash=hash_password(data.password),
+        nombre=data.nombre,
+        email=data.email,
+        es_admin=data.es_admin,
+        permisos=permisos
+    )
+    
+    doc = usuario.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    doc['updated_at'] = doc['updated_at'].isoformat()
+    doc['permisos'] = permisos.model_dump()
+    
+    await db.usuarios.insert_one(doc)
+    
+    return UsuarioResponse(
+        id=usuario.id,
+        username=usuario.username,
+        nombre=usuario.nombre,
+        email=usuario.email,
+        activo=usuario.activo,
+        es_admin=usuario.es_admin,
+        permisos=permisos,
+        created_at=usuario.created_at
+    )
+
+@api_router.put("/config/usuarios/{user_id}", response_model=UsuarioResponse)
+async def update_usuario(user_id: str, data: UsuarioUpdate, current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.configuracion.editar:
+        raise HTTPException(status_code=403, detail="No tiene permisos para editar usuarios")
+    
+    existing = await db.usuarios.find_one({"id": user_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    update_dict = {}
+    
+    if data.username is not None:
+        # Check if new username already exists
+        if data.username != existing["username"]:
+            existing_username = await db.usuarios.find_one({"username": data.username})
+            if existing_username:
+                raise HTTPException(status_code=400, detail="El nombre de usuario ya existe")
+        update_dict["username"] = data.username
+    
+    if data.password is not None:
+        update_dict["password_hash"] = hash_password(data.password)
+    
+    if data.nombre is not None:
+        update_dict["nombre"] = data.nombre
+    
+    if data.email is not None:
+        update_dict["email"] = data.email
+    
+    if data.activo is not None:
+        update_dict["activo"] = data.activo
+    
+    if data.es_admin is not None:
+        update_dict["es_admin"] = data.es_admin
+    
+    if data.permisos is not None:
+        update_dict["permisos"] = data.permisos.model_dump()
+    
+    update_dict["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.usuarios.update_one({"id": user_id}, {"$set": update_dict})
+    
+    updated = await db.usuarios.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+    permisos = updated.get("permisos", {})
+    
+    return UsuarioResponse(
+        id=updated["id"],
+        username=updated["username"],
+        nombre=updated["nombre"],
+        email=updated.get("email"),
+        activo=updated.get("activo", True),
+        es_admin=updated.get("es_admin", False),
+        permisos=UserPermissions(**permisos) if permisos else UserPermissions(),
+        created_at=updated.get("created_at", datetime.now(timezone.utc))
+    )
+
+@api_router.delete("/config/usuarios/{user_id}")
+async def delete_usuario(user_id: str, current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.configuracion.eliminar:
+        raise HTTPException(status_code=403, detail="No tiene permisos para eliminar usuarios")
+    
+    # Prevent deleting yourself
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="No puede eliminarse a sí mismo")
+    
+    result = await db.usuarios.delete_one({"id": user_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    return {"message": "Usuario eliminado exitosamente"}
+
+# ============ GENERAL ROUTES ============
+
 @api_router.get("/")
 async def root():
     return {"message": "Gestión de Vulnerabilidades API"}
 
-# ============ CONFIGURATION ENDPOINTS ============
+# ============ INSTITUTION CONFIGURATION ROUTES ============
 
 @api_router.get("/config/instituciones", response_model=List[Institucion])
-async def get_instituciones():
+async def get_instituciones(current_user: CurrentUser = Depends(get_current_user)):
     instituciones = await db.instituciones.find({}, {"_id": 0}).to_list(1000)
     return instituciones
 
 @api_router.post("/config/instituciones", response_model=Institucion)
-async def create_institucion(data: InstitucionCreate):
-    # Check if already exists
+async def create_institucion(data: InstitucionCreate, current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.configuracion.crear:
+        raise HTTPException(status_code=403, detail="No tiene permisos para crear instituciones")
+    
     existing = await db.instituciones.find_one({"nombre": data.nombre})
     if existing:
         raise HTTPException(status_code=400, detail="La institución ya existe")
@@ -134,7 +455,10 @@ async def create_institucion(data: InstitucionCreate):
     return inst
 
 @api_router.put("/config/instituciones/{inst_id}", response_model=Institucion)
-async def update_institucion(inst_id: str, data: InstitucionUpdate):
+async def update_institucion(inst_id: str, data: InstitucionUpdate, current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.configuracion.editar:
+        raise HTTPException(status_code=403, detail="No tiene permisos para editar instituciones")
+    
     existing = await db.instituciones.find_one({"id": inst_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Institución no encontrada")
@@ -147,7 +471,10 @@ async def update_institucion(inst_id: str, data: InstitucionUpdate):
     return updated
 
 @api_router.delete("/config/instituciones/{inst_id}")
-async def delete_institucion(inst_id: str):
+async def delete_institucion(inst_id: str, current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.configuracion.eliminar:
+        raise HTTPException(status_code=403, detail="No tiene permisos para eliminar instituciones")
+    
     result = await db.instituciones.delete_one({"id": inst_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Institución no encontrada")
@@ -157,7 +484,6 @@ async def delete_institucion(inst_id: str):
 async def init_instituciones():
     count = await db.instituciones.count_documents({})
     if count == 0:
-        # Get unique institutions from existing vulnerabilities
         unique_inst = await db.vulnerabilidades.distinct("institucion")
         for nombre in unique_inst:
             if nombre:
@@ -166,22 +492,45 @@ async def init_instituciones():
                 doc['created_at'] = doc['created_at'].isoformat()
                 await db.instituciones.insert_one(doc)
 
+# Initialize admin user
+async def init_admin_user():
+    admin = await db.usuarios.find_one({"username": "admin"})
+    if not admin:
+        admin_permisos = UserPermissions(
+            dashboard=ModulePermissions(ver=True),
+            vulnerabilidades=ModulePermissions(ver=True, crear=True, editar=True, eliminar=True),
+            configuracion=ModulePermissions(ver=True, crear=True, editar=True, eliminar=True)
+        )
+        
+        admin_user = Usuario(
+            username="admin",
+            password_hash=hash_password("admin123"),
+            nombre="Administrador",
+            email="admin@secfind.local",
+            es_admin=True,
+            permisos=admin_permisos
+        )
+        
+        doc = admin_user.model_dump()
+        doc['created_at'] = doc['created_at'].isoformat()
+        doc['updated_at'] = doc['updated_at'].isoformat()
+        doc['permisos'] = admin_permisos.model_dump()
+        
+        await db.usuarios.insert_one(doc)
+        logging.info("Admin user created: admin / admin123")
+
 @api_router.get("/dropdown-options", response_model=DropdownOptions)
 async def get_dropdown_options():
-    # Get institutions from config
     instituciones_docs = await db.instituciones.find({"activo": True}, {"_id": 0}).to_list(1000)
     instituciones = [i["nombre"] for i in instituciones_docs] if instituciones_docs else []
     
-    # If no configured institutions, get from vulnerabilities
     if not instituciones:
         instituciones = await db.vulnerabilidades.distinct("institucion")
         instituciones = [i for i in instituciones if i]
     
-    # Get unique informes de pentest
     informes = await db.vulnerabilidades.distinct("nombre_informe_pentest")
     informes = sorted([i for i in informes if i])
     
-    # Get unique years from fecha_hallazgo
     años = set()
     vulns = await db.vulnerabilidades.find({}, {"fecha_hallazgo": 1, "_id": 0}).to_list(10000)
     for v in vulns:
@@ -194,7 +543,6 @@ async def get_dropdown_options():
             except:
                 pass
     
-    # Get unique proveedores
     proveedores = await db.vulnerabilidades.distinct("proveedor")
     proveedores = sorted([p for p in proveedores if p])
     
@@ -218,8 +566,12 @@ async def get_vulnerabilidades(
     search: Optional[str] = None,
     año: Optional[int] = None,
     informe_pentest: Optional[str] = None,
-    proveedor: Optional[str] = None
+    proveedor: Optional[str] = None,
+    current_user: CurrentUser = Depends(get_current_user)
 ):
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos para ver vulnerabilidades")
+    
     query = {}
     if severidad:
         query["severidad"] = severidad
@@ -245,14 +597,20 @@ async def get_vulnerabilidades(
     return vulnerabilidades
 
 @api_router.get("/vulnerabilidades/{vuln_id}", response_model=Vulnerabilidad)
-async def get_vulnerabilidad(vuln_id: str):
+async def get_vulnerabilidad(vuln_id: str, current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos para ver vulnerabilidades")
+    
     vuln = await db.vulnerabilidades.find_one({"id": vuln_id}, {"_id": 0})
     if not vuln:
         raise HTTPException(status_code=404, detail="Vulnerabilidad no encontrada")
     return vuln
 
 @api_router.post("/vulnerabilidades", response_model=Vulnerabilidad)
-async def create_vulnerabilidad(vuln_data: VulnerabilidadCreate):
+async def create_vulnerabilidad(vuln_data: VulnerabilidadCreate, current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.crear:
+        raise HTTPException(status_code=403, detail="No tiene permisos para crear vulnerabilidades")
+    
     vuln_dict = vuln_data.model_dump()
     vuln_obj = Vulnerabilidad(**vuln_dict)
     
@@ -264,7 +622,10 @@ async def create_vulnerabilidad(vuln_data: VulnerabilidadCreate):
     return vuln_obj
 
 @api_router.put("/vulnerabilidades/{vuln_id}", response_model=Vulnerabilidad)
-async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate):
+async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate, current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.editar:
+        raise HTTPException(status_code=403, detail="No tiene permisos para editar vulnerabilidades")
+    
     existing = await db.vulnerabilidades.find_one({"id": vuln_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Vulnerabilidad no encontrada")
@@ -281,7 +642,10 @@ async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate):
     return updated
 
 @api_router.delete("/vulnerabilidades/{vuln_id}")
-async def delete_vulnerabilidad(vuln_id: str):
+async def delete_vulnerabilidad(vuln_id: str, current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.eliminar:
+        raise HTTPException(status_code=403, detail="No tiene permisos para eliminar vulnerabilidades")
+    
     result = await db.vulnerabilidades.delete_one({"id": vuln_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Vulnerabilidad no encontrada")
@@ -295,9 +659,12 @@ async def get_dashboard_stats(
     institucion: Optional[str] = None,
     informe_pentest: Optional[str] = None,
     severidad: Optional[str] = None,
-    proveedor: Optional[str] = None
+    proveedor: Optional[str] = None,
+    current_user: CurrentUser = Depends(get_current_user)
 ):
-    # Build base query from filters
+    if not current_user.es_admin and not current_user.permisos.dashboard.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos para ver el dashboard")
+    
     base_query = {}
     if año:
         base_query["fecha_hallazgo"] = {"$regex": f"^{año}"}
@@ -321,7 +688,6 @@ async def get_dashboard_stats(
     pendientes_query = {**base_query, "estatus": {"$in": ["Pendiente", "En Proceso", "Para Re Test"]}}
     pendientes = await db.vulnerabilidades.count_documents(pendientes_query)
     
-    # Aggregate by severidad with filters
     severidad_pipeline = [
         {"$match": base_query} if base_query else {"$match": {}},
         {"$group": {"_id": "$severidad", "count": {"$sum": 1}}}
@@ -335,7 +701,6 @@ async def get_dashboard_stats(
         if doc["_id"]:
             por_severidad[doc["_id"]] = doc["count"]
     
-    # Aggregate by estatus with filters
     estatus_pipeline = [
         {"$match": base_query} if base_query else {"$match": {}},
         {"$group": {"_id": "$estatus", "count": {"$sum": 1}}}
@@ -349,7 +714,6 @@ async def get_dashboard_stats(
         if doc["_id"]:
             por_estatus[doc["_id"]] = doc["count"]
     
-    # Aggregate by institucion with filters
     institucion_pipeline = [
         {"$match": base_query} if base_query else {"$match": {}},
         {"$group": {"_id": "$institucion", "count": {"$sum": 1}}}
@@ -375,9 +739,12 @@ async def get_dashboard_stats(
 
 @api_router.get("/dashboard/tendencias")
 async def get_dashboard_tendencias(
-    tipo: str = "mensual"  # mensual o trimestral
+    tipo: str = "mensual",
+    current_user: CurrentUser = Depends(get_current_user)
 ):
-    """Get vulnerability trends by month or quarter"""
+    if not current_user.es_admin and not current_user.permisos.dashboard.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos para ver el dashboard")
+    
     from collections import defaultdict
     
     vulns = await db.vulnerabilidades.find({}, {"fecha_hallazgo": 1, "severidad": 1, "estatus": 1, "_id": 0}).to_list(10000)
@@ -413,7 +780,6 @@ async def get_dashboard_tendencias(
         except:
             continue
     
-    # Sort by period and return
     result = []
     for periodo in sorted(tendencias.keys()):
         data = tendencias[periodo]
@@ -429,17 +795,19 @@ async def get_dashboard_tendencias(
 
 @api_router.get("/dashboard/kpi-detail")
 async def get_kpi_detail(
-    tipo: str,  # criticas_abiertas, pendientes, corregidas
+    tipo: str,
     año: Optional[int] = None,
     institucion: Optional[str] = None,
     informe_pentest: Optional[str] = None,
     severidad: Optional[str] = None,
-    proveedor: Optional[str] = None
+    proveedor: Optional[str] = None,
+    current_user: CurrentUser = Depends(get_current_user)
 ):
-    """Get vulnerabilities for a specific KPI card"""
+    if not current_user.es_admin and not current_user.permisos.dashboard.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos para ver el dashboard")
+    
     query = {}
     
-    # Apply common filters
     if año:
         query["fecha_hallazgo"] = {"$regex": f"^{año}"}
     if institucion:
@@ -451,7 +819,6 @@ async def get_kpi_detail(
     if proveedor:
         query["proveedor"] = proveedor
     
-    # Apply KPI-specific filters
     if tipo == "criticas_abiertas":
         query["severidad"] = "Critica"
         query["estatus"] = {"$nin": ["Cerrado", "Corregido", "Desestimado"]}
@@ -466,7 +833,10 @@ async def get_kpi_detail(
 # ============ EXPORT/IMPORT ENDPOINTS ============
 
 @api_router.get("/export/csv")
-async def export_csv():
+async def export_csv(current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos para exportar")
+    
     vulnerabilidades = await db.vulnerabilidades.find({}, {"_id": 0}).to_list(10000)
     
     if not vulnerabilidades:
@@ -490,7 +860,10 @@ async def export_csv():
     )
 
 @api_router.get("/export/excel")
-async def export_excel():
+async def export_excel(current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos para exportar")
+    
     vulnerabilidades = await db.vulnerabilidades.find({}, {"_id": 0}).to_list(10000)
     
     if not vulnerabilidades:
@@ -515,7 +888,10 @@ async def export_excel():
     )
 
 @api_router.post("/import/csv")
-async def import_csv(file: UploadFile = File(...)):
+async def import_csv(file: UploadFile = File(...), current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.crear:
+        raise HTTPException(status_code=403, detail="No tiene permisos para importar")
+    
     if not file.filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="El archivo debe ser CSV")
     
@@ -555,7 +931,10 @@ async def import_csv(file: UploadFile = File(...)):
     return {"message": f"Se importaron {inserted_count} registros exitosamente"}
 
 @api_router.post("/import/excel")
-async def import_excel(file: UploadFile = File(...)):
+async def import_excel(file: UploadFile = File(...), current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.crear:
+        raise HTTPException(status_code=403, detail="No tiene permisos para importar")
+    
     if not (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
         raise HTTPException(status_code=400, detail="El archivo debe ser Excel (.xlsx o .xls)")
     
@@ -603,7 +982,10 @@ async def import_excel(file: UploadFile = File(...)):
     return {"message": f"Se importaron {inserted_count} registros exitosamente"}
 
 @api_router.delete("/vulnerabilidades")
-async def delete_all_vulnerabilidades():
+async def delete_all_vulnerabilidades(current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar todos los registros")
+    
     result = await db.vulnerabilidades.delete_many({})
     return {"message": f"Se eliminaron {result.deleted_count} registros"}
 
@@ -628,6 +1010,7 @@ logger = logging.getLogger(__name__)
 @app.on_event("startup")
 async def startup_event():
     await init_instituciones()
+    await init_admin_user()
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
