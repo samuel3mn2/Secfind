@@ -24,7 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Shield, AlertTriangle, CheckCircle2, Clock, TrendingUp, Filter, X, ExternalLink } from "lucide-react";
+import { Shield, AlertTriangle, CheckCircle2, Clock, TrendingUp, Filter, X, ExternalLink, PlayCircle, RefreshCw } from "lucide-react";
 import {
   PieChart,
   Pie,
@@ -392,25 +392,25 @@ export default function Dashboard() {
       </Card>
 
       {/* KPI Cards - Clickable */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card 
           className="bg-[#18181b] border-[#27272a] kpi-card cursor-pointer hover:border-indigo-500/50 transition-colors" 
           data-testid="kpi-total"
           onClick={() => handleKpiClick("total", "Total Vulnerabilidades")}
         >
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-zinc-500 text-sm font-medium">Total Vulnerabilidades</p>
-                <p className="text-3xl font-bold text-white mt-2">
+                <p className="text-zinc-500 text-xs font-medium">Total</p>
+                <p className="text-2xl font-bold text-white mt-1">
                   {stats?.total_vulnerabilidades || 0}
                 </p>
                 <p className="text-xs text-indigo-400 mt-1 flex items-center gap-1">
-                  <ExternalLink className="w-3 h-3" /> Click para ver detalle
+                  <ExternalLink className="w-3 h-3" /> Ver detalle
                 </p>
               </div>
-              <div className="p-3 rounded-lg bg-indigo-500/10">
-                <Shield className="w-6 h-6 text-indigo-500" />
+              <div className="p-2 rounded-lg bg-indigo-500/10">
+                <Shield className="w-5 h-5 text-indigo-500" />
               </div>
             </div>
           </CardContent>
@@ -421,19 +421,19 @@ export default function Dashboard() {
           data-testid="kpi-criticas"
           onClick={() => handleKpiClick("criticas_abiertas", "Críticas Abiertas")}
         >
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-zinc-500 text-sm font-medium">Críticas Abiertas</p>
-                <p className="text-3xl font-bold text-red-500 mt-2">
+                <p className="text-zinc-500 text-xs font-medium">Críticas Abiertas</p>
+                <p className="text-2xl font-bold text-red-500 mt-1">
                   {stats?.criticas_abiertas || 0}
                 </p>
                 <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
-                  <ExternalLink className="w-3 h-3" /> Click para ver detalle
+                  <ExternalLink className="w-3 h-3" /> Ver detalle
                 </p>
               </div>
-              <div className="p-3 rounded-lg bg-red-500/10">
-                <AlertTriangle className="w-6 h-6 text-red-500" />
+              <div className="p-2 rounded-lg bg-red-500/10">
+                <AlertTriangle className="w-5 h-5 text-red-500" />
               </div>
             </div>
           </CardContent>
@@ -444,19 +444,19 @@ export default function Dashboard() {
           data-testid="kpi-corregidas"
           onClick={() => handleKpiClick("corregidas", "Vulnerabilidades Corregidas")}
         >
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-zinc-500 text-sm font-medium">Corregidas</p>
-                <p className="text-3xl font-bold text-green-500 mt-2">
+                <p className="text-zinc-500 text-xs font-medium">Corregidas</p>
+                <p className="text-2xl font-bold text-green-500 mt-1">
                   {stats?.vulnerabilidades_corregidas || 0}
                 </p>
                 <p className="text-xs text-green-400 mt-1 flex items-center gap-1">
-                  <ExternalLink className="w-3 h-3" /> Click para ver detalle
+                  <ExternalLink className="w-3 h-3" /> Ver detalle
                 </p>
               </div>
-              <div className="p-3 rounded-lg bg-green-500/10">
-                <CheckCircle2 className="w-6 h-6 text-green-500" />
+              <div className="p-2 rounded-lg bg-green-500/10">
+                <CheckCircle2 className="w-5 h-5 text-green-500" />
               </div>
             </div>
           </CardContent>
@@ -467,19 +467,65 @@ export default function Dashboard() {
           data-testid="kpi-pendientes"
           onClick={() => handleKpiClick("pendientes", "Vulnerabilidades Pendientes")}
         >
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-zinc-500 text-sm font-medium">Pendientes</p>
-                <p className="text-3xl font-bold text-yellow-500 mt-2">
+                <p className="text-zinc-500 text-xs font-medium">Pendientes</p>
+                <p className="text-2xl font-bold text-yellow-500 mt-1">
                   {stats?.pendientes || 0}
                 </p>
                 <p className="text-xs text-yellow-400 mt-1 flex items-center gap-1">
-                  <ExternalLink className="w-3 h-3" /> Click para ver detalle
+                  <ExternalLink className="w-3 h-3" /> Ver detalle
                 </p>
               </div>
-              <div className="p-3 rounded-lg bg-yellow-500/10">
-                <Clock className="w-6 h-6 text-yellow-500" />
+              <div className="p-2 rounded-lg bg-yellow-500/10">
+                <Clock className="w-5 h-5 text-yellow-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className="bg-[#18181b] border-[#27272a] kpi-card cursor-pointer hover:border-orange-500/50 transition-colors" 
+          data-testid="kpi-en-proceso"
+          onClick={() => handleKpiClick("en_proceso", "En Proceso")}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-zinc-500 text-xs font-medium">En Proceso</p>
+                <p className="text-2xl font-bold text-orange-500 mt-1">
+                  {stats?.en_proceso || 0}
+                </p>
+                <p className="text-xs text-orange-400 mt-1 flex items-center gap-1">
+                  <ExternalLink className="w-3 h-3" /> Ver detalle
+                </p>
+              </div>
+              <div className="p-2 rounded-lg bg-orange-500/10">
+                <PlayCircle className="w-5 h-5 text-orange-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className="bg-[#18181b] border-[#27272a] kpi-card cursor-pointer hover:border-blue-500/50 transition-colors" 
+          data-testid="kpi-para-retest"
+          onClick={() => handleKpiClick("para_retest", "Para Re Test")}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-zinc-500 text-xs font-medium">Para Re Test</p>
+                <p className="text-2xl font-bold text-blue-500 mt-1">
+                  {stats?.para_retest || 0}
+                </p>
+                <p className="text-xs text-blue-400 mt-1 flex items-center gap-1">
+                  <ExternalLink className="w-3 h-3" /> Ver detalle
+                </p>
+              </div>
+              <div className="p-2 rounded-lg bg-blue-500/10">
+                <RefreshCw className="w-5 h-5 text-blue-500" />
               </div>
             </div>
           </CardContent>

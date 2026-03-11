@@ -992,6 +992,14 @@ async def get_dashboard_stats(
     }
     pendientes = await db.vulnerabilidades.count_documents(pendientes_query)
     
+    # En Proceso
+    en_proceso_query = {**base_query, "estatus": "En Proceso"}
+    en_proceso = await db.vulnerabilidades.count_documents(en_proceso_query)
+    
+    # Para Re Test
+    para_retest_query = {**base_query, "estatus": "Para Re Test"}
+    para_retest = await db.vulnerabilidades.count_documents(para_retest_query)
+    
     severidad_pipeline = [
         {"$match": base_query} if base_query else {"$match": {}},
         {"$group": {"_id": "$severidad", "count": {"$sum": 1}}}
@@ -1036,6 +1044,8 @@ async def get_dashboard_stats(
         "criticas_abiertas": criticas_abiertas,
         "vulnerabilidades_corregidas": corregidas,
         "pendientes": pendientes,
+        "en_proceso": en_proceso,
+        "para_retest": para_retest,
         "por_severidad": por_severidad,
         "por_estatus": por_estatus,
         "por_institucion": por_institucion
@@ -1127,9 +1137,13 @@ async def get_kpi_detail(
         query["severidad"] = "Critica"
         query["estatus"] = {"$nin": ["Cerrado", "Corregido", "Desestimado"]}
     elif tipo == "pendientes":
-        query["estatus"] = {"$in": ["Pendiente", "En Proceso", "Para Re Test"]}
+        query["estatus"] = {"$nin": ["Cerrado", "Corregido", "Desestimado"]}
     elif tipo == "corregidas":
         query["estatus"] = {"$in": ["Corregido", "Cerrado"]}
+    elif tipo == "en_proceso":
+        query["estatus"] = "En Proceso"
+    elif tipo == "para_retest":
+        query["estatus"] = "Para Re Test"
     
     vulnerabilidades = await db.vulnerabilidades.find(query, {"_id": 0}).to_list(10000)
     return vulnerabilidades
