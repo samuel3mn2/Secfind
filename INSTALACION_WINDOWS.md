@@ -22,8 +22,8 @@ Python es el lenguaje de programación que usa el servidor de la aplicación.
 
 3. **Descargar Python:**
    - Verás un botón amarillo grande que dice **"Download Python 3.x.x"**
-   - Haz clic en ese botón
-   - Se descargará un archivo como `python-3.12.x-amd64.exe`
+   - Haz clic en ese botón (descarga la versión que aparezca, cualquiera 3.9+ funciona)
+   - Se descargará un archivo como `python-3.xx.x-amd64.exe`
 
 4. **Instalar Python:**
    - Ve a tu carpeta de **Descargas**
@@ -44,7 +44,7 @@ Python es el lenguaje de programación que usa el servidor de la aplicación.
      ```
      python --version
      ```
-   - Deberías ver algo como: `Python 3.12.0`
+   - Deberías ver algo como: `Python 3.12.0` o `Python 3.13.0` (cualquier número 3.9 o mayor está bien)
    - Si ves un error, reinicia la computadora e intenta de nuevo
 
 ---
