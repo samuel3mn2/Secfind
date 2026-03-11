@@ -6,29 +6,49 @@ Aplicación web para la Gestión de Vulnerabilidades de Ciberseguridad, reemplaz
 ## Arquitectura
 - **Backend**: FastAPI + MongoDB (Motor async)
 - **Frontend**: React + Shadcn UI + Recharts
-- **Base de datos**: MongoDB (colección: vulnerabilidades)
+- **Base de datos**: MongoDB (colecciones: vulnerabilidades, instituciones)
 
 ## Usuarios
 - Profesionales de ciberseguridad
 - Ejecutivos que necesitan reportes visuales
 
 ## Requisitos Core (Implementados)
-- [x] Dashboard con KPIs (Total, Críticas abiertas, Corregidas, Pendientes)
+
+### Dashboard
+- [x] KPIs (Total, Críticas abiertas, Corregidas, Pendientes)
 - [x] Gráfico de pastel por Severidad
 - [x] Gráfico de barras por Estatus  
 - [x] Gráfico de barras por Institución
+- [x] **Filtros dinámicos**: Año, Institución, Informe Pentest, Severidad, Proveedor
+- [x] Botón "Limpiar filtros"
+- [x] KPIs y gráficos se actualizan con filtros
+
+### Gestión de Vulnerabilidades
 - [x] Tabla CRUD con búsqueda y filtros
 - [x] Modal para crear/editar vulnerabilidades
 - [x] Eliminación con confirmación
-- [x] Importar/Exportar CSV y Excel
-- [x] Campos dropdown predefinidos (Severidad, Estatus, Institución, Resultado Re Test)
-- [x] 225 vulnerabilidades importadas del Excel del usuario
+- [x] Campos dropdown predefinidos
+- [x] 225 vulnerabilidades importadas del Excel
+
+### Módulo de Configuración
+- [x] CRUD de Instituciones
+- [x] Activar/Desactivar instituciones
+- [x] Instituciones dinámicas en dropdowns
+
+### Importar/Exportar
+- [x] Exportar a CSV y Excel
+- [x] Importar desde CSV y Excel
 
 ## Campos del Modelo
 - fecha_hallazgo, institucion, aplicacion, vulnerabilidad
 - recomendaciones, severidad, riesgo_asociado, descripcion_riesgo
 - responsable, fecha_compromiso, estatus, resultado_re_test
 - nombre_informe_pentest, proveedor
+
+## Implementado: 11 Marzo 2026
+- Dashboard con filtros avanzados (5 filtros)
+- Módulo de configuración para instituciones
+- Todas las funcionalidades CRUD
 
 ## Backlog
 ### P1 (Alta Prioridad)
