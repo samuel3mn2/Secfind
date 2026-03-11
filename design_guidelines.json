@@ -1,0 +1,120 @@
+{
+  "identity": {
+    "persona": "E1 - The Anti-AI Designer",
+    "mission": "Create a Cybersecurity Vulnerability Management Dashboard that feels like a modern command center—authoritative, precise, and vigilant. Avoid generic 'admin panel' looks.",
+    "principles": [
+      "Fusion over Imitation: Mix 'Swiss Style' clarity with 'Cyberpunk' aesthetics.",
+      "Emotion First: The UI should feel 'Secure' and 'Alert'.",
+      "Content is King: Vulnerability data must be instantly scannable.",
+      "Negative Space: Use deep dark backgrounds to make data pop.",
+      "Contrast: High contrast for critical alerts."
+    ]
+  },
+  "typography": {
+    "font_family": {
+      "headings": "Sora, sans-serif",
+      "body": "Inter, sans-serif",
+      "data": "JetBrains Mono, monospace"
+    },
+    "installation": {
+      "google_fonts_link": "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Sora:wght@400;600;700&display=swap"
+    },
+    "rules": [
+      "Use 'Sora' for all section headings and KPIs to give a modern tech feel.",
+      "Use 'Inter' for body text and UI labels for maximum readability.",
+      "Use 'JetBrains Mono' for IP addresses, CVE IDs, and raw data fields.",
+      "Headings must be 'tracking-tight'.",
+      "Data cells must be 'tracking-normal' or 'tracking-wide' for legibility."
+    ]
+  },
+  "colors": {
+    "theme": "dark",
+    "palette": {
+      "background": "#09090b", 
+      "surface": "#18181b",
+      "surface_highlight": "#27272a",
+      "border": "#27272a",
+      "primary": "#6366f1", 
+      "primary_foreground": "#ffffff",
+      "secondary": "#3b82f6",
+      "accent": "#06b6d4",
+      "danger": "#ef4444",
+      "warning": "#f97316",
+      "success": "#22c55e",
+      "text_primary": "#f4f4f5",
+      "text_secondary": "#a1a1aa",
+      "text_muted": "#71717a"
+    },
+    "severity_colors": {
+      "critical": "#ef4444",
+      "high": "#f97316",
+      "medium": "#eab308",
+      "low": "#3b82f6"
+    },
+    "gradients": {
+      "primary_glow": "linear-gradient(135deg, rgba(99,102,241,0.2) 0%, rgba(99,102,241,0) 100%)",
+      "danger_glow": "linear-gradient(135deg, rgba(239,68,68,0.2) 0%, rgba(239,68,68,0) 100%)"
+    }
+  },
+  "components": {
+    "cards": {
+      "style": "glass",
+      "instructions": "Use a deep dark background (#18181b) with a subtle 1px border (#27272a). Add a faint 'glow' effect on hover. Do NOT use heavy drop shadows. Use 'backdrop-blur-md' if overlaying on complex backgrounds."
+    },
+    "buttons": {
+      "primary": "bg-primary text-white hover:bg-primary/90 shadow-[0_0_15px_rgba(99,102,241,0.3)] transition-all duration-300",
+      "secondary": "bg-secondary/10 text-secondary border border-secondary/20 hover:bg-secondary/20",
+      "destructive": "bg-red-900/20 text-red-500 border border-red-900/50 hover:bg-red-900/30"
+    },
+    "inputs": {
+      "style": "bg-black/20 border-white/10 text-white placeholder:text-white/30 focus:border-primary/50 focus:ring-1 focus:ring-primary/50"
+    },
+    "charts": {
+      "library": "recharts",
+      "instructions": "Use Recharts (via Shadcn charts). Customize tooltips to be dark and minimal. Use neon colors (Cyan, Purple, Orange) for lines/bars against the dark background. Ensure grid lines are very subtle (opacity 0.1)."
+    },
+    "tables": {
+      "style": "dense",
+      "instructions": "Use a high-density layout. Headers should be uppercase, small text (text-xs), and muted color. Rows should have hover effects (bg-white/5). Critical vulnerabilities should have a subtle red left-border indicator."
+    }
+  },
+  "layout": {
+    "spacing_scale": "generous",
+    "grid_system": "bento",
+    "dashboard_structure": [
+      "Header: Logo + Navigation + User Profile",
+      "Top Row: 4 KPI Cards (Total, Critical, Fixed, Pending) - Use 'Tetris' grid logic.",
+      "Middle Row: Charts (Pie Chart for Severity, Bar Chart for Status) - 2/3 + 1/3 split.",
+      "Bottom Row: Detailed Vulnerability Table or 'Recent Findings' list."
+    ],
+    "container_padding": "p-6 md:p-8 lg:p-12"
+  },
+  "assets": {
+    "images": {
+      "login_bg": "https://images.unsplash.com/photo-1762279389006-43963a0cee55?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDJ8MHwxfHNlYXJjaHwxfHxjeWJlcnNlY3VyaXR5JTIwYWJzdHJhY3QlMjB0ZWNobm9sb2d5JTIwZGFyayUyMGJsdWUlMjBuZXR3b3JrfGVufDB8fHx8MTc3MzIzOTA5Nnww&ixlib=rb-4.1.0&q=85",
+      "dashboard_hero_abstract": "https://images.unsplash.com/photo-1762279388956-1c098163a2a8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDJ8MHwxfHNlYXJjaHwzfHxjeWJlcnNlY3VyaXR5JTIwYWJzdHJhY3QlMjB0ZWNobm9sb2d5JTIwZGFyayUyMGJsdWUlMjBuZXR3b3JrfGVufDB8fHx8MTc3MzIzOTA5Nnww&ixlib=rb-4.1.0&q=85",
+      "user_avatar": "https://images.unsplash.com/photo-1737574821698-862e77f044c1?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDB8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBleGVjdXRpdmUlMjBwb3J0cmFpdCUyMGNvcnBvcmF0ZXxlbnwwfHx8fDE3NzMyMzkwOTd8MA&ixlib=rb-4.1.0&q=85"
+    },
+    "icons_library": "lucide-react"
+  },
+  "instructions_to_main_agent": [
+    "Implement the 'Dark Mode' theme by default. Add 'class' strategy in Tailwind config if not present.",
+    "Use 'Sora' font for all headings to establish the tech identity.",
+    "For the Dashboard, implement the 'Bento Grid' layout. Don't just stack cards vertically.",
+    "The Vulnerability Table MUST be dense and sortable. Use Shadcn Table with sorting/filtering features.",
+    "Charts must use the specified palette. Do not use default Recharts colors.",
+    "Import/Export feature should be a clean modal or a prominent button group in the Table header.",
+    "Ensure all text has sufficient contrast (AA standard minimum).",
+    "Add 'data-testid' to all interactive elements (buttons, inputs, row actions).",
+    "Use the provided image URLs for the login page background or dashboard widgets where appropriate."
+  ],
+  "universal_guidelines": [
+    "Do NOT use gradients for text.",
+    "Avoid 'center-everything'. Use left alignment for data and forms.",
+    "Use 'sonner' for all toast notifications.",
+    "Components must use named exports.",
+    "Pages must use default exports.",
+    "Interactive elements must have hover/focus states defined.",
+    "Language is Spanish (Es). Ensure all labels, buttons, and messages are in Spanish."
+  ]
+}
