@@ -1435,6 +1435,269 @@ async def delete_all_vulnerabilidades(current_user: CurrentUser = Depends(get_cu
     result = await db.vulnerabilidades.delete_many({})
     return {"message": f"Se eliminaron {result.deleted_count} registros"}
 
+# ============ PDF IMPORT ENDPOINTS ============
+
+class ExtractedVulnerability(BaseModel):
+    titulo: str
+    severidad: str
+    activos_afectados: List[str] = []
+    descripcion: str
+    impacto: str = ""
+    recomendaciones: str
+    
+class PDFExtractionResult(BaseModel):
+    nombre_informe: str
+    fecha_informe: str
+    institucion: str
+    proveedor: str
+    vulnerabilidades: List[ExtractedVulnerability]
+    aplicaciones_nuevas: List[str] = []
+    informes_nuevos: List[str] = []
+    proveedores_nuevos: List[str] = []
+
+class VulnerabilidadParaAgregar(BaseModel):
+    fecha_hallazgo: str
+    institucion: str
+    aplicaciones: List[str] = []
+    vulnerabilidad: str
+    descripcion_riesgo: str
+    recomendaciones: str
+    severidad: str
+    estatus: str = "Pendiente"
+    nombre_informe_pentest: str
+    proveedor: str
+    riesgo_asociado: Optional[str] = None
+    responsable: Optional[str] = None
+    fecha_compromiso: Optional[str] = None
+
+@api_router.post("/import/pdf/extract")
+async def extract_vulnerabilities_from_pdf(
+    file: UploadFile = File(...),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Extract vulnerabilities from a PDF pentest report using AI"""
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.crear:
+        raise HTTPException(status_code=403, detail="No tiene permisos para importar")
+    
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="El archivo debe ser PDF")
+    
+    try:
+        import fitz  # PyMuPDF
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        
+        # Read PDF content
+        contents = await file.read()
+        pdf_document = fitz.open(stream=contents, filetype="pdf")
+        
+        # Extract text from all pages
+        full_text = ""
+        for page_num in range(len(pdf_document)):
+            page = pdf_document[page_num]
+            full_text += f"\n--- Página {page_num + 1} ---\n"
+            full_text += page.get_text()
+        
+        pdf_document.close()
+        
+        # Limit text length for LLM
+        if len(full_text) > 50000:
+            full_text = full_text[:50000]
+        
+        # Use LLM to extract structured data
+        llm_key = os.environ.get('EMERGENT_LLM_KEY')
+        if not llm_key:
+            raise HTTPException(status_code=500, detail="LLM key not configured")
+        
+        chat = LlmChat(
+            api_key=llm_key,
+            session_id=f"pdf-extract-{uuid.uuid4()}",
+            system_message="""Eres un experto en ciberseguridad que analiza informes de pruebas de penetración (pentest).
+Tu tarea es extraer información estructurada de informes de pentest en español.
+
+IMPORTANTE: Responde SOLO con JSON válido, sin texto adicional ni markdown.
+
+El JSON debe tener esta estructura exacta:
+{
+    "nombre_informe": "nombre completo del informe de la portada",
+    "fecha_informe": "YYYY-MM-DD",
+    "institucion": "nombre de la institución/cliente",
+    "proveedor": "empresa que realizó el pentest",
+    "vulnerabilidades": [
+        {
+            "titulo": "título de la vulnerabilidad",
+            "severidad": "Critica|Alta|Media|Baja",
+            "activos_afectados": ["lista", "de", "activos"],
+            "descripcion": "descripción detallada de la vulnerabilidad",
+            "impacto": "impacto de la vulnerabilidad",
+            "recomendaciones": "recomendaciones para remediar"
+        }
+    ]
+}
+
+Reglas:
+- La fecha debe estar en formato YYYY-MM-DD
+- La severidad debe ser exactamente: Critica, Alta, Media o Baja
+- Extrae TODAS las vulnerabilidades del informe
+- Los activos_afectados son los sistemas/aplicaciones afectados"""
+        ).with_model("openai", "gpt-4.1-mini")
+        
+        user_message = UserMessage(
+            text=f"Analiza el siguiente informe de pentest y extrae la información en formato JSON:\n\n{full_text}"
+        )
+        
+        response = await chat.send_message(user_message)
+        
+        # Parse JSON response
+        import json
+        import re
+        
+        # Clean response - remove markdown code blocks if present
+        response_text = response.strip()
+        if response_text.startswith("```"):
+            response_text = re.sub(r'^```\w*\n?', '', response_text)
+            response_text = re.sub(r'\n?```$', '', response_text)
+        
+        try:
+            extracted_data = json.loads(response_text)
+        except json.JSONDecodeError as e:
+            logging.error(f"JSON parse error: {e}. Response: {response_text[:500]}")
+            raise HTTPException(status_code=500, detail=f"Error al parsear respuesta del LLM: {str(e)}")
+        
+        # Get existing catalogs
+        existing_apps = await db.aplicaciones.distinct("nombre")
+        existing_informes = await db.informes_pentest.distinct("nombre")
+        existing_proveedores = await db.proveedores.distinct("nombre")
+        existing_instituciones = await db.instituciones.distinct("nombre")
+        
+        # Check for new items
+        aplicaciones_nuevas = set()
+        for vuln in extracted_data.get("vulnerabilidades", []):
+            for activo in vuln.get("activos_afectados", []):
+                if activo and activo not in existing_apps:
+                    aplicaciones_nuevas.add(activo)
+        
+        informes_nuevos = []
+        nombre_informe = extracted_data.get("nombre_informe", "")
+        if nombre_informe and nombre_informe not in existing_informes:
+            informes_nuevos.append(nombre_informe)
+        
+        proveedores_nuevos = []
+        proveedor = extracted_data.get("proveedor", "")
+        if proveedor and proveedor not in existing_proveedores:
+            proveedores_nuevos.append(proveedor)
+        
+        institucion = extracted_data.get("institucion", "")
+        instituciones_nuevas = []
+        if institucion and institucion not in existing_instituciones:
+            instituciones_nuevas.append(institucion)
+        
+        return {
+            "nombre_informe": extracted_data.get("nombre_informe", ""),
+            "fecha_informe": extracted_data.get("fecha_informe", ""),
+            "institucion": extracted_data.get("institucion", ""),
+            "proveedor": extracted_data.get("proveedor", ""),
+            "vulnerabilidades": extracted_data.get("vulnerabilidades", []),
+            "aplicaciones_nuevas": list(aplicaciones_nuevas),
+            "informes_nuevos": informes_nuevos,
+            "proveedores_nuevos": proveedores_nuevos,
+            "instituciones_nuevas": instituciones_nuevas
+        }
+        
+    except ImportError as e:
+        logging.error(f"Import error: {e}")
+        raise HTTPException(status_code=500, detail="Dependencias no instaladas para procesar PDF")
+    except Exception as e:
+        logging.error(f"PDF extraction error: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al procesar el PDF: {str(e)}")
+
+@api_router.post("/import/pdf/add-vulnerability")
+async def add_vulnerability_from_pdf(
+    data: VulnerabilidadParaAgregar,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Add a single vulnerability extracted from PDF"""
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.crear:
+        raise HTTPException(status_code=403, detail="No tiene permisos para crear vulnerabilidades")
+    
+    vuln = Vulnerabilidad(
+        fecha_hallazgo=data.fecha_hallazgo,
+        institucion=data.institucion,
+        aplicaciones=data.aplicaciones,
+        vulnerabilidad=data.vulnerabilidad,
+        descripcion_riesgo=data.descripcion_riesgo,
+        recomendaciones=data.recomendaciones,
+        severidad=data.severidad,
+        estatus=data.estatus,
+        nombre_informe_pentest=data.nombre_informe_pentest,
+        proveedor=data.proveedor,
+        riesgo_asociado=data.riesgo_asociado,
+        responsable=data.responsable,
+        fecha_compromiso=data.fecha_compromiso
+    )
+    
+    doc = vuln.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    doc['updated_at'] = doc['updated_at'].isoformat()
+    await db.vulnerabilidades.insert_one(doc)
+    
+    return {"message": "Vulnerabilidad agregada exitosamente", "id": vuln.id}
+
+@api_router.post("/import/pdf/add-catalog-items")
+async def add_catalog_items_from_pdf(
+    aplicaciones: List[str] = [],
+    informes: List[str] = [],
+    proveedores: List[str] = [],
+    instituciones: List[str] = [],
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Add missing catalog items (applications, reports, providers, institutions)"""
+    if not current_user.es_admin and not current_user.permisos.configuracion.crear:
+        raise HTTPException(status_code=403, detail="No tiene permisos para crear elementos de catálogo")
+    
+    added = {"aplicaciones": 0, "informes": 0, "proveedores": 0, "instituciones": 0}
+    
+    for nombre in aplicaciones:
+        if nombre:
+            existing = await db.aplicaciones.find_one({"nombre": nombre})
+            if not existing:
+                app = Aplicacion(nombre=nombre)
+                doc = app.model_dump()
+                doc['created_at'] = doc['created_at'].isoformat()
+                await db.aplicaciones.insert_one(doc)
+                added["aplicaciones"] += 1
+    
+    for nombre in informes:
+        if nombre:
+            existing = await db.informes_pentest.find_one({"nombre": nombre})
+            if not existing:
+                informe = InformePentest(nombre=nombre)
+                doc = informe.model_dump()
+                doc['created_at'] = doc['created_at'].isoformat()
+                await db.informes_pentest.insert_one(doc)
+                added["informes"] += 1
+    
+    for nombre in proveedores:
+        if nombre:
+            existing = await db.proveedores.find_one({"nombre": nombre})
+            if not existing:
+                prov = Proveedor(nombre=nombre)
+                doc = prov.model_dump()
+                doc['created_at'] = doc['created_at'].isoformat()
+                await db.proveedores.insert_one(doc)
+                added["proveedores"] += 1
+    
+    for nombre in instituciones:
+        if nombre:
+            existing = await db.instituciones.find_one({"nombre": nombre})
+            if not existing:
+                inst = Institucion(nombre=nombre)
+                doc = inst.model_dump()
+                doc['created_at'] = doc['created_at'].isoformat()
+                await db.instituciones.insert_one(doc)
+                added["instituciones"] += 1
+    
+    return {"message": "Elementos agregados exitosamente", "added": added}
+
 # Include the router in the main app
 app.include_router(api_router)
 

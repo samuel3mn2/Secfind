@@ -68,7 +68,9 @@ import {
   X,
   ChevronsUpDown,
   Check,
+  FileText,
 } from "lucide-react";
+import ImportarPDF from "@/pages/ImportarPDF";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -188,6 +190,7 @@ export default function Vulnerabilidades() {
   const [deleteId, setDeleteId] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [showPdfImport, setShowPdfImport] = useState(false);
   const itemsPerPage = 15;
 
   const [formData, setFormData] = useState({
@@ -524,6 +527,16 @@ export default function Vulnerabilidades() {
                         </span>
                       </Button>
                     </label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-indigo-500/50 text-indigo-400 hover:bg-indigo-500/10"
+                      onClick={() => setShowPdfImport(true)}
+                      data-testid="import-pdf-btn"
+                    >
+                      <FileText className="w-4 h-4 mr-1" />
+                      PDF
+                    </Button>
                   </>
                 )}
                 <Button
@@ -1047,6 +1060,25 @@ export default function Vulnerabilidades() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* PDF Import Modal */}
+      <Dialog open={showPdfImport} onOpenChange={setShowPdfImport}>
+        <DialogContent className="bg-[#18181b] border-[#27272a] text-white max-w-3xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="text-xl flex items-center gap-2">
+              <FileText className="w-5 h-5 text-indigo-500" />
+              Importar desde PDF
+            </DialogTitle>
+          </DialogHeader>
+          <ImportarPDF 
+            onClose={() => setShowPdfImport(false)}
+            onSuccess={() => {
+              fetchVulnerabilidades();
+              fetchOptions();
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
