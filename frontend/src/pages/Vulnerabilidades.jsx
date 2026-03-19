@@ -183,6 +183,7 @@ export default function Vulnerabilidades() {
   const [filterInstitucion, setFilterInstitucion] = useState("");
   const [filterAño, setFilterAño] = useState("");
   const [filterAplicacion, setFilterAplicacion] = useState("");
+  const [filterInforme, setFilterInforme] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingVuln, setViewingVuln] = useState(null);
@@ -232,6 +233,7 @@ export default function Vulnerabilidades() {
       if (filterInstitucion && filterInstitucion !== "all") params.append("institucion", filterInstitucion);
       if (filterAño && filterAño !== "all") params.append("año", filterAño);
       if (filterAplicacion && filterAplicacion !== "all") params.append("aplicacion", filterAplicacion);
+      if (filterInforme && filterInforme !== "all") params.append("informe_pentest", filterInforme);
 
       const response = await axios.get(`${API}/vulnerabilidades?${params.toString()}`);
       setVulnerabilidades(response.data);
@@ -242,7 +244,7 @@ export default function Vulnerabilidades() {
     } finally {
       setLoading(false);
     }
-  }, [search, filterSeveridad, filterEstatus, filterInstitucion, filterAño, filterAplicacion]);
+  }, [search, filterSeveridad, filterEstatus, filterInstitucion, filterAño, filterAplicacion, filterInforme]);
 
   useEffect(() => {
     fetchOptions();
@@ -489,6 +491,18 @@ export default function Vulnerabilidades() {
                   <SelectItem value="all">Todas</SelectItem>
                   {options?.aplicaciones?.map((a) => (
                     <SelectItem key={a} value={a}>{a}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={filterInforme} onValueChange={setFilterInforme}>
+                <SelectTrigger className="w-[160px] bg-black/20 border-zinc-700 text-white" data-testid="filter-informe">
+                  <SelectValue placeholder="Informe" />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-900 border-zinc-700 max-h-[300px]">
+                  <SelectItem value="all">Todos</SelectItem>
+                  {options?.informes_pentest?.map((i) => (
+                    <SelectItem key={i} value={i}>{i.length > 40 ? i.substring(0, 40) + "..." : i}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
