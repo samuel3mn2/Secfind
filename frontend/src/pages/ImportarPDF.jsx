@@ -134,12 +134,24 @@ export default function ImportarPDF({ onClose, onSuccess }) {
   const prepareFirstVuln = (data) => {
     if (data.vulnerabilidades?.length > 0) {
       const vuln = data.vulnerabilidades[0];
+      // Use the main application evaluated, not the technical assets
+      const aplicacion = data.aplicacion_evaluada ? [data.aplicacion_evaluada] : [];
+      // Include technical assets in description
+      const activosTecnicos = vuln.activos_tecnicos || [];
+      let descripcion = vuln.descripcion || "";
+      if (activosTecnicos.length > 0) {
+        descripcion += `\n\nActivos técnicos afectados: ${activosTecnicos.join(", ")}`;
+      }
+      if (vuln.impacto) {
+        descripcion += `\n\nImpacto: ${vuln.impacto}`;
+      }
+      
       setEditingVuln({
         fecha_hallazgo: data.fecha_informe || new Date().toISOString().split('T')[0],
         institucion: data.institucion || "",
-        aplicaciones: vuln.activos_afectados || [],
+        aplicaciones: aplicacion,
         vulnerabilidad: vuln.titulo || "",
-        descripcion_riesgo: `${vuln.descripcion || ""}\n\nImpacto: ${vuln.impacto || ""}`.trim(),
+        descripcion_riesgo: descripcion.trim(),
         recomendaciones: vuln.recomendaciones || "",
         severidad: vuln.severidad || "Media",
         estatus: "Pendiente",
@@ -223,12 +235,24 @@ export default function ImportarPDF({ onClose, onSuccess }) {
     if (nextIndex < extractedData.vulnerabilidades.length) {
       setCurrentVulnIndex(nextIndex);
       const vuln = extractedData.vulnerabilidades[nextIndex];
+      // Use the main application evaluated, not the technical assets
+      const aplicacion = extractedData.aplicacion_evaluada ? [extractedData.aplicacion_evaluada] : [];
+      // Include technical assets in description
+      const activosTecnicos = vuln.activos_tecnicos || [];
+      let descripcion = vuln.descripcion || "";
+      if (activosTecnicos.length > 0) {
+        descripcion += `\n\nActivos técnicos afectados: ${activosTecnicos.join(", ")}`;
+      }
+      if (vuln.impacto) {
+        descripcion += `\n\nImpacto: ${vuln.impacto}`;
+      }
+      
       setEditingVuln({
         fecha_hallazgo: extractedData.fecha_informe || new Date().toISOString().split('T')[0],
         institucion: extractedData.institucion || "",
-        aplicaciones: vuln.activos_afectados || [],
+        aplicaciones: aplicacion,
         vulnerabilidad: vuln.titulo || "",
-        descripcion_riesgo: `${vuln.descripcion || ""}\n\nImpacto: ${vuln.impacto || ""}`.trim(),
+        descripcion_riesgo: descripcion.trim(),
         recomendaciones: vuln.recomendaciones || "",
         severidad: vuln.severidad || "Media",
         estatus: "Pendiente",
@@ -246,12 +270,24 @@ export default function ImportarPDF({ onClose, onSuccess }) {
     if (prevIndex >= 0) {
       setCurrentVulnIndex(prevIndex);
       const vuln = extractedData.vulnerabilidades[prevIndex];
+      // Use the main application evaluated, not the technical assets
+      const aplicacion = extractedData.aplicacion_evaluada ? [extractedData.aplicacion_evaluada] : [];
+      // Include technical assets in description
+      const activosTecnicos = vuln.activos_tecnicos || [];
+      let descripcion = vuln.descripcion || "";
+      if (activosTecnicos.length > 0) {
+        descripcion += `\n\nActivos técnicos afectados: ${activosTecnicos.join(", ")}`;
+      }
+      if (vuln.impacto) {
+        descripcion += `\n\nImpacto: ${vuln.impacto}`;
+      }
+      
       setEditingVuln({
         fecha_hallazgo: extractedData.fecha_informe || new Date().toISOString().split('T')[0],
         institucion: extractedData.institucion || "",
-        aplicaciones: vuln.activos_afectados || [],
+        aplicaciones: aplicacion,
         vulnerabilidad: vuln.titulo || "",
-        descripcion_riesgo: `${vuln.descripcion || ""}\n\nImpacto: ${vuln.impacto || ""}`.trim(),
+        descripcion_riesgo: descripcion.trim(),
         recomendaciones: vuln.recomendaciones || "",
         severidad: vuln.severidad || "Media",
         estatus: "Pendiente",
@@ -375,6 +411,19 @@ export default function ImportarPDF({ onClose, onSuccess }) {
             </div>
 
             {/* New items */}
+            {extractedData.aplicaciones_nuevas?.length > 0 && (
+              <div>
+                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Aplicación Evaluada (Nueva)</p>
+                <div className="flex flex-wrap gap-2">
+                  {extractedData.aplicaciones_nuevas.map((item, i) => (
+                    <Badge key={i} variant="outline" className="border-green-500/50 text-green-400">
+                      <Plus className="w-3 h-3 mr-1" /> {item}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {extractedData.instituciones_nuevas?.length > 0 && (
               <div>
                 <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Instituciones Nuevas</p>
@@ -407,19 +456,6 @@ export default function ImportarPDF({ onClose, onSuccess }) {
                 <div className="flex flex-wrap gap-2">
                   {extractedData.proveedores_nuevos.map((item, i) => (
                     <Badge key={i} variant="outline" className="border-purple-500/50 text-purple-400">
-                      <Plus className="w-3 h-3 mr-1" /> {item}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {extractedData.aplicaciones_nuevas?.length > 0 && (
-              <div>
-                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Aplicaciones/Activos Nuevos</p>
-                <div className="flex flex-wrap gap-2">
-                  {extractedData.aplicaciones_nuevas.map((item, i) => (
-                    <Badge key={i} variant="outline" className="border-green-500/50 text-green-400">
                       <Plus className="w-3 h-3 mr-1" /> {item}
                     </Badge>
                   ))}

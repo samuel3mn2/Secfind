@@ -1522,11 +1522,12 @@ El JSON debe tener esta estructura exacta:
     "fecha_informe": "YYYY-MM-DD",
     "institucion": "nombre de la institución/cliente",
     "proveedor": "empresa que realizó el pentest",
+    "aplicacion_evaluada": "nombre de la aplicación/sistema principal evaluado (ej: SWIFT, IBP, Active Directory)",
     "vulnerabilidades": [
         {
             "titulo": "título de la vulnerabilidad",
             "severidad": "Critica|Alta|Media|Baja",
-            "activos_afectados": ["lista", "de", "activos"],
+            "activos_tecnicos": ["servidores", "IPs", "URLs afectados"],
             "descripcion": "descripción detallada de la vulnerabilidad",
             "impacto": "impacto de la vulnerabilidad",
             "recomendaciones": "recomendaciones para remediar"
@@ -1534,11 +1535,13 @@ El JSON debe tener esta estructura exacta:
     ]
 }
 
-Reglas:
+Reglas IMPORTANTES:
 - La fecha debe estar en formato YYYY-MM-DD
 - La severidad debe ser exactamente: Critica, Alta, Media o Baja
 - Extrae TODAS las vulnerabilidades del informe
-- Los activos_afectados son los sistemas/aplicaciones afectados"""
+- "aplicacion_evaluada" es el SISTEMA o APLICACIÓN principal que se evaluó en el pentest (ej: SWIFT, SAP, Active Directory, Portal Web, etc.)
+- "activos_tecnicos" son los SERVIDORES, IPs, URLs o hosts específicos donde se encontró la vulnerabilidad. NO son aplicaciones.
+- NO confundas servidores (SERTERPRD05.cfbhd.com) con aplicaciones (SWIFT). Los servidores van en activos_tecnicos."""
         ).with_model("openai", "gpt-4.1-mini")
         
         user_message = UserMessage(
@@ -1569,12 +1572,11 @@ Reglas:
         existing_proveedores = await db.proveedores.distinct("nombre")
         existing_instituciones = await db.instituciones.distinct("nombre")
         
-        # Check for new items
+        # Check for new application (the main evaluated application)
         aplicaciones_nuevas = set()
-        for vuln in extracted_data.get("vulnerabilidades", []):
-            for activo in vuln.get("activos_afectados", []):
-                if activo and activo not in existing_apps:
-                    aplicaciones_nuevas.add(activo)
+        aplicacion_evaluada = extracted_data.get("aplicacion_evaluada", "")
+        if aplicacion_evaluada and aplicacion_evaluada not in existing_apps:
+            aplicaciones_nuevas.add(aplicacion_evaluada)
         
         informes_nuevos = []
         nombre_informe = extracted_data.get("nombre_informe", "")
@@ -1596,6 +1598,7 @@ Reglas:
             "fecha_informe": extracted_data.get("fecha_informe", ""),
             "institucion": extracted_data.get("institucion", ""),
             "proveedor": extracted_data.get("proveedor", ""),
+            "aplicacion_evaluada": aplicacion_evaluada,
             "vulnerabilidades": extracted_data.get("vulnerabilidades", []),
             "aplicaciones_nuevas": list(aplicaciones_nuevas),
             "informes_nuevos": informes_nuevos,
