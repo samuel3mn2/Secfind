@@ -80,7 +80,10 @@ export default function ImportarPDF({ onClose, onSuccess }) {
 
   const fetchOptions = async () => {
     try {
-      const response = await axios.get(`${API}/dropdown-options`);
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${API}/dropdown-options`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       setOptions(response.data);
     } catch (error) {
       console.error("Error fetching options:", error);
@@ -101,8 +104,13 @@ export default function ImportarPDF({ onClose, onSuccess }) {
     formData.append('file', file);
 
     try {
+      // Get token from localStorage
+      const token = localStorage.getItem("token");
       const response = await axios.post(`${API}/import/pdf/extract`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`
+        }
       });
       
       setExtractedData(response.data);
@@ -167,7 +175,9 @@ export default function ImportarPDF({ onClose, onSuccess }) {
   const handleAddCatalogItems = async () => {
     setLoading(true);
     try {
+      const token = localStorage.getItem("token");
       await axios.post(`${API}/import/pdf/add-catalog-items`, null, {
+        headers: { 'Authorization': `Bearer ${token}` },
         params: {
           aplicaciones: extractedData.aplicaciones_nuevas || [],
           informes: extractedData.informes_nuevos || [],
@@ -209,7 +219,10 @@ export default function ImportarPDF({ onClose, onSuccess }) {
     
     setLoading(true);
     try {
-      await axios.post(`${API}/import/pdf/add-vulnerability`, editingVuln);
+      const token = localStorage.getItem("token");
+      await axios.post(`${API}/import/pdf/add-vulnerability`, editingVuln, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       
       setAddedVulns([...addedVulns, currentVulnIndex]);
       toast.success("Vulnerabilidad agregada exitosamente");
