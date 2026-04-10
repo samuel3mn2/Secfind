@@ -216,17 +216,21 @@ MongoDB es la base de datos donde se guardarán las vulnerabilidades.
      ```
    - Presiona Enter después de cada línea
 
-6. **Verificar que el archivo se creó:**
+6. **(OPCIONAL) Configurar importación de PDF con IA:**
+   - Si quieres usar la funcionalidad de importar vulnerabilidades desde PDF, necesitas una API key
+   - Escribe:
+     ```
+     echo EMERGENT_LLM_KEY="tu-api-key-aqui" >> .env
+     ```
+   - Reemplaza `tu-api-key-aqui` con tu API key real
+   - **Sin esta key**, la importación de PDF no funcionará, pero todas las demás funciones sí
+
+7. **Verificar que el archivo se creó:**
    - Escribe:
      ```
      type .env
      ```
-   - Deberías ver:
-     ```
-     MONGO_URL="mongodb://localhost:27017"
-     DB_NAME="secfind_db"
-     CORS_ORIGINS="http://localhost:3000"
-     ```
+   - Deberías ver las variables configuradas
 
 ---
 
@@ -432,6 +436,50 @@ La aplicación crea automáticamente un usuario administrador al iniciar:
 | Aplicación Web | http://localhost:3000 |
 | API Backend | http://localhost:8001 |
 | Documentación API | http://localhost:8001/docs |
+
+---
+
+## FUNCIONALIDADES PRINCIPALES
+
+### Dashboard
+- **6 KPIs**: Total, Críticas Abiertas, Corregidas, Pendientes, En Proceso, Para Re Test
+- Gráficos de pastel y barras
+- Filtros por año, institución, severidad, proveedor, aplicación
+
+### Gestión de Vulnerabilidades
+- Búsqueda y filtros múltiples
+- Importar desde Excel, CSV y **PDF con IA**
+- Exportar a Excel y CSV
+
+### Seguimiento de Riesgos
+- Vulnerabilidades con fecha de compromiso
+- Alertas de vencimiento
+
+### Configuración
+- Instituciones, Aplicaciones, Proveedores, Informes Pentest
+- Gestión de usuarios con permisos
+
+---
+
+## IMPORTACIÓN DE PDF CON IA
+
+Esta funcionalidad permite **extraer automáticamente** las vulnerabilidades de un informe de pentest en PDF.
+
+### Cómo funciona:
+1. Sube un PDF de informe de pentest
+2. La IA extrae: nombre del informe, fecha, institución, proveedor
+3. Extrae todas las vulnerabilidades con severidad, descripción, recomendaciones
+4. Puedes revisar y editar cada vulnerabilidad antes de guardarla
+
+### Requisito:
+- Necesitas una API key configurada en `backend/.env`:
+  ```
+  EMERGENT_LLM_KEY="tu-api-key"
+  ```
+
+### Sin API key:
+- La importación de PDF mostrará un error
+- Todas las demás funcionalidades funcionan normalmente
 
 ---
 

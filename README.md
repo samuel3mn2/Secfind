@@ -1,51 +1,65 @@
 # SecFind - Sistema de Gestión de Vulnerabilidades
 
-Sistema web para la gestión de vulnerabilidades de ciberseguridad, diseñado para reemplazar flujos de trabajo basados en Excel. Incluye dashboard ejecutivo con KPIs, gráficos interactivos y módulo CRUD completo.
+Sistema web completo para la gestión de vulnerabilidades de ciberseguridad, diseñado para reemplazar flujos de trabajo basados en Excel. Incluye dashboard ejecutivo con KPIs, gráficos interactivos, módulo CRUD completo, seguimiento de riesgos e importación inteligente desde PDF con IA.
 
-![Dashboard](https://img.shields.io/badge/Dashboard-KPIs%20%2B%20Gráficos-blue)
+![Dashboard](https://img.shields.io/badge/Dashboard-6%20KPIs%20%2B%20Gráficos-blue)
 ![Stack](https://img.shields.io/badge/Stack-FastAPI%20%2B%20React%20%2B%20MongoDB-green)
 ![Idioma](https://img.shields.io/badge/Idioma-Español-red)
+![AI](https://img.shields.io/badge/AI-GPT--4.1--mini-purple)
 
-## Características
+---
+
+## Características Principales
 
 ### Dashboard Ejecutivo
-- **KPIs interactivos**: Total, Críticas Abiertas, Corregidas, Pendientes
+- **6 KPIs interactivos**: Total, Críticas Abiertas, Corregidas, Pendientes, En Proceso, Para Re Test
 - **Click en KPIs** para ver el detalle de vulnerabilidades
 - **Gráfico de evolución temporal** (mensual/trimestral)
-- **Gráfico de pastel** por Severidad
-- **Gráfico de barras** por Estatus e Institución
-- **5 filtros dinámicos**: Año, Institución, Informe Pentest, Severidad, Proveedor
+- **Gráficos de pastel y barras** por Severidad, Estatus e Institución
+- **6 filtros dinámicos**: Año, Institución, Informe Pentest, Severidad, Proveedor, Aplicación
 
 ### Gestión de Vulnerabilidades
-- Tabla CRUD con búsqueda y filtros
-- Crear, editar y eliminar vulnerabilidades
-- Campos dropdown predefinidos
+- Tabla CRUD con búsqueda y múltiples filtros
+- Campos dropdown predefinidos desde catálogos
+- Multi-select para aplicaciones
 - Paginación
 
+### Seguimiento de Riesgos
+- Página dedicada para vulnerabilidades con fecha de compromiso
+- KPIs: Vencidas, Próximos 7 días, Próximos 30 días
+- Cálculo automático de días restantes
+- Alertas visuales por estado
+
 ### Módulo de Configuración
-- Gestión dinámica de instituciones
-- Activar/Desactivar instituciones
+- **Instituciones**: Gestión de empresas/clientes
+- **Aplicaciones**: Catálogo de sistemas evaluados
+- **Proveedores**: Empresas de pentest
+- **Informes Pentest**: Nombres de informes
+- **Usuarios**: Gestión con permisos por módulo
 
 ### Importar/Exportar
 - Exportar a CSV y Excel
 - Importar desde CSV y Excel
+- **🆕 Importar desde PDF con IA** (extrae vulnerabilidades automáticamente)
 
 ---
 
 ## Requisitos Previos
 
 ### Software necesario:
-- **Python 3.9+**
-- **Node.js 18+** y **Yarn**
-- **MongoDB 6.0+**
+| Software | Versión Mínima | Verificar |
+|----------|----------------|-----------|
+| Python | 3.9+ | `python3 --version` |
+| Node.js | 18+ | `node --version` |
+| Yarn | 1.22+ | `yarn --version` |
+| MongoDB | 6.0+ | `mongod --version` |
 
-### Verificar instalaciones:
-```bash
-python3 --version    # Python 3.9+
-node --version       # v18+
-yarn --version       # 1.22+
-mongod --version     # 6.0+
-```
+### API Key para Importación de PDF (Opcional)
+La funcionalidad de **importar vulnerabilidades desde PDF** utiliza IA (GPT-4.1-mini). Para usarla necesitas:
+- Una API key de OpenAI, o
+- Una API key de Emergent (si usas emergentintegrations)
+
+> **Nota**: Si no configuras la API key, todas las demás funcionalidades funcionarán normalmente. Solo la importación de PDF estará deshabilitada.
 
 ---
 
@@ -61,13 +75,13 @@ cd secfind
 
 #### Opción A: MongoDB Local
 ```bash
-# Iniciar MongoDB (Linux/Mac)
+# Linux
 sudo systemctl start mongod
 
-# o en Mac con Homebrew
+# Mac con Homebrew
 brew services start mongodb-community
 
-# Verificar que está corriendo
+# Verificar conexión
 mongosh --eval "db.runCommand({ ping: 1 })"
 ```
 
@@ -85,26 +99,27 @@ cd backend
 python3 -m venv venv
 
 # Activar entorno virtual
-# Linux/Mac:
-source venv/bin/activate
-# Windows:
-.\venv\Scripts\activate
+source venv/bin/activate     # Linux/Mac
+# .\venv\Scripts\activate    # Windows
 
 # Instalar dependencias
 pip install -r requirements.txt
 ```
 
-#### Configurar variables de entorno:
-```bash
-# Crear archivo .env
-cat > .env << EOF
+#### Variables de entorno del Backend:
+Crear archivo `backend/.env`:
+```env
 MONGO_URL="mongodb://localhost:27017"
 DB_NAME="secfind_db"
 CORS_ORIGINS="http://localhost:3000"
-EOF
-```
 
-> **Nota**: Si usas MongoDB Atlas, reemplaza `MONGO_URL` con tu URL de conexión.
+# OPCIONAL: Para importación de PDF con IA
+# Opción 1: API Key de OpenAI directa
+# OPENAI_API_KEY="sk-..."
+
+# Opción 2: API Key de Emergent (si usas emergentintegrations)
+# EMERGENT_LLM_KEY="sk-emergent-..."
+```
 
 ### 4. Configurar el Frontend
 
@@ -115,12 +130,10 @@ cd ../frontend
 yarn install
 ```
 
-#### Configurar variables de entorno:
-```bash
-# Crear archivo .env
-cat > .env << EOF
+#### Variables de entorno del Frontend:
+Crear archivo `frontend/.env`:
+```env
 REACT_APP_BACKEND_URL=http://localhost:8001
-EOF
 ```
 
 ---
@@ -131,76 +144,20 @@ EOF
 ```bash
 cd backend
 source venv/bin/activate  # Linux/Mac
-# .\venv\Scripts\activate  # Windows
-
 uvicorn server:app --host 0.0.0.0 --port 8001 --reload
 ```
-
-El backend estará disponible en: `http://localhost:8001`
+Backend disponible en: `http://localhost:8001`
 
 ### Terminal 2 - Frontend:
 ```bash
 cd frontend
 yarn start
 ```
+Frontend disponible en: `http://localhost:3000`
 
-El frontend estará disponible en: `http://localhost:3000`
-
----
-
-## Importar Datos Iniciales
-
-### Opción 1: Desde la interfaz web
-1. Ir a **Vulnerabilidades** > **Importar Excel**
-2. Seleccionar tu archivo `.xlsx` o `.csv`
-
-### Opción 2: Script de importación
-```bash
-cd backend
-source venv/bin/activate
-
-python3 << 'EOF'
-import pandas as pd
-from pymongo import MongoClient
-import uuid
-from datetime import datetime, timezone
-
-client = MongoClient("mongodb://localhost:27017")
-db = client["secfind_db"]
-
-# Leer Excel
-df = pd.read_excel("tu_archivo.xlsx", sheet_name="Consolidado")
-
-# Mapear columnas
-column_mapping = {
-    'Fecha Hallazgo': 'fecha_hallazgo',
-    'Institucion': 'institucion',
-    'Aplicacion': 'aplicacion',
-    'Vulnerabilidad': 'vulnerabilidad',
-    'Recomendaciones': 'recomendaciones',
-    'Severidad': 'severidad',
-    'Riesgo Asociado': 'riesgo_asociado',
-    'Descripcion del riesgo': 'descripcion_riesgo',
-    'Responsable': 'responsable',
-    'Fecha de Compromiso': 'fecha_compromiso',
-    'Estatus': 'estatus',
-    'Resultado Re Test': 'resultado_re_test',
-    'Nombre informe de pentest': 'nombre_informe_pentest',
-    'Proveedor': 'proveedor'
-}
-df = df.rename(columns=column_mapping)
-
-# Insertar registros
-for _, row in df.iterrows():
-    record = {k: (None if pd.isna(v) else str(v)) for k, v in row.items()}
-    record['id'] = str(uuid.uuid4())
-    record['created_at'] = datetime.now(timezone.utc).isoformat()
-    record['updated_at'] = datetime.now(timezone.utc).isoformat()
-    db.vulnerabilidades.insert_one(record)
-
-print(f"Importados {len(df)} registros")
-EOF
-```
+### Credenciales por Defecto
+- **Usuario**: `admin`
+- **Contraseña**: `admin123`
 
 ---
 
@@ -209,51 +166,73 @@ EOF
 ```
 secfind/
 ├── backend/
-│   ├── server.py          # API FastAPI
-│   ├── requirements.txt   # Dependencias Python
-│   └── .env              # Variables de entorno
+│   ├── server.py              # API FastAPI (todos los endpoints)
+│   ├── requirements.txt       # Dependencias Python
+│   └── .env                   # Variables de entorno
 ├── frontend/
 │   ├── src/
 │   │   ├── pages/
-│   │   │   ├── Dashboard.jsx
-│   │   │   ├── Vulnerabilidades.jsx
-│   │   │   └── Configuracion.jsx
+│   │   │   ├── Dashboard.jsx          # Dashboard con KPIs
+│   │   │   ├── Vulnerabilidades.jsx   # CRUD de vulnerabilidades
+│   │   │   ├── SeguimientoRiesgos.jsx # Seguimiento de fechas
+│   │   │   ├── Configuracion.jsx      # Módulo de configuración
+│   │   │   ├── ImportarPDF.jsx        # Importación con IA
+│   │   │   ├── Instituciones.jsx
+│   │   │   ├── Aplicaciones.jsx
+│   │   │   ├── Proveedores.jsx
+│   │   │   ├── InformesPentest.jsx
+│   │   │   ├── Usuarios.jsx
+│   │   │   └── Login.jsx
 │   │   ├── components/
 │   │   │   ├── Layout.jsx
-│   │   │   └── ui/        # Componentes Shadcn
-│   │   ├── App.js
-│   │   └── index.css
+│   │   │   └── ui/                    # Componentes Shadcn
+│   │   ├── context/
+│   │   │   └── AuthContext.jsx        # Autenticación
+│   │   └── App.js
 │   ├── package.json
 │   └── .env
-└── README.md
+├── README.md
+└── INSTALACION_WINDOWS.md
 ```
 
 ---
 
 ## API Endpoints
 
+### Autenticación
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| POST | `/api/auth/login` | Iniciar sesión |
+
 ### Vulnerabilidades
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
-| GET | `/api/vulnerabilidades` | Listar vulnerabilidades |
+| GET | `/api/vulnerabilidades` | Listar con filtros |
 | POST | `/api/vulnerabilidades` | Crear vulnerabilidad |
-| PUT | `/api/vulnerabilidades/{id}` | Actualizar vulnerabilidad |
-| DELETE | `/api/vulnerabilidades/{id}` | Eliminar vulnerabilidad |
+| PUT | `/api/vulnerabilidades/{id}` | Actualizar |
+| DELETE | `/api/vulnerabilidades/{id}` | Eliminar |
 
 ### Dashboard
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
-| GET | `/api/dashboard/stats` | Estadísticas con filtros |
+| GET | `/api/dashboard/stats` | KPIs con filtros |
 | GET | `/api/dashboard/tendencias` | Evolución temporal |
 | GET | `/api/dashboard/kpi-detail` | Detalle de KPIs |
+
+### Seguimiento de Riesgos
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/seguimiento-riesgos` | Vulnerabilidades con fecha compromiso |
+| GET | `/api/seguimiento-riesgos/resumen` | KPIs de seguimiento |
 
 ### Configuración
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
-| GET | `/api/config/instituciones` | Listar instituciones |
-| POST | `/api/config/instituciones` | Crear institución |
-| PUT | `/api/config/instituciones/{id}` | Actualizar institución |
-| DELETE | `/api/config/instituciones/{id}` | Eliminar institución |
+| GET/POST/PUT/DELETE | `/api/config/instituciones` | CRUD Instituciones |
+| GET/POST/PUT/DELETE | `/api/config/aplicaciones` | CRUD Aplicaciones |
+| GET/POST/PUT/DELETE | `/api/config/proveedores` | CRUD Proveedores |
+| GET/POST/PUT/DELETE | `/api/config/informes-pentest` | CRUD Informes |
+| GET/POST/PUT/DELETE | `/api/users` | CRUD Usuarios |
 
 ### Importar/Exportar
 | Método | Endpoint | Descripción |
@@ -262,51 +241,36 @@ secfind/
 | GET | `/api/export/excel` | Exportar a Excel |
 | POST | `/api/import/csv` | Importar CSV |
 | POST | `/api/import/excel` | Importar Excel |
+| POST | `/api/import/pdf/extract` | **Extraer de PDF con IA** |
+| POST | `/api/import/pdf/add-vulnerability` | Agregar vulnerabilidad de PDF |
 
 ---
 
-## Campos del Modelo de Vulnerabilidad
+## Importación desde PDF con IA
 
-| Campo | Tipo | Descripción |
-|-------|------|-------------|
-| fecha_hallazgo | Date | Fecha de descubrimiento |
-| institucion | Select | Empresa afectada |
-| aplicacion | String | Sistema/aplicación |
-| vulnerabilidad | Text | Descripción de la vulnerabilidad |
-| recomendaciones | Text | Acciones recomendadas |
-| severidad | Select | Critica, Alta, Media, Baja |
-| riesgo_asociado | String | Riesgo de negocio |
-| descripcion_riesgo | Text | Detalle del riesgo |
-| responsable | String | Persona asignada |
-| fecha_compromiso | Date | Fecha límite de corrección |
-| estatus | Select | Estado actual |
-| resultado_re_test | Select | Resultado de verificación |
-| nombre_informe_pentest | String | Informe de origen |
-| proveedor | String | Empresa de pentest |
+### Cómo funciona
+1. Sube un informe de pentest en PDF
+2. El sistema extrae automáticamente:
+   - Nombre del informe, fecha, institución, proveedor
+   - Aplicación evaluada
+   - Todas las vulnerabilidades con severidad, descripción y recomendaciones
+3. Revisa y edita cada vulnerabilidad antes de agregarla
+4. El sistema detecta elementos nuevos (aplicaciones, proveedores, etc.) y te permite agregarlos al catálogo
 
-### Valores de Dropdowns
+### Requisitos
+- API Key configurada en `backend/.env`
+- El PDF debe ser un informe de pentest estructurado
 
-**Severidad:** Critica, Alta, Media, Baja
-
-**Estatus:** En Proceso, Cerrado, Pendiente, Para Re Test, Corregido, Desestimado
-
-**Resultado Re Test:** Corregido, Pendiente, Impedimento, Vulnerable, Desestimado
+### Sin API Key
+Si no configuras la API key:
+- El botón "PDF" aparecerá pero mostrará un error al intentar procesar
+- Todas las demás funcionalidades (importar Excel/CSV, CRUD, etc.) funcionan normalmente
 
 ---
 
 ## Despliegue en Producción
 
-### Usando Docker (Recomendado)
-
-```dockerfile
-# Dockerfile para backend
-FROM python:3.11-slim
-WORKDIR /app
-COPY backend/requirements.txt .
-RUN pip install -r requirements.txt
-COPY backend/ .
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001"]
-```
+### Con Docker Compose
 
 ```yaml
 # docker-compose.yml
@@ -326,6 +290,9 @@ services:
     environment:
       - MONGO_URL=mongodb://mongodb:27017
       - DB_NAME=secfind_db
+      - CORS_ORIGINS=http://tu-dominio.com
+      # Opcional para PDF:
+      # - EMERGENT_LLM_KEY=sk-emergent-...
     depends_on:
       - mongodb
 
@@ -334,7 +301,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - REACT_APP_BACKEND_URL=http://localhost:8001
+      - REACT_APP_BACKEND_URL=http://tu-dominio.com:8001
 
 volumes:
   mongo_data:
@@ -344,7 +311,7 @@ volumes:
 docker-compose up -d
 ```
 
-### Usando Nginx como Reverse Proxy
+### Con Nginx como Reverse Proxy
 
 ```nginx
 server {
@@ -371,27 +338,55 @@ server {
 
 ### MongoDB no conecta
 ```bash
-# Verificar que MongoDB está corriendo
 sudo systemctl status mongod
-
-# Reiniciar MongoDB
 sudo systemctl restart mongod
 ```
 
 ### Error de CORS
 Verificar que `CORS_ORIGINS` en `backend/.env` incluya la URL del frontend.
 
-### Dependencias de Python
+### Error en importación de PDF
+- Verificar que `EMERGENT_LLM_KEY` o `OPENAI_API_KEY` está configurada
+- El PDF debe ser legible (no escaneado como imagen)
+
+### Dependencias
 ```bash
+# Backend
 pip install --upgrade pip
 pip install -r requirements.txt --force-reinstall
-```
 
-### Dependencias de Node
-```bash
+# Frontend
 rm -rf node_modules yarn.lock
 yarn install
 ```
+
+---
+
+## Modelo de Datos
+
+### Vulnerabilidad
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| fecha_hallazgo | Date | Fecha de descubrimiento |
+| institucion | String | Empresa afectada |
+| aplicaciones | Array | Sistemas/aplicaciones afectadas |
+| vulnerabilidad | String | Título de la vulnerabilidad |
+| descripcion_riesgo | Text | Descripción detallada |
+| recomendaciones | Text | Acciones para remediar |
+| severidad | Enum | Critica, Alta, Media, Baja |
+| estatus | Enum | Estado actual |
+| responsable | String | Persona asignada |
+| fecha_compromiso | Date | Fecha límite |
+| nombre_informe_pentest | String | Informe de origen |
+| proveedor | String | Empresa de pentest |
+
+### Valores de Enums
+
+**Severidad**: Critica, Alta, Media, Baja
+
+**Estatus**: En Proceso, Cerrado, Pendiente, Para Re Test, Corregido, Desestimado
+
+**Resultado Re Test**: Corregido, Pendiente, Impedimento, Vulnerable, Desestimado
 
 ---
 
