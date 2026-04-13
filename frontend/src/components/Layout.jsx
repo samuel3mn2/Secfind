@@ -1,6 +1,6 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { Shield, LayoutDashboard, List, Menu, X, Settings, LogOut, User, CalendarClock } from "lucide-react";
+import { Shield, LayoutDashboard, List, Menu, X, Settings, LogOut, User, CalendarClock, Users } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,6 +39,12 @@ export const Layout = () => {
       to: "/seguimiento-riesgos", 
       icon: CalendarClock, 
       label: "Seguimiento",
+      show: isAdmin || canView("vulnerabilidades")
+    },
+    { 
+      to: "/vista-comite", 
+      icon: Users, 
+      label: "Vista Comité",
       show: isAdmin || canView("vulnerabilidades")
     },
     { 

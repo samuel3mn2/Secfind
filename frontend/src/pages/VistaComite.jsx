@@ -40,7 +40,10 @@ import {
   AlertTriangle,
   TrendingUp,
   Clock,
+  Image,
 } from "lucide-react";
+import html2canvas from "html2canvas";
+import { useRef } from "react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -81,6 +84,8 @@ export default function VistaComite() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState([]);
   const [options, setOptions] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const tableRef = useRef(null);
   
   // Filters
   const [selectedInformes, setSelectedInformes] = useState([]);
@@ -205,6 +210,31 @@ export default function VistaComite() {
     toast.success("Exportado a CSV");
   };
 
+  const exportToImage = async () => {
+    if (!tableRef.current || data.length === 0) return;
+    
+    setExporting(true);
+    try {
+      const canvas = await html2canvas(tableRef.current, {
+        backgroundColor: "#18181b",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      
+      const link = document.createElement("a");
+      link.download = `vista_comite_${new Date().toISOString().split('T')[0]}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+      toast.success("Imagen descargada para PowerPoint");
+    } catch (error) {
+      console.error("Error exporting image:", error);
+      toast.error("Error al exportar imagen");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // Calculate totals
   const totals = data.reduce((acc, row) => {
     acc.criticas_pendientes += row.criticas_pendientes;
@@ -264,10 +294,20 @@ export default function VistaComite() {
             onClick={exportToCSV}
             disabled={data.length === 0}
             className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
-            data-testid="export-btn"
+            data-testid="export-csv-btn"
           >
             <Download className="w-4 h-4 mr-2" />
-            Exportar CSV
+            CSV
+          </Button>
+          <Button
+            variant="outline"
+            onClick={exportToImage}
+            disabled={data.length === 0 || exporting}
+            className="border-indigo-700 text-indigo-300 hover:bg-indigo-900/30"
+            data-testid="export-image-btn"
+          >
+            <Image className="w-4 h-4 mr-2" />
+            {exporting ? "Exportando..." : "Imagen PPT"}
           </Button>
         </div>
       </div>
@@ -451,7 +491,7 @@ export default function VistaComite() {
       </div>
 
       {/* Table */}
-      <Card className="bg-[#18181b] border-[#27272a]">
+      <Card className="bg-[#18181b] border-[#27272a]" ref={tableRef}>
         <CardContent className="p-0">
           {loading ? (
             <div className="p-8 text-center">

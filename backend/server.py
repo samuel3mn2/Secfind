@@ -1107,6 +1107,111 @@ async def get_dashboard_tendencias(
     
     return result
 
+# ============ VISTA COMITÉ ENDPOINT ============
+
+@api_router.get("/vista-comite")
+async def get_vista_comite(
+    informes: str = "",
+    severidades: str = "Critica,Alta,Media,Baja",
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Agregación de vulnerabilidades por informe de pentest para vista de comité.
+    Retorna pendientes/total por severidad, responsables, y porcentaje de pendientes.
+    """
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos para ver este módulo")
+    
+    # Parse filters
+    informes_list = [i.strip() for i in informes.split(",") if i.strip()] if informes else []
+    severidades_list = [s.strip() for s in severidades.split(",") if s.strip()] if severidades else []
+    
+    if not informes_list:
+        return []
+    
+    # Build query
+    query = {"nombre_informe_pentest": {"$in": informes_list}}
+    
+    # Statuses considered as "not pending" (completed/resolved)
+    closed_statuses = ["Cerrado", "Corregido", "Desestimado"]
+    
+    # Get all vulnerabilities matching the filter
+    vulns = await db.vulnerabilidades.find(
+        query,
+        {"_id": 0, "nombre_informe_pentest": 1, "severidad": 1, "estatus": 1, "responsable": 1}
+    ).to_list(50000)
+    
+    # Aggregate by informe
+    from collections import defaultdict
+    
+    informe_data = defaultdict(lambda: {
+        "criticas_pendientes": 0, "criticas_total": 0,
+        "altas_pendientes": 0, "altas_total": 0,
+        "medias_pendientes": 0, "medias_total": 0,
+        "bajas_pendientes": 0, "bajas_total": 0,
+        "total_pendientes": 0, "total_hallazgos": 0,
+        "responsables": set()
+    })
+    
+    for v in vulns:
+        informe = v.get("nombre_informe_pentest", "Sin informe")
+        severidad = v.get("severidad", "")
+        estatus = v.get("estatus")
+        responsable = v.get("responsable")
+        
+        if responsable:
+            informe_data[informe]["responsables"].add(responsable)
+        
+        # Check if pending (not in closed statuses)
+        is_pending = estatus not in closed_statuses
+        
+        # Map severidad to field name
+        if severidad == "Critica":
+            informe_data[informe]["criticas_total"] += 1
+            if is_pending:
+                informe_data[informe]["criticas_pendientes"] += 1
+        elif severidad == "Alta":
+            informe_data[informe]["altas_total"] += 1
+            if is_pending:
+                informe_data[informe]["altas_pendientes"] += 1
+        elif severidad == "Media":
+            informe_data[informe]["medias_total"] += 1
+            if is_pending:
+                informe_data[informe]["medias_pendientes"] += 1
+        elif severidad == "Baja":
+            informe_data[informe]["bajas_total"] += 1
+            if is_pending:
+                informe_data[informe]["bajas_pendientes"] += 1
+        
+        # Totals (only count if severidad is in the selected list)
+        if severidad in ["Critica", "Alta", "Media", "Baja"]:
+            informe_data[informe]["total_hallazgos"] += 1
+            if is_pending:
+                informe_data[informe]["total_pendientes"] += 1
+    
+    # Build response
+    result = []
+    for informe in sorted(informe_data.keys()):
+        data = informe_data[informe]
+        responsables_list = sorted(data["responsables"])
+        
+        result.append({
+            "informe": informe,
+            "criticas_pendientes": data["criticas_pendientes"],
+            "criticas_total": data["criticas_total"],
+            "altas_pendientes": data["altas_pendientes"],
+            "altas_total": data["altas_total"],
+            "medias_pendientes": data["medias_pendientes"],
+            "medias_total": data["medias_total"],
+            "bajas_pendientes": data["bajas_pendientes"],
+            "bajas_total": data["bajas_total"],
+            "responsable": ", ".join(responsables_list) if responsables_list else None,
+            "total_pendientes": data["total_pendientes"],
+            "total_hallazgos": data["total_hallazgos"]
+        })
+    
+    return result
+
 @api_router.get("/dashboard/kpi-detail")
 async def get_kpi_detail(
     tipo: str,

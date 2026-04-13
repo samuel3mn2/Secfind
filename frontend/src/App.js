@@ -6,6 +6,7 @@ import Dashboard from "@/pages/Dashboard";
 import Vulnerabilidades from "@/pages/Vulnerabilidades";
 import Configuracion from "@/pages/Configuracion";
 import SeguimientoRiesgos from "@/pages/SeguimientoRiesgos";
+import VistaComite from "@/pages/VistaComite";
 import Login from "@/pages/Login";
 import Layout from "@/components/Layout";
 
@@ -69,6 +70,7 @@ function AppRoutes() {
         <Route index element={<Dashboard />} />
         <Route path="vulnerabilidades" element={<Vulnerabilidades />} />
         <Route path="seguimiento-riesgos" element={<SeguimientoRiesgos />} />
+        <Route path="vista-comite" element={<VistaComite />} />
         <Route path="configuracion" element={<Configuracion />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
