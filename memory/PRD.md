@@ -93,6 +93,12 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - [x] Dropdowns para campos de catálogo
 - [x] Importar: Excel, CSV, **PDF con IA**
 - [x] Exportar: Excel, CSV
+- [x] **Acciones Masivas** (NUEVO - Dic 2025):
+  - [x] Selección múltiple con checkboxes
+  - [x] Cambiar estatus de múltiples vulnerabilidades
+  - [x] Asignar responsable en lote
+  - [x] Actualizar fecha de compromiso en grupo
+  - [x] Registro en historial de auditoría
 
 ### Importación de PDF con IA
 - [x] Extracción automática con GPT-4.1-mini

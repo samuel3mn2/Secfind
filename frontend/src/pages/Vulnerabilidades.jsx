@@ -69,6 +69,9 @@ import {
   ChevronsUpDown,
   Check,
   FileText,
+  CheckSquare,
+  Square,
+  Layers,
 } from "lucide-react";
 import ImportarPDF from "@/pages/ImportarPDF";
 
@@ -193,6 +196,12 @@ export default function Vulnerabilidades() {
   const [currentPage, setCurrentPage] = useState(1);
   const [showPdfImport, setShowPdfImport] = useState(false);
   const itemsPerPage = 15;
+
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkAction, setBulkAction] = useState({ estatus: "", responsable: "", fecha_compromiso: "" });
+  const [applyingBulk, setApplyingBulk] = useState(false);
 
   const [formData, setFormData] = useState({
     fecha_hallazgo: "",
@@ -374,6 +383,57 @@ export default function Vulnerabilidades() {
     const apps = vuln.aplicaciones || [];
     if (apps.length === 0) return vuln.aplicacion || "-";
     return apps.join(", ");
+  };
+
+  // Bulk selection helpers
+  const toggleSelectAll = () => {
+    if (selectedIds.length === paginatedData.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(paginatedData.map(v => v.id));
+    }
+  };
+
+  const toggleSelect = (id) => {
+    if (selectedIds.includes(id)) {
+      setSelectedIds(selectedIds.filter(i => i !== id));
+    } else {
+      setSelectedIds([...selectedIds, id]);
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedIds([]);
+  };
+
+  const handleBulkUpdate = async () => {
+    if (selectedIds.length === 0) return;
+    
+    // Check if at least one field is set
+    if (!bulkAction.estatus && bulkAction.responsable === undefined && bulkAction.fecha_compromiso === undefined) {
+      toast.error("Selecciona al menos un campo para actualizar");
+      return;
+    }
+    
+    setApplyingBulk(true);
+    try {
+      const payload = { ids: selectedIds };
+      if (bulkAction.estatus) payload.estatus = bulkAction.estatus;
+      if (bulkAction.responsable !== undefined && bulkAction.responsable !== "") payload.responsable = bulkAction.responsable;
+      if (bulkAction.fecha_compromiso !== undefined && bulkAction.fecha_compromiso !== "") payload.fecha_compromiso = bulkAction.fecha_compromiso;
+      
+      const response = await axios.post(`${API}/vulnerabilidades/bulk-update`, payload);
+      toast.success(response.data.message);
+      setShowBulkModal(false);
+      setSelectedIds([]);
+      setBulkAction({ estatus: "", responsable: "", fecha_compromiso: "" });
+      fetchVulnerabilidades();
+    } catch (error) {
+      console.error("Error in bulk update:", error);
+      toast.error(error.response?.data?.detail || "Error al actualizar");
+    } finally {
+      setApplyingBulk(false);
+    }
   };
 
   const paginatedData = vulnerabilidades.slice(
@@ -570,6 +630,42 @@ export default function Vulnerabilidades() {
         </CardContent>
       </Card>
 
+      {/* Bulk Actions Bar */}
+      {selectedIds.length > 0 && (
+        <Card className="bg-indigo-950/50 border-indigo-500/30">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <CheckSquare className="w-5 h-5 text-indigo-400" />
+                <span className="text-indigo-300 font-medium">
+                  {selectedIds.length} vulnerabilidad{selectedIds.length > 1 ? "es" : ""} seleccionada{selectedIds.length > 1 ? "s" : ""}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  onClick={() => setShowBulkModal(true)}
+                  data-testid="bulk-action-btn"
+                >
+                  <Layers className="w-4 h-4 mr-2" />
+                  Acciones Masivas
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-zinc-400 hover:text-white"
+                  onClick={clearSelection}
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Table */}
       <Card className="bg-[#18181b] border-[#27272a]">
         <CardContent className="p-0">
@@ -577,6 +673,16 @@ export default function Vulnerabilidades() {
             <Table className="vuln-table">
               <TableHeader>
                 <TableRow className="border-zinc-700 hover:bg-transparent">
+                  {canModify && (
+                    <TableHead className="w-[40px]">
+                      <Checkbox
+                        checked={paginatedData.length > 0 && selectedIds.length === paginatedData.length}
+                        onCheckedChange={toggleSelectAll}
+                        className="border-zinc-600"
+                        data-testid="select-all-checkbox"
+                      />
+                    </TableHead>
+                  )}
                   <TableHead className="text-zinc-400">Fecha</TableHead>
                   <TableHead className="text-zinc-400">Institución</TableHead>
                   <TableHead className="text-zinc-400">Aplicaciones</TableHead>
@@ -590,7 +696,7 @@ export default function Vulnerabilidades() {
               <TableBody>
                 {paginatedData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-12 text-zinc-500">
+                    <TableCell colSpan={canModify ? 9 : 8} className="text-center py-12 text-zinc-500">
                       No se encontraron vulnerabilidades
                     </TableCell>
                   </TableRow>
@@ -598,9 +704,19 @@ export default function Vulnerabilidades() {
                   paginatedData.map((vuln) => (
                     <TableRow
                       key={vuln.id}
-                      className={`border-zinc-800 table-row-hover ${vuln.severidad === "Critica" ? "critical-indicator" : ""}`}
+                      className={`border-zinc-800 table-row-hover ${vuln.severidad === "Critica" ? "critical-indicator" : ""} ${selectedIds.includes(vuln.id) ? "bg-indigo-950/30" : ""}`}
                       data-testid={`vuln-row-${vuln.id}`}
                     >
+                      {canModify && (
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedIds.includes(vuln.id)}
+                            onCheckedChange={() => toggleSelect(vuln.id)}
+                            className="border-zinc-600"
+                            data-testid={`select-checkbox-${vuln.id}`}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell className="text-zinc-300 font-mono text-xs">
                         {vuln.fecha_hallazgo || "-"}
                       </TableCell>
@@ -1092,6 +1208,92 @@ export default function Vulnerabilidades() {
               fetchOptions();
             }}
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Actions Modal */}
+      <Dialog open={showBulkModal} onOpenChange={setShowBulkModal}>
+        <DialogContent className="bg-zinc-900 border-zinc-800 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Layers className="w-5 h-5 text-indigo-400" />
+              Acciones Masivas
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-zinc-400">
+              Aplicar cambios a <strong className="text-indigo-400">{selectedIds.length}</strong> vulnerabilidad{selectedIds.length > 1 ? "es" : ""} seleccionada{selectedIds.length > 1 ? "s" : ""}:
+            </p>
+
+            <div className="space-y-4">
+              {/* Estatus */}
+              <div className="space-y-2">
+                <Label className="text-zinc-300">Cambiar Estatus</Label>
+                <Select 
+                  value={bulkAction.estatus} 
+                  onValueChange={(val) => setBulkAction({...bulkAction, estatus: val})}
+                >
+                  <SelectTrigger className="bg-black/20 border-zinc-700 text-white" data-testid="bulk-estatus">
+                    <SelectValue placeholder="Seleccionar estatus..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-zinc-900 border-zinc-700">
+                    <SelectItem value="none">-- No cambiar --</SelectItem>
+                    {options?.estatus?.map((e) => (
+                      <SelectItem key={e} value={e}>{e}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Responsable */}
+              <div className="space-y-2">
+                <Label className="text-zinc-300">Asignar Responsable</Label>
+                <Input
+                  value={bulkAction.responsable || ""}
+                  onChange={(e) => setBulkAction({...bulkAction, responsable: e.target.value})}
+                  placeholder="Nombre del responsable..."
+                  className="bg-black/20 border-zinc-700 text-white"
+                  data-testid="bulk-responsable"
+                />
+              </div>
+
+              {/* Fecha Compromiso */}
+              <div className="space-y-2">
+                <Label className="text-zinc-300">Fecha de Compromiso</Label>
+                <Input
+                  type="date"
+                  value={bulkAction.fecha_compromiso || ""}
+                  onChange={(e) => setBulkAction({...bulkAction, fecha_compromiso: e.target.value})}
+                  className="bg-black/20 border-zinc-700 text-white"
+                  data-testid="bulk-fecha"
+                />
+              </div>
+            </div>
+
+            <div className="bg-amber-950/30 border border-amber-500/30 rounded-lg p-3 text-sm text-amber-300">
+              <strong>Nota:</strong> Solo los campos con valores serán actualizados. Los campos vacíos no se modificarán.
+            </div>
+          </div>
+          <DialogFooter className="gap-2 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowBulkModal(false);
+                setBulkAction({ estatus: "", responsable: "", fecha_compromiso: "" });
+              }}
+              className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleBulkUpdate}
+              disabled={applyingBulk || (!bulkAction.estatus && !bulkAction.responsable && !bulkAction.fecha_compromiso)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              data-testid="apply-bulk-btn"
+            >
+              {applyingBulk ? "Aplicando..." : "Aplicar Cambios"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

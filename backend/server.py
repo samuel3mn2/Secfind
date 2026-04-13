@@ -1090,6 +1090,71 @@ async def delete_vulnerabilidad(vuln_id: str, current_user: CurrentUser = Depend
     
     return {"message": "Vulnerabilidad eliminada exitosamente"}
 
+# ============ BULK ACTIONS ENDPOINT ============
+
+class BulkUpdateRequest(BaseModel):
+    ids: List[str]
+    estatus: Optional[str] = None
+    responsable: Optional[str] = None
+    fecha_compromiso: Optional[str] = None
+
+@api_router.post("/vulnerabilidades/bulk-update")
+async def bulk_update_vulnerabilidades(
+    data: BulkUpdateRequest,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Update multiple vulnerabilities at once"""
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.editar:
+        raise HTTPException(status_code=403, detail="No tiene permisos para editar vulnerabilidades")
+    
+    if not data.ids:
+        raise HTTPException(status_code=400, detail="No se especificaron vulnerabilidades")
+    
+    # Build update dict with only non-null fields
+    update_dict = {}
+    if data.estatus:
+        update_dict["estatus"] = data.estatus
+    if data.responsable is not None:  # Allow empty string to clear
+        update_dict["responsable"] = data.responsable
+    if data.fecha_compromiso is not None:  # Allow empty string to clear
+        update_dict["fecha_compromiso"] = data.fecha_compromiso
+    
+    if not update_dict:
+        raise HTTPException(status_code=400, detail="No se especificaron campos para actualizar")
+    
+    update_dict["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    # Update all matching documents
+    result = await db.vulnerabilidades.update_many(
+        {"id": {"$in": data.ids}},
+        {"$set": update_dict}
+    )
+    
+    # Build change description for audit log
+    cambios = []
+    if data.estatus:
+        cambios.append({"campo": "estatus", "valor_anterior": "(múltiple)", "valor_nuevo": data.estatus})
+    if data.responsable is not None:
+        cambios.append({"campo": "responsable", "valor_anterior": "(múltiple)", "valor_nuevo": data.responsable or "(vacío)"})
+    if data.fecha_compromiso is not None:
+        cambios.append({"campo": "fecha_compromiso", "valor_anterior": "(múltiple)", "valor_nuevo": data.fecha_compromiso or "(vacío)"})
+    
+    # Register in audit log
+    await registrar_cambio(
+        entidad="vulnerabilidad",
+        entidad_id=f"bulk-{len(data.ids)}",
+        entidad_nombre=f"Actualización masiva de {len(data.ids)} vulnerabilidades",
+        accion="actualizar",
+        usuario_id=current_user.id,
+        usuario_nombre=current_user.username,
+        cambios=cambios
+    )
+    
+    return {
+        "message": f"Se actualizaron {result.modified_count} vulnerabilidades",
+        "modified_count": result.modified_count
+    }
+
 # ============ DASHBOARD ENDPOINTS ============
 
 # ============ HISTORIAL DE CAMBIOS ENDPOINT ============
