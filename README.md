@@ -1,6 +1,6 @@
 # SecFind - Sistema de Gestión de Vulnerabilidades
 
-Sistema web completo para la gestión de vulnerabilidades de ciberseguridad, diseñado para reemplazar flujos de trabajo basados en Excel. Incluye dashboard ejecutivo con KPIs, gráficos interactivos, módulo CRUD completo, seguimiento de riesgos e importación inteligente desde PDF con IA.
+Sistema web completo para la gestión de vulnerabilidades de ciberseguridad, diseñado para reemplazar flujos de trabajo basados en Excel. Incluye dashboard ejecutivo con KPIs, gráficos interactivos, módulo CRUD completo, seguimiento de riesgos, **Vista Comité para presentaciones ejecutivas** e importación inteligente desde PDF con IA.
 
 ![Dashboard](https://img.shields.io/badge/Dashboard-6%20KPIs%20%2B%20Gráficos-blue)
 ![Stack](https://img.shields.io/badge/Stack-FastAPI%20%2B%20React%20%2B%20MongoDB-green)
@@ -17,6 +17,15 @@ Sistema web completo para la gestión de vulnerabilidades de ciberseguridad, dis
 - **Gráfico de evolución temporal** (mensual/trimestral)
 - **Gráficos de pastel y barras** por Severidad, Estatus e Institución
 - **6 filtros dinámicos**: Año, Institución, Informe Pentest, Severidad, Proveedor, Aplicación
+
+### 🆕 Vista Comité (Para Presentaciones Ejecutivas)
+- **Resumen por informe de pentest** (Alcance)
+- **Ratios Pendiente/Total** por severidad (Crítico, Alto, Medio, Bajo)
+- **Tiempo Activo (meses)** desde el hallazgo más antiguo
+- **Colores dinámicos** por porcentaje y antigüedad
+- **Filtros multi-select** por Alcance/Informe y Severidad
+- **Exportar a CSV** para análisis
+- **Exportar a Imagen PNG (fondo blanco)** para presentaciones PowerPoint
 
 ### Gestión de Vulnerabilidades
 - Tabla CRUD con búsqueda y múltiples filtros
@@ -175,6 +184,7 @@ secfind/
 │   │   │   ├── Dashboard.jsx          # Dashboard con KPIs
 │   │   │   ├── Vulnerabilidades.jsx   # CRUD de vulnerabilidades
 │   │   │   ├── SeguimientoRiesgos.jsx # Seguimiento de fechas
+│   │   │   ├── VistaComite.jsx        # Vista ejecutiva para comités
 │   │   │   ├── Configuracion.jsx      # Módulo de configuración
 │   │   │   ├── ImportarPDF.jsx        # Importación con IA
 │   │   │   ├── Instituciones.jsx
@@ -224,6 +234,11 @@ secfind/
 |--------|----------|-------------|
 | GET | `/api/seguimiento-riesgos` | Vulnerabilidades con fecha compromiso |
 | GET | `/api/seguimiento-riesgos/resumen` | KPIs de seguimiento |
+
+### Vista Comité
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/vista-comite` | Agregación por informe (Alcance) |
 
 ### Configuración
 | Método | Endpoint | Descripción |

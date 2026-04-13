@@ -446,6 +446,14 @@ La aplicación crea automáticamente un usuario administrador al iniciar:
 - Gráficos de pastel y barras
 - Filtros por año, institución, severidad, proveedor, aplicación
 
+### Vista Comité (Para Presentaciones)
+- **Resumen ejecutivo por informe de pentest** (Alcance)
+- **Ratios Pendiente/Total** por severidad
+- **Tiempo Activo (meses)** desde el hallazgo más antiguo
+- **Colores dinámicos** por porcentaje pendiente y antigüedad
+- **Exportar a CSV** para análisis
+- **Exportar a Imagen PNG** con fondo blanco para PowerPoint
+
 ### Gestión de Vulnerabilidades
 - Búsqueda y filtros múltiples
 - Importar desde Excel, CSV y **PDF con IA**
