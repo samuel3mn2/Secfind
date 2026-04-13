@@ -1798,43 +1798,66 @@ async def add_vulnerability_from_pdf(
     if not current_user.es_admin and not current_user.permisos.vulnerabilidades.crear:
         raise HTTPException(status_code=403, detail="No tiene permisos para crear vulnerabilidades")
     
-    # Auto-create catalog items if they don't exist
-    # Institution
+    import re
+    
+    # Auto-create catalog items if they don't exist (case-insensitive check)
+    # Institution - use existing name if found (case-insensitive)
+    final_institucion = data.institucion
     if data.institucion:
-        existing_inst = await db.instituciones.find_one({"nombre": data.institucion})
-        if not existing_inst:
+        existing_inst = await db.instituciones.find_one(
+            {"nombre": {"$regex": f"^{re.escape(data.institucion)}$", "$options": "i"}}
+        )
+        if existing_inst:
+            final_institucion = existing_inst["nombre"]  # Use the existing name
+        else:
             inst = Institucion(nombre=data.institucion)
             doc = inst.model_dump()
             doc['created_at'] = doc['created_at'].isoformat()
             await db.instituciones.insert_one(doc)
             logging.info(f"Auto-created institution: {data.institucion}")
     
-    # Applications (list)
+    # Applications (list) - use existing name if found (case-insensitive)
+    final_aplicaciones = []
     if data.aplicaciones:
         for app_name in data.aplicaciones:
             if app_name:
-                existing_app = await db.aplicaciones.find_one({"nombre": app_name})
-                if not existing_app:
+                existing_app = await db.aplicaciones.find_one(
+                    {"nombre": {"$regex": f"^{re.escape(app_name)}$", "$options": "i"}}
+                )
+                if existing_app:
+                    final_aplicaciones.append(existing_app["nombre"])  # Use existing name
+                else:
                     app = Aplicacion(nombre=app_name)
                     doc = app.model_dump()
                     doc['created_at'] = doc['created_at'].isoformat()
                     await db.aplicaciones.insert_one(doc)
+                    final_aplicaciones.append(app_name)
                     logging.info(f"Auto-created application: {app_name}")
     
-    # Provider
+    # Provider - use existing name if found (case-insensitive)
+    final_proveedor = data.proveedor
     if data.proveedor:
-        existing_prov = await db.proveedores.find_one({"nombre": data.proveedor})
-        if not existing_prov:
+        existing_prov = await db.proveedores.find_one(
+            {"nombre": {"$regex": f"^{re.escape(data.proveedor)}$", "$options": "i"}}
+        )
+        if existing_prov:
+            final_proveedor = existing_prov["nombre"]  # Use existing name
+        else:
             prov = Proveedor(nombre=data.proveedor)
             doc = prov.model_dump()
             doc['created_at'] = doc['created_at'].isoformat()
             await db.proveedores.insert_one(doc)
             logging.info(f"Auto-created provider: {data.proveedor}")
     
-    # Informe Pentest
+    # Informe Pentest - use existing name if found (case-insensitive)
+    final_informe = data.nombre_informe_pentest
     if data.nombre_informe_pentest:
-        existing_informe = await db.informes_pentest.find_one({"nombre": data.nombre_informe_pentest})
-        if not existing_informe:
+        existing_informe = await db.informes_pentest.find_one(
+            {"nombre": {"$regex": f"^{re.escape(data.nombre_informe_pentest)}$", "$options": "i"}}
+        )
+        if existing_informe:
+            final_informe = existing_informe["nombre"]  # Use existing name
+        else:
             informe = InformePentest(nombre=data.nombre_informe_pentest)
             doc = informe.model_dump()
             doc['created_at'] = doc['created_at'].isoformat()
@@ -1843,15 +1866,15 @@ async def add_vulnerability_from_pdf(
     
     vuln = Vulnerabilidad(
         fecha_hallazgo=data.fecha_hallazgo,
-        institucion=data.institucion,
-        aplicaciones=data.aplicaciones,
+        institucion=final_institucion,
+        aplicaciones=final_aplicaciones if final_aplicaciones else data.aplicaciones,
         vulnerabilidad=data.vulnerabilidad,
         descripcion_riesgo=data.descripcion_riesgo,
         recomendaciones=data.recomendaciones,
         severidad=data.severidad,
         estatus=data.estatus,
-        nombre_informe_pentest=data.nombre_informe_pentest,
-        proveedor=data.proveedor,
+        nombre_informe_pentest=final_informe,
+        proveedor=final_proveedor,
         riesgo_asociado=data.riesgo_asociado,
         responsable=data.responsable,
         fecha_compromiso=data.fecha_compromiso
@@ -1876,11 +1899,15 @@ async def add_catalog_items_from_pdf(
     if not current_user.es_admin and not current_user.permisos.configuracion.crear:
         raise HTTPException(status_code=403, detail="No tiene permisos para crear elementos de catálogo")
     
+    import re
     added = {"aplicaciones": 0, "informes": 0, "proveedores": 0, "instituciones": 0}
     
     for nombre in aplicaciones:
         if nombre:
-            existing = await db.aplicaciones.find_one({"nombre": nombre})
+            # Case-insensitive check
+            existing = await db.aplicaciones.find_one(
+                {"nombre": {"$regex": f"^{re.escape(nombre)}$", "$options": "i"}}
+            )
             if not existing:
                 app = Aplicacion(nombre=nombre)
                 doc = app.model_dump()
@@ -1890,7 +1917,10 @@ async def add_catalog_items_from_pdf(
     
     for nombre in informes:
         if nombre:
-            existing = await db.informes_pentest.find_one({"nombre": nombre})
+            # Case-insensitive check
+            existing = await db.informes_pentest.find_one(
+                {"nombre": {"$regex": f"^{re.escape(nombre)}$", "$options": "i"}}
+            )
             if not existing:
                 informe = InformePentest(nombre=nombre)
                 doc = informe.model_dump()
@@ -1900,7 +1930,10 @@ async def add_catalog_items_from_pdf(
     
     for nombre in proveedores:
         if nombre:
-            existing = await db.proveedores.find_one({"nombre": nombre})
+            # Case-insensitive check
+            existing = await db.proveedores.find_one(
+                {"nombre": {"$regex": f"^{re.escape(nombre)}$", "$options": "i"}}
+            )
             if not existing:
                 prov = Proveedor(nombre=nombre)
                 doc = prov.model_dump()
@@ -1910,7 +1943,10 @@ async def add_catalog_items_from_pdf(
     
     for nombre in instituciones:
         if nombre:
-            existing = await db.instituciones.find_one({"nombre": nombre})
+            # Case-insensitive check
+            existing = await db.instituciones.find_one(
+                {"nombre": {"$regex": f"^{re.escape(nombre)}$", "$options": "i"}}
+            )
             if not existing:
                 inst = Institucion(nombre=nombre)
                 doc = inst.model_dump()
