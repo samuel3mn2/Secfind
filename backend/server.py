@@ -14,6 +14,7 @@ import pandas as pd
 import io
 import bcrypt
 import jwt
+from pdf_reports import generate_executive_report, generate_institution_report, generate_vista_comite_report
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -223,6 +224,61 @@ class TendenciaItem(BaseModel):
     criticas: int
     corregidas: int
     pendientes: int
+
+# ============ HISTORIAL DE CAMBIOS MODEL ============
+
+class HistorialCambio(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    entidad: str  # "vulnerabilidad", "institucion", "aplicacion", etc.
+    entidad_id: str
+    entidad_nombre: Optional[str] = None  # Para mostrar nombre descriptivo
+    accion: str  # "crear", "actualizar", "eliminar"
+    usuario_id: str
+    usuario_nombre: str
+    cambios: List[dict] = []  # [{campo: "estatus", valor_anterior: "Pendiente", valor_nuevo: "Corregido"}]
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+async def registrar_cambio(
+    entidad: str,
+    entidad_id: str,
+    accion: str,
+    usuario_id: str,
+    usuario_nombre: str,
+    cambios: List[dict] = None,
+    entidad_nombre: str = None
+):
+    """Helper function to log changes to the historial collection"""
+    historial = HistorialCambio(
+        entidad=entidad,
+        entidad_id=entidad_id,
+        entidad_nombre=entidad_nombre,
+        accion=accion,
+        usuario_id=usuario_id,
+        usuario_nombre=usuario_nombre,
+        cambios=cambios or []
+    )
+    doc = historial.model_dump()
+    doc['timestamp'] = doc['timestamp'].isoformat()
+    await db.historial_cambios.insert_one(doc)
+    return historial
+
+def calcular_cambios(original: dict, actualizado: dict, campos_excluir: list = None) -> List[dict]:
+    """Calculate differences between original and updated dictionaries"""
+    cambios = []
+    campos_excluir = campos_excluir or ['_id', 'id', 'created_at', 'updated_at']
+    
+    for campo, valor_nuevo in actualizado.items():
+        if campo in campos_excluir:
+            continue
+        valor_anterior = original.get(campo)
+        if valor_anterior != valor_nuevo:
+            cambios.append({
+                "campo": campo,
+                "valor_anterior": valor_anterior,
+                "valor_nuevo": valor_nuevo
+            })
+    return cambios
 
 # ============ AUTH HELPERS ============
 
@@ -960,6 +1016,17 @@ async def create_vulnerabilidad(vuln_data: VulnerabilidadCreate, current_user: C
     doc['updated_at'] = doc['updated_at'].isoformat()
     
     await db.vulnerabilidades.insert_one(doc)
+    
+    # Registrar en historial
+    await registrar_cambio(
+        entidad="vulnerabilidad",
+        entidad_id=vuln_obj.id,
+        entidad_nombre=vuln_obj.vulnerabilidad[:50] if vuln_obj.vulnerabilidad else None,
+        accion="crear",
+        usuario_id=current_user.id,
+        usuario_nombre=current_user.username
+    )
+    
     return vuln_obj
 
 @api_router.put("/vulnerabilidades/{vuln_id}", response_model=Vulnerabilidad)
@@ -972,12 +1039,28 @@ async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate, c
         raise HTTPException(status_code=404, detail="Vulnerabilidad no encontrada")
     
     update_dict = vuln_data.model_dump(exclude_unset=True)
+    
+    # Calcular cambios antes de actualizar
+    cambios = calcular_cambios(existing, update_dict)
+    
     update_dict['updated_at'] = datetime.now(timezone.utc).isoformat()
     
     await db.vulnerabilidades.update_one(
         {"id": vuln_id},
         {"$set": update_dict}
     )
+    
+    # Registrar en historial solo si hay cambios
+    if cambios:
+        await registrar_cambio(
+            entidad="vulnerabilidad",
+            entidad_id=vuln_id,
+            entidad_nombre=existing.get("vulnerabilidad", "")[:50],
+            accion="actualizar",
+            usuario_id=current_user.id,
+            usuario_nombre=current_user.username,
+            cambios=cambios
+        )
     
     updated = await db.vulnerabilidades.find_one({"id": vuln_id}, {"_id": 0})
     return updated
@@ -987,12 +1070,71 @@ async def delete_vulnerabilidad(vuln_id: str, current_user: CurrentUser = Depend
     if not current_user.es_admin and not current_user.permisos.vulnerabilidades.eliminar:
         raise HTTPException(status_code=403, detail="No tiene permisos para eliminar vulnerabilidades")
     
+    # Obtener datos antes de eliminar para el historial
+    existing = await db.vulnerabilidades.find_one({"id": vuln_id}, {"_id": 0})
+    
     result = await db.vulnerabilidades.delete_one({"id": vuln_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Vulnerabilidad no encontrada")
+    
+    # Registrar en historial
+    if existing:
+        await registrar_cambio(
+            entidad="vulnerabilidad",
+            entidad_id=vuln_id,
+            entidad_nombre=existing.get("vulnerabilidad", "")[:50],
+            accion="eliminar",
+            usuario_id=current_user.id,
+            usuario_nombre=current_user.username
+        )
+    
     return {"message": "Vulnerabilidad eliminada exitosamente"}
 
 # ============ DASHBOARD ENDPOINTS ============
+
+# ============ HISTORIAL DE CAMBIOS ENDPOINT ============
+
+@api_router.get("/historial")
+async def get_historial(
+    entidad: Optional[str] = None,
+    accion: Optional[str] = None,
+    usuario: Optional[str] = None,
+    fecha_desde: Optional[str] = None,
+    fecha_hasta: Optional[str] = None,
+    limit: int = 100,
+    skip: int = 0,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Get audit log of all changes in the system"""
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden ver el historial")
+    
+    query = {}
+    if entidad:
+        query["entidad"] = entidad
+    if accion:
+        query["accion"] = accion
+    if usuario:
+        query["usuario_nombre"] = {"$regex": usuario, "$options": "i"}
+    if fecha_desde:
+        query["timestamp"] = {"$gte": fecha_desde}
+    if fecha_hasta:
+        if "timestamp" in query:
+            query["timestamp"]["$lte"] = fecha_hasta
+        else:
+            query["timestamp"] = {"$lte": fecha_hasta}
+    
+    total = await db.historial_cambios.count_documents(query)
+    
+    historial = await db.historial_cambios.find(
+        query,
+        {"_id": 0}
+    ).sort("timestamp", -1).skip(skip).limit(limit).to_list(limit)
+    
+    return {
+        "total": total,
+        "historial": historial
+    }
 
 @api_router.get("/dashboard/stats")
 async def get_dashboard_stats(
@@ -1955,6 +2097,285 @@ async def add_catalog_items_from_pdf(
                 added["instituciones"] += 1
     
     return {"message": "Elementos agregados exitosamente", "added": added}
+
+# ============ PDF REPORTS ENDPOINTS ============
+
+@api_router.get("/reportes/ejecutivo")
+async def get_reporte_ejecutivo(
+    año: Optional[int] = None,
+    institucion: Optional[str] = None,
+    informe_pentest: Optional[str] = None,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Generate executive PDF report with KPIs and charts"""
+    if not current_user.es_admin and not current_user.permisos.dashboard.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos para generar reportes")
+    
+    # Build query
+    query = {}
+    if año:
+        query["fecha_hallazgo"] = {"$regex": f"^{año}"}
+    if institucion:
+        query["institucion"] = institucion
+    if informe_pentest:
+        query["nombre_informe_pentest"] = informe_pentest
+    
+    # Get stats
+    total = await db.vulnerabilidades.count_documents(query)
+    criticas = await db.vulnerabilidades.count_documents({**query, "severidad": "Critica", "estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]}})
+    corregidas = await db.vulnerabilidades.count_documents({**query, "estatus": {"$in": ["Corregido", "Cerrado"]}})
+    pendientes = await db.vulnerabilidades.count_documents({**query, "estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]}})
+    en_proceso = await db.vulnerabilidades.count_documents({**query, "estatus": "En Proceso"})
+    para_retest = await db.vulnerabilidades.count_documents({**query, "estatus": "Para Re Test"})
+    
+    stats = {
+        "total_vulnerabilidades": total,
+        "criticas_abiertas": criticas,
+        "vulnerabilidades_corregidas": corregidas,
+        "pendientes": pendientes,
+        "en_proceso": en_proceso,
+        "para_retest": para_retest
+    }
+    
+    # Get distribution by severity
+    por_severidad = {}
+    for sev in ["Critica", "Alta", "Media", "Baja"]:
+        count = await db.vulnerabilidades.count_documents({**query, "severidad": sev})
+        por_severidad[sev] = count
+    
+    # Get distribution by status
+    por_estatus = {}
+    for est in ["Pendiente", "En Proceso", "Para Re Test", "Corregido", "Cerrado", "Desestimado"]:
+        count = await db.vulnerabilidades.count_documents({**query, "estatus": est})
+        por_estatus[est] = count
+    
+    # Get distribution by institution (top 10)
+    pipeline = [
+        {"$match": query} if query else {"$match": {}},
+        {"$group": {"_id": "$institucion", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 10}
+    ]
+    cursor = db.vulnerabilidades.aggregate(pipeline)
+    por_institucion = {}
+    async for doc in cursor:
+        if doc["_id"]:
+            por_institucion[doc["_id"]] = doc["count"]
+    
+    # Generate PDF
+    filtros = {"año": año, "institucion": institucion, "informe_pentest": informe_pentest}
+    pdf_buffer = generate_executive_report(stats, por_severidad, por_estatus, por_institucion, filtros)
+    
+    filename = f"reporte_ejecutivo_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}.pdf"
+    
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+@api_router.get("/reportes/institucion/{institucion}")
+async def get_reporte_institucion(
+    institucion: str,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Generate PDF report for a specific institution"""
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos para generar reportes")
+    
+    # Get vulnerabilities for this institution
+    vulns = await db.vulnerabilidades.find(
+        {"institucion": institucion},
+        {"_id": 0}
+    ).sort("severidad", 1).to_list(1000)
+    
+    if not vulns:
+        raise HTTPException(status_code=404, detail="No se encontraron vulnerabilidades para esta institución")
+    
+    # Calculate stats
+    stats = {
+        "criticas": sum(1 for v in vulns if v.get("severidad") == "Critica"),
+        "altas": sum(1 for v in vulns if v.get("severidad") == "Alta"),
+        "medias": sum(1 for v in vulns if v.get("severidad") == "Media"),
+        "bajas": sum(1 for v in vulns if v.get("severidad") == "Baja"),
+        "pendientes": sum(1 for v in vulns if v.get("estatus") not in ["Cerrado", "Corregido", "Desestimado"]),
+        "corregidas": sum(1 for v in vulns if v.get("estatus") in ["Corregido", "Cerrado"]),
+    }
+    
+    pdf_buffer = generate_institution_report(institucion, vulns, stats)
+    
+    filename = f"reporte_{institucion.replace(' ', '_')}_{datetime.now(timezone.utc).strftime('%Y%m%d')}.pdf"
+    
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+@api_router.get("/reportes/informe/{informe}")
+async def get_reporte_informe(
+    informe: str,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Generate PDF report for a specific pentest report"""
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos para generar reportes")
+    
+    # Get vulnerabilities for this informe
+    vulns = await db.vulnerabilidades.find(
+        {"nombre_informe_pentest": informe},
+        {"_id": 0}
+    ).sort("severidad", 1).to_list(1000)
+    
+    if not vulns:
+        raise HTTPException(status_code=404, detail="No se encontraron vulnerabilidades para este informe")
+    
+    # Calculate stats
+    stats = {
+        "criticas": sum(1 for v in vulns if v.get("severidad") == "Critica"),
+        "altas": sum(1 for v in vulns if v.get("severidad") == "Alta"),
+        "medias": sum(1 for v in vulns if v.get("severidad") == "Media"),
+        "bajas": sum(1 for v in vulns if v.get("severidad") == "Baja"),
+        "pendientes": sum(1 for v in vulns if v.get("estatus") not in ["Cerrado", "Corregido", "Desestimado"]),
+        "corregidas": sum(1 for v in vulns if v.get("estatus") in ["Corregido", "Cerrado"]),
+    }
+    
+    # Use institution report template with informe name
+    pdf_buffer = generate_institution_report(f"Informe: {informe}", vulns, stats)
+    
+    filename = f"reporte_informe_{datetime.now(timezone.utc).strftime('%Y%m%d')}.pdf"
+    
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+@api_router.get("/reportes/vista-comite")
+async def get_reporte_vista_comite(
+    informes: str = "",
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Generate Vista Comité PDF report"""
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos para generar reportes")
+    
+    informes_list = [i.strip() for i in informes.split(",") if i.strip()] if informes else []
+    
+    if not informes_list:
+        # Get all informes if none specified
+        all_informes = await db.informes_pentest.find({}, {"_id": 0, "nombre": 1}).to_list(1000)
+        informes_list = [i["nombre"] for i in all_informes if i.get("nombre")]
+    
+    if not informes_list:
+        raise HTTPException(status_code=400, detail="No hay informes para generar el reporte")
+    
+    # Get aggregated data (similar to vista-comite endpoint)
+    query = {"nombre_informe_pentest": {"$in": informes_list}}
+    closed_statuses = ["Cerrado", "Corregido", "Desestimado"]
+    
+    vulns = await db.vulnerabilidades.find(
+        query,
+        {"_id": 0, "nombre_informe_pentest": 1, "severidad": 1, "estatus": 1, "responsable": 1, "fecha_hallazgo": 1}
+    ).to_list(50000)
+    
+    from collections import defaultdict
+    
+    informe_data = defaultdict(lambda: {
+        "criticas_pendientes": 0, "criticas_total": 0,
+        "altas_pendientes": 0, "altas_total": 0,
+        "medias_pendientes": 0, "medias_total": 0,
+        "bajas_pendientes": 0, "bajas_total": 0,
+        "total_pendientes": 0, "total_hallazgos": 0,
+        "responsables": set(),
+        "fecha_mas_antigua": None
+    })
+    
+    for v in vulns:
+        inf = v.get("nombre_informe_pentest", "Sin informe")
+        sev = v.get("severidad", "")
+        est = v.get("estatus")
+        resp = v.get("responsable")
+        fecha = v.get("fecha_hallazgo")
+        
+        if resp:
+            informe_data[inf]["responsables"].add(resp)
+        
+        if fecha:
+            try:
+                current = informe_data[inf]["fecha_mas_antigua"]
+                if current is None or fecha < current:
+                    informe_data[inf]["fecha_mas_antigua"] = fecha
+            except:
+                pass
+        
+        is_pending = est not in closed_statuses
+        
+        if sev == "Critica":
+            informe_data[inf]["criticas_total"] += 1
+            if is_pending:
+                informe_data[inf]["criticas_pendientes"] += 1
+        elif sev == "Alta":
+            informe_data[inf]["altas_total"] += 1
+            if is_pending:
+                informe_data[inf]["altas_pendientes"] += 1
+        elif sev == "Media":
+            informe_data[inf]["medias_total"] += 1
+            if is_pending:
+                informe_data[inf]["medias_pendientes"] += 1
+        elif sev == "Baja":
+            informe_data[inf]["bajas_total"] += 1
+            if is_pending:
+                informe_data[inf]["bajas_pendientes"] += 1
+        
+        if sev in ["Critica", "Alta", "Media", "Baja"]:
+            informe_data[inf]["total_hallazgos"] += 1
+            if is_pending:
+                informe_data[inf]["total_pendientes"] += 1
+    
+    # Build result
+    result = []
+    today = datetime.now(timezone.utc).date()
+    
+    for inf in sorted(informe_data.keys()):
+        data = informe_data[inf]
+        responsables_list = sorted(data["responsables"])
+        
+        tiempo_activo_meses = None
+        if data["fecha_mas_antigua"]:
+            try:
+                fecha_str = data["fecha_mas_antigua"]
+                fecha_date = datetime.strptime(fecha_str[:10], "%Y-%m-%d").date()
+                months_diff = (today.year - fecha_date.year) * 12 + (today.month - fecha_date.month)
+                tiempo_activo_meses = max(0, months_diff)
+            except:
+                pass
+        
+        result.append({
+            "informe": inf,
+            "criticas_pendientes": data["criticas_pendientes"],
+            "criticas_total": data["criticas_total"],
+            "altas_pendientes": data["altas_pendientes"],
+            "altas_total": data["altas_total"],
+            "medias_pendientes": data["medias_pendientes"],
+            "medias_total": data["medias_total"],
+            "bajas_pendientes": data["bajas_pendientes"],
+            "bajas_total": data["bajas_total"],
+            "responsable": ", ".join(responsables_list) if responsables_list else None,
+            "total_pendientes": data["total_pendientes"],
+            "total_hallazgos": data["total_hallazgos"],
+            "tiempo_activo_meses": tiempo_activo_meses
+        })
+    
+    pdf_buffer = generate_vista_comite_report(result)
+    
+    filename = f"vista_comite_{datetime.now(timezone.utc).strftime('%Y%m%d')}.pdf"
+    
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 # Include the router in the main app
 app.include_router(api_router)

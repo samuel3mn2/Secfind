@@ -24,7 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Shield, AlertTriangle, CheckCircle2, Clock, TrendingUp, Filter, X, ExternalLink, PlayCircle, RefreshCw } from "lucide-react";
+import { Shield, AlertTriangle, CheckCircle2, Clock, TrendingUp, Filter, X, ExternalLink, PlayCircle, RefreshCw, FileText, Download } from "lucide-react";
 import {
   PieChart,
   Pie,
@@ -145,6 +145,10 @@ export default function Dashboard() {
   const [kpiData, setKpiData] = useState([]);
   const [loadingKpi, setLoadingKpi] = useState(false);
 
+  // Report Modal
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false);
+
   useEffect(() => {
     fetchOptions();
     fetchTendencias();
@@ -230,6 +234,56 @@ export default function Dashboard() {
 
   const hasActiveFilters = filterAño || filterInstitucion || filterInforme || filterSeveridad || filterProveedor;
 
+  const generateReport = async (type) => {
+    setGeneratingReport(true);
+    try {
+      let url = `${API}/reportes/${type}`;
+      const params = new URLSearchParams();
+      
+      if (type === "ejecutivo") {
+        if (filterAño) params.append("año", filterAño);
+        if (filterInstitucion) params.append("institucion", filterInstitucion);
+        if (filterInforme) params.append("informe_pentest", filterInforme);
+        if (params.toString()) url += `?${params.toString()}`;
+      } else if (type.startsWith("institucion/")) {
+        // URL already has institution
+      } else if (type.startsWith("informe/")) {
+        // URL already has informe
+      } else if (type === "vista-comite") {
+        // Get all informes
+      }
+      
+      const response = await axios.get(url, { responseType: 'blob' });
+      
+      // Download the file
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      
+      // Get filename from header or generate one
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'reporte.pdf';
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename=(.+)/);
+        if (match) filename = match[1];
+      }
+      
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+      
+      setShowReportModal(false);
+    } catch (error) {
+      console.error("Error generating report:", error);
+      alert("Error al generar el reporte");
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
+
   const formatSeverityData = () => {
     if (!stats?.por_severidad) return [];
     return Object.entries(stats.por_severidad).map(([name, value]) => ({
@@ -275,13 +329,23 @@ export default function Dashboard() {
   return (
     <div className="p-6 md:p-8 lg:p-12 space-y-6" data-testid="dashboard-page">
       {/* Header */}
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
-          Dashboard de Vulnerabilidades
-        </h1>
-        <p className="text-zinc-500">
-          Vista general del estado de seguridad
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
+            Dashboard de Vulnerabilidades
+          </h1>
+          <p className="text-zinc-500">
+            Vista general del estado de seguridad
+          </p>
+        </div>
+        <Button
+          onClick={() => setShowReportModal(true)}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white"
+          data-testid="generate-report-btn"
+        >
+          <FileText className="w-4 h-4 mr-2" />
+          Generar Reporte PDF
+        </Button>
       </div>
 
       {/* Filters Card */}
@@ -791,6 +855,96 @@ export default function Dashboard() {
               </Table>
             )}
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Report Generation Modal */}
+      <Dialog open={showReportModal} onOpenChange={setShowReportModal}>
+        <DialogContent className="bg-zinc-900 border-zinc-800 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-indigo-400" />
+              Generar Reporte PDF
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <p className="text-sm text-zinc-400">
+              Selecciona el tipo de reporte que deseas generar:
+            </p>
+            
+            <div className="space-y-3">
+              <Button
+                variant="outline"
+                className="w-full justify-start border-zinc-700 text-white hover:bg-zinc-800"
+                onClick={() => generateReport("ejecutivo")}
+                disabled={generatingReport}
+                data-testid="report-ejecutivo-btn"
+              >
+                <Download className="w-4 h-4 mr-3 text-indigo-400" />
+                <div className="text-left">
+                  <div className="font-medium">Reporte Ejecutivo</div>
+                  <div className="text-xs text-zinc-500">KPIs y gráficos generales {hasActiveFilters && "(con filtros aplicados)"}</div>
+                </div>
+              </Button>
+
+              {filterInstitucion && filterInstitucion !== "all" && (
+                <Button
+                  variant="outline"
+                  className="w-full justify-start border-zinc-700 text-white hover:bg-zinc-800"
+                  onClick={() => generateReport(`institucion/${encodeURIComponent(filterInstitucion)}`)}
+                  disabled={generatingReport}
+                  data-testid="report-institucion-btn"
+                >
+                  <Download className="w-4 h-4 mr-3 text-cyan-400" />
+                  <div className="text-left">
+                    <div className="font-medium">Reporte por Institución</div>
+                    <div className="text-xs text-zinc-500">{filterInstitucion}</div>
+                  </div>
+                </Button>
+              )}
+
+              {filterInforme && filterInforme !== "all" && (
+                <Button
+                  variant="outline"
+                  className="w-full justify-start border-zinc-700 text-white hover:bg-zinc-800"
+                  onClick={() => generateReport(`informe/${encodeURIComponent(filterInforme)}`)}
+                  disabled={generatingReport}
+                  data-testid="report-informe-btn"
+                >
+                  <Download className="w-4 h-4 mr-3 text-orange-400" />
+                  <div className="text-left">
+                    <div className="font-medium">Reporte por Informe Pentest</div>
+                    <div className="text-xs text-zinc-500 truncate max-w-[280px]">{filterInforme}</div>
+                  </div>
+                </Button>
+              )}
+
+              <Button
+                variant="outline"
+                className="w-full justify-start border-zinc-700 text-white hover:bg-zinc-800"
+                onClick={() => generateReport("vista-comite")}
+                disabled={generatingReport}
+                data-testid="report-comite-btn"
+              >
+                <Download className="w-4 h-4 mr-3 text-purple-400" />
+                <div className="text-left">
+                  <div className="font-medium">Reporte Vista Comité</div>
+                  <div className="text-xs text-zinc-500">Resumen ejecutivo por informes</div>
+                </div>
+              </Button>
+            </div>
+
+            {generatingReport && (
+              <div className="flex items-center justify-center gap-2 text-zinc-400 py-2">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Generando reporte...
+              </div>
+            )}
+
+            <p className="text-xs text-zinc-500 pt-2">
+              Tip: Aplica filtros en el dashboard para generar reportes específicos por institución o informe.
+            </p>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

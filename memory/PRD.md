@@ -56,6 +56,22 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - [x] Gráficos: Severidad, Estatus, Institución, Tendencias
 - [x] 6 Filtros: Año, Institución, Informe, Severidad, Proveedor, Aplicación
 - [x] KPIs clickeables con modal de detalle
+- [x] **Botón "Generar Reporte PDF"** con opciones de reportes
+
+### Reportes PDF (NUEVO - Dic 2025)
+- [x] **Reporte Ejecutivo**: KPIs + gráficos de pastel (severidad, estatus) + barras (instituciones)
+- [x] **Reporte por Institución**: Resumen + tabla de vulnerabilidades con colores por severidad
+- [x] **Reporte por Informe Pentest**: Similar al de institución pero filtrado por informe
+- [x] **Reporte Vista Comité**: Tabla con ratios por severidad, tiempo activo, totales
+- [x] Generación dinámica con filtros aplicados
+- [x] Descarga automática del PDF
+
+### Auditoría del Sistema (NUEVO - Dic 2025)
+- [x] Página dedicada /auditoria (solo administradores)
+- [x] Registro automático de todas las acciones en vulnerabilidades (crear, actualizar, eliminar)
+- [x] Filtros por entidad, acción, usuario y rango de fechas
+- [x] Detalle de cambios: campo modificado, valor anterior, valor nuevo
+- [x] Paginación de registros
 
 ### Vista Comité (NUEVO - Dic 2025)
 - [x] Resumen ejecutivo de vulnerabilidades por informe de pentest
@@ -108,10 +124,11 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - [x] Permisos por módulo
 
 ## Rutas de la Aplicación
-- `/` - Dashboard (6 KPIs)
+- `/` - Dashboard (6 KPIs + Generar Reportes PDF)
 - `/vulnerabilidades` - Gestión de Vulnerabilidades
 - `/seguimiento-riesgos` - Seguimiento de Riesgos
-- `/vista-comite` - **Vista Comité (NUEVO)**
+- `/vista-comite` - Vista Comité
+- `/auditoria` - Auditoría del Sistema (solo admin)
 - `/configuracion` - Configuración del Sistema
 - `/login` - Inicio de Sesión
 
@@ -133,9 +150,8 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 ## Backlog
 
 ### P2 (Media Prioridad)
-- [ ] Historial de cambios por vulnerabilidad
 - [ ] Notificaciones por email de fechas de compromiso
-- [ ] Reportes PDF generados
+- [ ] Historial de cambios en catálogos de configuración (instituciones, aplicaciones, etc.)
 
 ### P3 (Baja Prioridad)
 - [ ] Dashboard comparativo por períodos
