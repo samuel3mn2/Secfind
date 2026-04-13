@@ -48,15 +48,26 @@ def create_pie_chart_image(data: dict, title: str, width: int = 300, height: int
     
     chart_colors = [color_map.get(l, "#6b7280") for l in labels]
     
+    # Use legend instead of labels on pie to avoid overlapping
     wedges, texts, autotexts = ax.pie(
         values, 
-        labels=labels, 
         autopct='%1.0f%%',
         colors=chart_colors,
-        startangle=90
+        startangle=90,
+        pctdistance=0.75
     )
     
-    ax.set_title(title, fontsize=10, fontweight='bold')
+    # Style percentage labels
+    for autotext in autotexts:
+        autotext.set_fontsize(8)
+        autotext.set_color('white')
+        autotext.set_fontweight('bold')
+    
+    # Add legend outside the pie
+    ax.legend(wedges, labels, title="", loc="center left", bbox_to_anchor=(1, 0, 0.5, 1), fontsize=8)
+    
+    if title:
+        ax.set_title(title, fontsize=10, fontweight='bold')
     
     plt.tight_layout()
     
@@ -356,8 +367,11 @@ def generate_institution_report(
     return buffer
 
 
-def generate_vista_comite_report(data: list, filtros: dict = None) -> BytesIO:
-    """Generate Vista Comité report in PDF format"""
+def generate_vista_comite_report(data: list, severidades: list = None, filtros: dict = None) -> BytesIO:
+    """Generate Vista Comité report in PDF format with selected severidades"""
+    
+    if severidades is None:
+        severidades = ["Critica", "Alta", "Media", "Baja"]
     
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1*cm, bottomMargin=1*cm, leftMargin=0.5*cm, rightMargin=0.5*cm)
@@ -386,10 +400,28 @@ def generate_vista_comite_report(data: list, filtros: dict = None) -> BytesIO:
         f"Generado: {datetime.now(timezone.utc).strftime('%d/%m/%Y %H:%M UTC')}",
         normal_style
     ))
+    
+    # Show which severidades are included
+    sev_names = {"Critica": "Crítico", "Alta": "Alto", "Media": "Medio", "Baja": "Bajo"}
+    sev_text = ", ".join([sev_names.get(s, s) for s in severidades])
+    elements.append(Paragraph(f"Severidades incluidas: {sev_text}", normal_style))
     elements.append(Spacer(1, 15))
     
-    # Table header
-    table_data = [["Informe/Alcance", "Crítico", "Alto", "Medio", "Bajo", "Responsable", "T.Activo", "Pend/Total", "%"]]
+    # Build table header based on selected severidades
+    header = ["Informe/Alcance"]
+    col_indices = {"Critica": 1, "Alta": 2, "Media": 3, "Baja": 4}
+    
+    if "Critica" in severidades:
+        header.append("Crítico")
+    if "Alta" in severidades:
+        header.append("Alto")
+    if "Media" in severidades:
+        header.append("Medio")
+    if "Baja" in severidades:
+        header.append("Bajo")
+    header.extend(["Responsable", "T.Activo", "Pend/Total", "%"])
+    
+    table_data = [header]
     
     # Totals
     totals = {
@@ -411,49 +443,73 @@ def generate_vista_comite_report(data: list, filtros: dict = None) -> BytesIO:
         
         tiempo = f"{row.get('tiempo_activo_meses', '-')}m" if row.get('tiempo_activo_meses') is not None else "-"
         
-        pend = row.get("total_pendientes", 0)
-        total = row.get("total_hallazgos", 0)
+        # Calculate totals based on selected severidades only
+        pend = 0
+        total = 0
+        if "Critica" in severidades:
+            pend += row.get("criticas_pendientes", 0)
+            total += row.get("criticas_total", 0)
+        if "Alta" in severidades:
+            pend += row.get("altas_pendientes", 0)
+            total += row.get("altas_total", 0)
+        if "Media" in severidades:
+            pend += row.get("medias_pendientes", 0)
+            total += row.get("medias_total", 0)
+        if "Baja" in severidades:
+            pend += row.get("bajas_pendientes", 0)
+            total += row.get("bajas_total", 0)
+        
         pct = round((pend / total * 100) if total > 0 else 0)
         
-        table_data.append([
-            informe,
-            f"{row.get('criticas_pendientes', 0)}/{row.get('criticas_total', 0)}",
-            f"{row.get('altas_pendientes', 0)}/{row.get('altas_total', 0)}",
-            f"{row.get('medias_pendientes', 0)}/{row.get('medias_total', 0)}",
-            f"{row.get('bajas_pendientes', 0)}/{row.get('bajas_total', 0)}",
-            responsable,
-            tiempo,
-            f"{pend}/{total}",
-            f"{pct}%"
-        ])
+        row_data = [informe]
+        if "Critica" in severidades:
+            row_data.append(f"{row.get('criticas_pendientes', 0)}/{row.get('criticas_total', 0)}")
+        if "Alta" in severidades:
+            row_data.append(f"{row.get('altas_pendientes', 0)}/{row.get('altas_total', 0)}")
+        if "Media" in severidades:
+            row_data.append(f"{row.get('medias_pendientes', 0)}/{row.get('medias_total', 0)}")
+        if "Baja" in severidades:
+            row_data.append(f"{row.get('bajas_pendientes', 0)}/{row.get('bajas_total', 0)}")
+        row_data.extend([responsable, tiempo, f"{pend}/{total}", f"{pct}%"])
+        
+        table_data.append(row_data)
         
         # Accumulate totals
-        totals["criticas_pend"] += row.get("criticas_pendientes", 0)
-        totals["criticas_total"] += row.get("criticas_total", 0)
-        totals["altas_pend"] += row.get("altas_pendientes", 0)
-        totals["altas_total"] += row.get("altas_total", 0)
-        totals["medias_pend"] += row.get("medias_pendientes", 0)
-        totals["medias_total"] += row.get("medias_total", 0)
-        totals["bajas_pend"] += row.get("bajas_pendientes", 0)
-        totals["bajas_total"] += row.get("bajas_total", 0)
+        if "Critica" in severidades:
+            totals["criticas_pend"] += row.get("criticas_pendientes", 0)
+            totals["criticas_total"] += row.get("criticas_total", 0)
+        if "Alta" in severidades:
+            totals["altas_pend"] += row.get("altas_pendientes", 0)
+            totals["altas_total"] += row.get("altas_total", 0)
+        if "Media" in severidades:
+            totals["medias_pend"] += row.get("medias_pendientes", 0)
+            totals["medias_total"] += row.get("medias_total", 0)
+        if "Baja" in severidades:
+            totals["bajas_pend"] += row.get("bajas_pendientes", 0)
+            totals["bajas_total"] += row.get("bajas_total", 0)
         totals["total_pend"] += pend
         totals["total_hall"] += total
     
     # Add totals row
     total_pct = round((totals["total_pend"] / totals["total_hall"] * 100) if totals["total_hall"] > 0 else 0)
-    table_data.append([
-        "TOTALES",
-        f"{totals['criticas_pend']}/{totals['criticas_total']}",
-        f"{totals['altas_pend']}/{totals['altas_total']}",
-        f"{totals['medias_pend']}/{totals['medias_total']}",
-        f"{totals['bajas_pend']}/{totals['bajas_total']}",
-        "",
-        "",
-        f"{totals['total_pend']}/{totals['total_hall']}",
-        f"{total_pct}%"
-    ])
+    totals_row = ["TOTALES"]
+    if "Critica" in severidades:
+        totals_row.append(f"{totals['criticas_pend']}/{totals['criticas_total']}")
+    if "Alta" in severidades:
+        totals_row.append(f"{totals['altas_pend']}/{totals['altas_total']}")
+    if "Media" in severidades:
+        totals_row.append(f"{totals['medias_pend']}/{totals['medias_total']}")
+    if "Baja" in severidades:
+        totals_row.append(f"{totals['bajas_pend']}/{totals['bajas_total']}")
+    totals_row.extend(["", "", f"{totals['total_pend']}/{totals['total_hall']}", f"{total_pct}%"])
+    table_data.append(totals_row)
     
-    col_widths = [2.5*inch, 0.6*inch, 0.6*inch, 0.6*inch, 0.6*inch, 1.2*inch, 0.5*inch, 0.7*inch, 0.4*inch]
+    # Dynamic column widths based on severidades selected
+    sev_count = len([s for s in severidades if s in ["Critica", "Alta", "Media", "Baja"]])
+    col_widths = [2.5*inch]
+    col_widths.extend([0.6*inch] * sev_count)
+    col_widths.extend([1.2*inch, 0.5*inch, 0.7*inch, 0.4*inch])
+    
     table = Table(table_data, colWidths=col_widths)
     
     table_style = [
@@ -471,11 +527,13 @@ def generate_vista_comite_report(data: list, filtros: dict = None) -> BytesIO:
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
     ]
     
-    # Color severity columns header
-    table_style.append(('BACKGROUND', (1, 0), (1, 0), colors.HexColor('#dc2626')))  # Critico
-    table_style.append(('BACKGROUND', (2, 0), (2, 0), colors.HexColor('#ea580c')))  # Alto
-    table_style.append(('BACKGROUND', (3, 0), (3, 0), colors.HexColor('#ca8a04')))  # Medio
-    table_style.append(('BACKGROUND', (4, 0), (4, 0), colors.HexColor('#16a34a')))  # Bajo
+    # Color severity columns header dynamically
+    col_idx = 1
+    sev_colors = {"Critica": "#dc2626", "Alta": "#ea580c", "Media": "#ca8a04", "Baja": "#16a34a"}
+    for sev in ["Critica", "Alta", "Media", "Baja"]:
+        if sev in severidades:
+            table_style.append(('BACKGROUND', (col_idx, 0), (col_idx, 0), colors.HexColor(sev_colors[sev])))
+            col_idx += 1
     
     table.setStyle(TableStyle(table_style))
     elements.append(table)

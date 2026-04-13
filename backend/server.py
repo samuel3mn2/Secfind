@@ -2319,13 +2319,15 @@ async def get_reporte_informe(
 @api_router.get("/reportes/vista-comite")
 async def get_reporte_vista_comite(
     informes: str = "",
+    severidades: str = "Critica,Alta,Media,Baja",
     current_user: CurrentUser = Depends(get_current_user)
 ):
-    """Generate Vista Comité PDF report"""
+    """Generate Vista Comité PDF report with selected informes and severidades"""
     if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
         raise HTTPException(status_code=403, detail="No tiene permisos para generar reportes")
     
     informes_list = [i.strip() for i in informes.split(",") if i.strip()] if informes else []
+    severidades_list = [s.strip() for s in severidades.split(",") if s.strip()] if severidades else ["Critica", "Alta", "Media", "Baja"]
     
     if not informes_list:
         # Get all informes if none specified
@@ -2432,7 +2434,7 @@ async def get_reporte_vista_comite(
             "tiempo_activo_meses": tiempo_activo_meses
         })
     
-    pdf_buffer = generate_vista_comite_report(result)
+    pdf_buffer = generate_vista_comite_report(result, severidades=severidades_list)
     
     filename = f"vista_comite_{datetime.now(timezone.utc).strftime('%Y%m%d')}.pdf"
     

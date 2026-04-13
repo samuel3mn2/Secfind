@@ -24,6 +24,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 import { Shield, AlertTriangle, CheckCircle2, Clock, TrendingUp, Filter, X, ExternalLink, PlayCircle, RefreshCw, FileText, Download } from "lucide-react";
 import {
   PieChart,
@@ -148,6 +150,11 @@ export default function Dashboard() {
   // Report Modal
   const [showReportModal, setShowReportModal] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
+  
+  // Vista Comité Report Options
+  const [showVistaComiteOptions, setShowVistaComiteOptions] = useState(false);
+  const [vcSelectedInformes, setVcSelectedInformes] = useState([]);
+  const [vcSelectedSeveridades, setVcSelectedSeveridades] = useState(["Critica", "Alta", "Media", "Baja"]);
 
   useEffect(() => {
     fetchOptions();
@@ -234,7 +241,7 @@ export default function Dashboard() {
 
   const hasActiveFilters = filterAño || filterInstitucion || filterInforme || filterSeveridad || filterProveedor;
 
-  const generateReport = async (type) => {
+  const generateReport = async (type, customParams = {}) => {
     setGeneratingReport(true);
     try {
       let url = `${API}/reportes/${type}`;
@@ -250,7 +257,14 @@ export default function Dashboard() {
       } else if (type.startsWith("informe/")) {
         // URL already has informe
       } else if (type === "vista-comite") {
-        // Get all informes
+        // Use custom params for Vista Comité
+        if (customParams.informes && customParams.informes.length > 0) {
+          params.append("informes", customParams.informes.join(","));
+        }
+        if (customParams.severidades && customParams.severidades.length > 0) {
+          params.append("severidades", customParams.severidades.join(","));
+        }
+        if (params.toString()) url += `?${params.toString()}`;
       }
       
       const response = await axios.get(url, { responseType: 'blob' });
@@ -276,12 +290,28 @@ export default function Dashboard() {
       window.URL.revokeObjectURL(downloadUrl);
       
       setShowReportModal(false);
+      setShowVistaComiteOptions(false);
     } catch (error) {
       console.error("Error generating report:", error);
-      alert("Error al generar el reporte");
+      toast.error("Error al generar el reporte");
     } finally {
       setGeneratingReport(false);
     }
+  };
+
+  const handleVistaComiteReport = () => {
+    if (vcSelectedInformes.length === 0) {
+      toast.error("Selecciona al menos un informe");
+      return;
+    }
+    if (vcSelectedSeveridades.length === 0) {
+      toast.error("Selecciona al menos una severidad");
+      return;
+    }
+    generateReport("vista-comite", {
+      informes: vcSelectedInformes,
+      severidades: vcSelectedSeveridades
+    });
   };
 
   const formatSeverityData = () => {
@@ -922,14 +952,21 @@ export default function Dashboard() {
               <Button
                 variant="outline"
                 className="w-full justify-start border-zinc-700 text-white hover:bg-zinc-800"
-                onClick={() => generateReport("vista-comite")}
+                onClick={() => {
+                  setShowReportModal(false);
+                  setShowVistaComiteOptions(true);
+                  // Pre-select all informes
+                  if (options?.informes_pentest) {
+                    setVcSelectedInformes(options.informes_pentest);
+                  }
+                }}
                 disabled={generatingReport}
                 data-testid="report-comite-btn"
               >
                 <Download className="w-4 h-4 mr-3 text-purple-400" />
                 <div className="text-left">
                   <div className="font-medium">Reporte Vista Comité</div>
-                  <div className="text-xs text-zinc-500">Resumen ejecutivo por informes</div>
+                  <div className="text-xs text-zinc-500">Selecciona informes y severidades</div>
                 </div>
               </Button>
             </div>
@@ -944,6 +981,130 @@ export default function Dashboard() {
             <p className="text-xs text-zinc-500 pt-2">
               Tip: Aplica filtros en el dashboard para generar reportes específicos por institución o informe.
             </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vista Comité Report Options Modal */}
+      <Dialog open={showVistaComiteOptions} onOpenChange={setShowVistaComiteOptions}>
+        <DialogContent className="bg-zinc-900 border-zinc-800 text-white max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-purple-400" />
+              Configurar Reporte Vista Comité
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            {/* Severidades Selection */}
+            <div>
+              <label className="text-sm font-medium text-zinc-300 mb-2 block">Severidades a incluir:</label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { value: "Critica", label: "Crítico", color: "bg-red-500/20 text-red-400 border-red-500/30" },
+                  { value: "Alta", label: "Alto", color: "bg-orange-500/20 text-orange-400 border-orange-500/30" },
+                  { value: "Media", label: "Medio", color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" },
+                  { value: "Baja", label: "Bajo", color: "bg-green-500/20 text-green-400 border-green-500/30" },
+                ].map(sev => (
+                  <Badge
+                    key={sev.value}
+                    variant="outline"
+                    className={`cursor-pointer transition-all ${
+                      vcSelectedSeveridades.includes(sev.value) 
+                        ? sev.color 
+                        : "bg-zinc-800 text-zinc-500 border-zinc-700"
+                    }`}
+                    onClick={() => {
+                      if (vcSelectedSeveridades.includes(sev.value)) {
+                        setVcSelectedSeveridades(vcSelectedSeveridades.filter(s => s !== sev.value));
+                      } else {
+                        setVcSelectedSeveridades([...vcSelectedSeveridades, sev.value]);
+                      }
+                    }}
+                  >
+                    {sev.label}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            {/* Informes Selection */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-zinc-300">Informes/Alcance a incluir:</label>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-indigo-400 hover:text-indigo-300"
+                    onClick={() => setVcSelectedInformes(options?.informes_pentest || [])}
+                  >
+                    Todos
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-zinc-400 hover:text-zinc-300"
+                    onClick={() => setVcSelectedInformes([])}
+                  >
+                    Ninguno
+                  </Button>
+                </div>
+              </div>
+              <div className="max-h-[200px] overflow-y-auto border border-zinc-700 rounded-lg p-2 space-y-1">
+                {options?.informes_pentest?.map(informe => (
+                  <label
+                    key={informe}
+                    className={`flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-zinc-800 ${
+                      vcSelectedInformes.includes(informe) ? "bg-indigo-950/30" : ""
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={vcSelectedInformes.includes(informe)}
+                      onChange={() => {
+                        if (vcSelectedInformes.includes(informe)) {
+                          setVcSelectedInformes(vcSelectedInformes.filter(i => i !== informe));
+                        } else {
+                          setVcSelectedInformes([...vcSelectedInformes, informe]);
+                        }
+                      }}
+                      className="rounded border-zinc-600"
+                    />
+                    <span className="text-sm text-zinc-300 truncate">{informe}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-zinc-500 mt-1">
+                {vcSelectedInformes.length} de {options?.informes_pentest?.length || 0} informes seleccionados
+              </p>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                className="flex-1 border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                onClick={() => setShowVistaComiteOptions(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+                onClick={handleVistaComiteReport}
+                disabled={generatingReport || vcSelectedInformes.length === 0 || vcSelectedSeveridades.length === 0}
+              >
+                {generatingReport ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Generando...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 mr-2" />
+                    Generar PDF
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
