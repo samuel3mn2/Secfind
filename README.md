@@ -38,6 +38,7 @@ Sistema web completo para la gestión de vulnerabilidades de ciberseguridad, dis
 - KPIs: Vencidas, Próximos 7 días, Próximos 30 días
 - Cálculo automático de días restantes
 - Alertas visuales por estado
+- Filtros por severidad, institución e **informe pentest**
 
 ### Módulo de Configuración
 - **Instituciones**: Gestión de empresas/clientes
@@ -45,6 +46,7 @@ Sistema web completo para la gestión de vulnerabilidades de ciberseguridad, dis
 - **Proveedores**: Empresas de pentest
 - **Informes Pentest**: Nombres de informes
 - **Usuarios**: Gestión con permisos por módulo
+- **🆕 Actualización en cascada**: Al renombrar instituciones, aplicaciones, proveedores o informes, las vulnerabilidades se actualizan automáticamente
 
 ### Importar/Exportar
 - Exportar a CSV y Excel

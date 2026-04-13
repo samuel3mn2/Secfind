@@ -462,10 +462,12 @@ La aplicación crea automáticamente un usuario administrador al iniciar:
 ### Seguimiento de Riesgos
 - Vulnerabilidades con fecha de compromiso
 - Alertas de vencimiento
+- Filtros por severidad, institución e **informe pentest**
 
 ### Configuración
 - Instituciones, Aplicaciones, Proveedores, Informes Pentest
 - Gestión de usuarios con permisos
+- **Actualización en cascada**: Al renombrar elementos, las vulnerabilidades se actualizan automáticamente
 
 ---
 
