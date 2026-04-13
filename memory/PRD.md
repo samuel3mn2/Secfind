@@ -40,6 +40,7 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 | Importar Excel/CSV | ✅ Funciona | ✅ Funciona |
 | Exportar Excel/CSV | ✅ Funciona | ✅ Funciona |
 | Seguimiento de Riesgos | ✅ Funciona | ✅ Funciona |
+| Vista Comité | ✅ Funciona | ✅ Funciona |
 | Configuración | ✅ Funciona | ✅ Funciona |
 | **Importar PDF con IA** | ❌ Error | ✅ Funciona |
 
@@ -55,6 +56,18 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - [x] Gráficos: Severidad, Estatus, Institución, Tendencias
 - [x] 6 Filtros: Año, Institución, Informe, Severidad, Proveedor, Aplicación
 - [x] KPIs clickeables con modal de detalle
+
+### Vista Comité (NUEVO - Dic 2025)
+- [x] Resumen ejecutivo de vulnerabilidades por informe de pentest
+- [x] Tabla con ratios Pendiente/Total por severidad (Crítico, Alto, Medio, Bajo)
+- [x] Columnas: Informe/Alcance, Responsable(s), Total Pend./Total, % Pendiente
+- [x] KPIs: Críticas Pendientes, Altas Pendientes, Total Pendientes, % Global
+- [x] Filtro multi-select por Alcance/Informe
+- [x] Filtro por Severidades con badges toggleables
+- [x] Colores por ratio (verde=0%, amarillo=50%, naranja=75%, rojo=100%)
+- [x] Fila TOTALES con suma de todas las filas
+- [x] Exportar CSV
+- [x] **Exportar Imagen PNG** (para presentaciones PowerPoint)
 
 ### Gestión de Vulnerabilidades
 - [x] Tabla CRUD con búsqueda (texto visible)
@@ -95,6 +108,7 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - `/` - Dashboard (6 KPIs)
 - `/vulnerabilidades` - Gestión de Vulnerabilidades
 - `/seguimiento-riesgos` - Seguimiento de Riesgos
+- `/vista-comite` - **Vista Comité (NUEVO)**
 - `/configuracion` - Configuración del Sistema
 - `/login` - Inicio de Sesión
 
@@ -107,11 +121,11 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - **Contraseña**: admin123
 
 ## Estadísticas Actuales
-- 220 vulnerabilidades
+- 219 vulnerabilidades
 - 6 instituciones
 - 48 aplicaciones
 - 4 proveedores
-- 28 informes pentest
+- 27 informes pentest
 
 ## Backlog
 
