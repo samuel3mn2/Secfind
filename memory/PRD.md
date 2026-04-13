@@ -91,14 +91,15 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - [x] Página dedicada /seguimiento-riesgos
 - [x] KPIs: Vencidas, Próximos 7 días, Próximos 30 días
 - [x] Cálculo automático de días restantes
-- [x] Filtros por severidad e institución
+- [x] Filtros por severidad, institución e **informe pentest**
 
 ### Módulo de Configuración
-- [x] CRUD Instituciones
-- [x] CRUD Aplicaciones
-- [x] CRUD Proveedores
-- [x] CRUD Informes Pentest
+- [x] CRUD Instituciones (con actualización en cascada)
+- [x] CRUD Aplicaciones (con actualización en cascada)
+- [x] CRUD Proveedores (con actualización en cascada)
+- [x] CRUD Informes Pentest (con actualización en cascada)
 - [x] CRUD Usuarios con permisos
+- [x] **Actualización en cascada**: Al cambiar nombre de institución, aplicación, proveedor o informe, se actualizan todas las vulnerabilidades relacionadas
 
 ### Sistema de Autenticación
 - [x] JWT con bcrypt

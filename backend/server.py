@@ -511,6 +511,16 @@ async def update_institucion(inst_id: str, data: InstitucionUpdate, current_user
     
     update_dict = data.model_dump(exclude_unset=True)
     if update_dict:
+        # Cascade update: if name changed, update all vulnerabilities
+        if "nombre" in update_dict and update_dict["nombre"] != existing.get("nombre"):
+            old_name = existing.get("nombre")
+            new_name = update_dict["nombre"]
+            await db.vulnerabilidades.update_many(
+                {"institucion": old_name},
+                {"$set": {"institucion": new_name}}
+            )
+            logging.info(f"Cascade update: Institución '{old_name}' -> '{new_name}' in vulnerabilities")
+        
         await db.instituciones.update_one({"id": inst_id}, {"$set": update_dict})
     
     updated = await db.instituciones.find_one({"id": inst_id}, {"_id": 0})
@@ -559,6 +569,17 @@ async def update_aplicacion(app_id: str, data: AplicacionUpdate, current_user: C
     
     update_dict = data.model_dump(exclude_unset=True)
     if update_dict:
+        # Cascade update: if name changed, update all vulnerabilities (aplicaciones is an array)
+        if "nombre" in update_dict and update_dict["nombre"] != existing.get("nombre"):
+            old_name = existing.get("nombre")
+            new_name = update_dict["nombre"]
+            # Update in array field 'aplicaciones'
+            await db.vulnerabilidades.update_many(
+                {"aplicaciones": old_name},
+                {"$set": {"aplicaciones.$": new_name}}
+            )
+            logging.info(f"Cascade update: Aplicación '{old_name}' -> '{new_name}' in vulnerabilities")
+        
         await db.aplicaciones.update_one({"id": app_id}, {"$set": update_dict})
     
     updated = await db.aplicaciones.find_one({"id": app_id}, {"_id": 0})
@@ -607,6 +628,16 @@ async def update_proveedor(prov_id: str, data: ProveedorUpdate, current_user: Cu
     
     update_dict = data.model_dump(exclude_unset=True)
     if update_dict:
+        # Cascade update: if name changed, update all vulnerabilities
+        if "nombre" in update_dict and update_dict["nombre"] != existing.get("nombre"):
+            old_name = existing.get("nombre")
+            new_name = update_dict["nombre"]
+            await db.vulnerabilidades.update_many(
+                {"proveedor": old_name},
+                {"$set": {"proveedor": new_name}}
+            )
+            logging.info(f"Cascade update: Proveedor '{old_name}' -> '{new_name}' in vulnerabilities")
+        
         await db.proveedores.update_one({"id": prov_id}, {"$set": update_dict})
     
     updated = await db.proveedores.find_one({"id": prov_id}, {"_id": 0})
@@ -655,6 +686,16 @@ async def update_informe_pentest(informe_id: str, data: InformePentestUpdate, cu
     
     update_dict = data.model_dump(exclude_unset=True)
     if update_dict:
+        # Cascade update: if name changed, update all vulnerabilities
+        if "nombre" in update_dict and update_dict["nombre"] != existing.get("nombre"):
+            old_name = existing.get("nombre")
+            new_name = update_dict["nombre"]
+            await db.vulnerabilidades.update_many(
+                {"nombre_informe_pentest": old_name},
+                {"$set": {"nombre_informe_pentest": new_name}}
+            )
+            logging.info(f"Cascade update: Informe Pentest '{old_name}' -> '{new_name}' in vulnerabilities")
+        
         await db.informes_pentest.update_one({"id": informe_id}, {"$set": update_dict})
     
     updated = await db.informes_pentest.find_one({"id": informe_id}, {"_id": 0})
@@ -1287,6 +1328,7 @@ async def get_seguimiento_riesgos(
     filtro: Optional[str] = None,  # "vencidas", "proximas", "todas"
     severidad: Optional[str] = None,
     institucion: Optional[str] = None,
+    informe_pentest: Optional[str] = None,
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """
@@ -1319,6 +1361,8 @@ async def get_seguimiento_riesgos(
         query["severidad"] = severidad
     if institucion:
         query["institucion"] = institucion
+    if informe_pentest:
+        query["nombre_informe_pentest"] = informe_pentest
     
     vulns = await db.vulnerabilidades.find(query, {"_id": 0}).to_list(10000)
     

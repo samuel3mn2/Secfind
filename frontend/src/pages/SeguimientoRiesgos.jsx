@@ -111,6 +111,7 @@ export default function SeguimientoRiesgos() {
   const [filterEstado, setFilterEstado] = useState("all");
   const [filterSeveridad, setFilterSeveridad] = useState("");
   const [filterInstitucion, setFilterInstitucion] = useState("");
+  const [filterInforme, setFilterInforme] = useState("");
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingVuln, setViewingVuln] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -142,6 +143,7 @@ export default function SeguimientoRiesgos() {
       if (filterEstado && filterEstado !== "all") params.append("filtro", filterEstado);
       if (filterSeveridad && filterSeveridad !== "all") params.append("severidad", filterSeveridad);
       if (filterInstitucion && filterInstitucion !== "all") params.append("institucion", filterInstitucion);
+      if (filterInforme && filterInforme !== "all") params.append("informe_pentest", filterInforme);
 
       const response = await axios.get(`${API}/seguimiento-riesgos?${params.toString()}`);
       setVulnerabilidades(response.data);
@@ -152,7 +154,7 @@ export default function SeguimientoRiesgos() {
     } finally {
       setLoading(false);
     }
-  }, [filterEstado, filterSeveridad, filterInstitucion]);
+  }, [filterEstado, filterSeveridad, filterInstitucion, filterInforme]);
 
   useEffect(() => {
     fetchOptions();
@@ -334,7 +336,21 @@ export default function SeguimientoRiesgos() {
               </SelectContent>
             </Select>
 
-            {(filterEstado !== "all" || filterSeveridad || filterInstitucion) && (
+            <Select value={filterInforme} onValueChange={setFilterInforme}>
+              <SelectTrigger className="w-[180px] bg-black/20 border-zinc-700 text-white" data-testid="filter-informe">
+                <SelectValue placeholder="Informe Pentest" />
+              </SelectTrigger>
+              <SelectContent className="bg-zinc-900 border-zinc-700 max-h-[300px]">
+                <SelectItem value="all">Todos</SelectItem>
+                {options?.informes_pentest?.map((i) => (
+                  <SelectItem key={i} value={i} className="truncate">
+                    {i.length > 40 ? i.substring(0, 40) + "..." : i}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {(filterEstado !== "all" || filterSeveridad || filterInstitucion || filterInforme) && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -342,6 +358,7 @@ export default function SeguimientoRiesgos() {
                   setFilterEstado("all");
                   setFilterSeveridad("");
                   setFilterInstitucion("");
+                  setFilterInforme("");
                 }}
                 className="text-zinc-400 hover:text-white"
               >
