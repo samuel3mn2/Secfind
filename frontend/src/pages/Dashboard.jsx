@@ -987,7 +987,7 @@ export default function Dashboard() {
 
       {/* Vista Comité Report Options Modal */}
       <Dialog open={showVistaComiteOptions} onOpenChange={setShowVistaComiteOptions}>
-        <DialogContent className="bg-zinc-900 border-zinc-800 text-white max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogContent className="bg-zinc-900 border-zinc-800 text-white max-w-2xl w-[90vw]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="w-5 h-5 text-purple-400" />
@@ -1050,7 +1050,7 @@ export default function Dashboard() {
                   </Button>
                 </div>
               </div>
-              <div className="max-h-[200px] overflow-y-auto border border-zinc-700 rounded-lg p-2 space-y-1">
+              <div className="max-h-[300px] overflow-y-auto border border-zinc-700 rounded-lg p-2 space-y-1">
                 {options?.informes_pentest?.map(informe => (
                   <label
                     key={informe}
@@ -1068,9 +1068,9 @@ export default function Dashboard() {
                           setVcSelectedInformes([...vcSelectedInformes, informe]);
                         }
                       }}
-                      className="rounded border-zinc-600"
+                      className="rounded border-zinc-600 flex-shrink-0"
                     />
-                    <span className="text-sm text-zinc-300 truncate">{informe}</span>
+                    <span className="text-sm text-zinc-300">{informe}</span>
                   </label>
                 ))}
               </div>
