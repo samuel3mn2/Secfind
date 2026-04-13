@@ -1138,7 +1138,7 @@ async def get_vista_comite(
     # Get all vulnerabilities matching the filter
     vulns = await db.vulnerabilidades.find(
         query,
-        {"_id": 0, "nombre_informe_pentest": 1, "severidad": 1, "estatus": 1, "responsable": 1}
+        {"_id": 0, "nombre_informe_pentest": 1, "severidad": 1, "estatus": 1, "responsable": 1, "fecha_hallazgo": 1}
     ).to_list(50000)
     
     # Aggregate by informe
@@ -1150,7 +1150,8 @@ async def get_vista_comite(
         "medias_pendientes": 0, "medias_total": 0,
         "bajas_pendientes": 0, "bajas_total": 0,
         "total_pendientes": 0, "total_hallazgos": 0,
-        "responsables": set()
+        "responsables": set(),
+        "fecha_mas_antigua": None
     })
     
     for v in vulns:
@@ -1158,9 +1159,19 @@ async def get_vista_comite(
         severidad = v.get("severidad", "")
         estatus = v.get("estatus")
         responsable = v.get("responsable")
+        fecha_hallazgo = v.get("fecha_hallazgo")
         
         if responsable:
             informe_data[informe]["responsables"].add(responsable)
+        
+        # Track oldest date for this informe
+        if fecha_hallazgo:
+            try:
+                current_oldest = informe_data[informe]["fecha_mas_antigua"]
+                if current_oldest is None or fecha_hallazgo < current_oldest:
+                    informe_data[informe]["fecha_mas_antigua"] = fecha_hallazgo
+            except:
+                pass
         
         # Check if pending (not in closed statuses)
         is_pending = estatus not in closed_statuses
@@ -1191,9 +1202,24 @@ async def get_vista_comite(
     
     # Build response
     result = []
+    today = datetime.now(timezone.utc).date()
+    
     for informe in sorted(informe_data.keys()):
         data = informe_data[informe]
         responsables_list = sorted(data["responsables"])
+        
+        # Calculate tiempo activo in months
+        tiempo_activo_meses = None
+        if data["fecha_mas_antigua"]:
+            try:
+                fecha_str = data["fecha_mas_antigua"]
+                # Parse date string (format: YYYY-MM-DD)
+                fecha_date = datetime.strptime(fecha_str[:10], "%Y-%m-%d").date()
+                # Calculate months difference
+                months_diff = (today.year - fecha_date.year) * 12 + (today.month - fecha_date.month)
+                tiempo_activo_meses = max(0, months_diff)
+            except:
+                tiempo_activo_meses = None
         
         result.append({
             "informe": informe,
@@ -1207,7 +1233,8 @@ async def get_vista_comite(
             "bajas_total": data["bajas_total"],
             "responsable": ", ".join(responsables_list) if responsables_list else None,
             "total_pendientes": data["total_pendientes"],
-            "total_hallazgos": data["total_hallazgos"]
+            "total_hallazgos": data["total_hallazgos"],
+            "tiempo_activo_meses": tiempo_activo_meses
         })
     
     return result

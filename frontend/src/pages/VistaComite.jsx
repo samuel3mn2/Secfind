@@ -184,7 +184,7 @@ export default function VistaComite() {
     if (selectedSeveridades.includes("Alta")) headers.push("Alto");
     if (selectedSeveridades.includes("Media")) headers.push("Medio");
     if (selectedSeveridades.includes("Baja")) headers.push("Bajo");
-    headers.push("Responsable", "Pendiente/Total", "% Pendiente");
+    headers.push("Responsable", "Tiempo Activo (meses)", "Pendiente/Total", "% Pendiente");
 
     const rows = data.map(row => {
       const cells = [row.informe];
@@ -193,6 +193,7 @@ export default function VistaComite() {
       if (selectedSeveridades.includes("Media")) cells.push(`${row.medias_pendientes}/${row.medias_total}`);
       if (selectedSeveridades.includes("Baja")) cells.push(`${row.bajas_pendientes}/${row.bajas_total}`);
       cells.push(row.responsable || "-");
+      cells.push(row.tiempo_activo_meses !== null ? row.tiempo_activo_meses : "-");
       cells.push(`${row.total_pendientes}/${row.total_hallazgos}`);
       const pct = row.total_hallazgos > 0 ? Math.round((row.total_pendientes / row.total_hallazgos) * 100) : 0;
       cells.push(`${pct}%`);
@@ -215,12 +216,18 @@ export default function VistaComite() {
     
     setExporting(true);
     try {
+      // Add export mode class for light-friendly colors
+      tableRef.current.classList.add("export-mode");
+      
       const canvas = await html2canvas(tableRef.current, {
-        backgroundColor: "#18181b",
+        backgroundColor: "#ffffff",
         scale: 2,
         useCORS: true,
         logging: false,
       });
+      
+      // Remove export mode class
+      tableRef.current.classList.remove("export-mode");
       
       const link = document.createElement("a");
       link.download = `vista_comite_${new Date().toISOString().split('T')[0]}.png`;
@@ -230,6 +237,7 @@ export default function VistaComite() {
     } catch (error) {
       console.error("Error exporting image:", error);
       toast.error("Error al exportar imagen");
+      tableRef.current?.classList.remove("export-mode");
     } finally {
       setExporting(false);
     }
@@ -521,6 +529,7 @@ export default function VistaComite() {
                       <TableHead className="text-green-400 text-center">Bajo</TableHead>
                     )}
                     <TableHead className="text-zinc-400">Responsable</TableHead>
+                    <TableHead className="text-zinc-400 text-center">T. Activo</TableHead>
                     <TableHead className="text-zinc-400 text-center">Pend./Total</TableHead>
                     <TableHead className="text-zinc-400 text-center">% Pend.</TableHead>
                   </TableRow>
@@ -559,6 +568,13 @@ export default function VistaComite() {
                         {row.responsable || <span className="text-zinc-600">-</span>}
                       </TableCell>
                       <TableCell className="text-center">
+                        {row.tiempo_activo_meses !== null ? (
+                          <span className={`font-mono ${row.tiempo_activo_meses >= 12 ? 'text-red-400' : row.tiempo_activo_meses >= 6 ? 'text-orange-400' : 'text-zinc-300'}`}>
+                            {row.tiempo_activo_meses} {row.tiempo_activo_meses === 1 ? 'mes' : 'meses'}
+                          </span>
+                        ) : <span className="text-zinc-600">-</span>}
+                      </TableCell>
+                      <TableCell className="text-center">
                         <RatioCell pending={row.total_pendientes} total={row.total_hallazgos} />
                       </TableCell>
                       <TableCell className="text-center">
@@ -590,6 +606,7 @@ export default function VistaComite() {
                         <RatioCell pending={totals.bajas_pendientes} total={totals.bajas_total} />
                       </TableCell>
                     )}
+                    <TableCell />
                     <TableCell />
                     <TableCell className="text-center">
                       <RatioCell pending={totals.total_pendientes} total={totals.total_hallazgos} />

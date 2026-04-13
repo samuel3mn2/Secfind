@@ -60,14 +60,15 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 ### Vista Comité (NUEVO - Dic 2025)
 - [x] Resumen ejecutivo de vulnerabilidades por informe de pentest
 - [x] Tabla con ratios Pendiente/Total por severidad (Crítico, Alto, Medio, Bajo)
-- [x] Columnas: Informe/Alcance, Responsable(s), Total Pend./Total, % Pendiente
+- [x] Columnas: Informe/Alcance, Responsable(s), **Tiempo Activo (meses)**, Total Pend./Total, % Pendiente
 - [x] KPIs: Críticas Pendientes, Altas Pendientes, Total Pendientes, % Global
 - [x] Filtro multi-select por Alcance/Informe
 - [x] Filtro por Severidades con badges toggleables
 - [x] Colores por ratio (verde=0%, amarillo=50%, naranja=75%, rojo=100%)
+- [x] Colores por tiempo activo (≥12 meses=rojo, ≥6 meses=naranja)
 - [x] Fila TOTALES con suma de todas las filas
-- [x] Exportar CSV
-- [x] **Exportar Imagen PNG** (para presentaciones PowerPoint)
+- [x] Exportar CSV (incluye Tiempo Activo)
+- [x] **Exportar Imagen PNG fondo BLANCO** (para presentaciones PowerPoint)
 
 ### Gestión de Vulnerabilidades
 - [x] Tabla CRUD con búsqueda (texto visible)

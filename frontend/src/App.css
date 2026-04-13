@@ -106,3 +106,50 @@
     0% { background-position: 200% 0; }
     100% { background-position: -200% 0; }
 }
+
+/* Export mode for Vista Comité - Light theme for PowerPoint */
+.export-mode {
+    background-color: #ffffff !important;
+    color: #1f2937 !important;
+    border-color: #e5e7eb !important;
+    padding: 16px !important;
+    border-radius: 8px !important;
+}
+
+.export-mode table {
+    background-color: #ffffff !important;
+}
+
+.export-mode th {
+    background-color: #f3f4f6 !important;
+    color: #374151 !important;
+    border-color: #d1d5db !important;
+}
+
+.export-mode td {
+    color: #1f2937 !important;
+    border-color: #e5e7eb !important;
+}
+
+.export-mode tr {
+    border-color: #e5e7eb !important;
+}
+
+.export-mode tr:hover {
+    background-color: #f9fafb !important;
+}
+
+.export-mode .text-white {
+    color: #1f2937 !important;
+}
+
+.export-mode .text-zinc-300,
+.export-mode .text-zinc-400,
+.export-mode .text-zinc-500,
+.export-mode .text-zinc-600 {
+    color: #4b5563 !important;
+}
+
+.export-mode .bg-zinc-800\/50 {
+    background-color: #f3f4f6 !important;
+}
