@@ -86,6 +86,7 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - [x] Activos técnicos (servidores/URLs) van en descripción
 - [x] Detecta elementos nuevos para agregar al catálogo
 - [x] Revisión individual antes de guardar
+- [x] **Auto-creación de catálogos**: Al agregar vulnerabilidad, crea automáticamente institución, aplicación, proveedor e informe si no existen
 
 ### Seguimiento de Riesgos
 - [x] Página dedicada /seguimiento-riesgos

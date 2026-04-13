@@ -1794,9 +1794,52 @@ async def add_vulnerability_from_pdf(
     data: VulnerabilidadParaAgregar,
     current_user: CurrentUser = Depends(get_current_user)
 ):
-    """Add a single vulnerability extracted from PDF"""
+    """Add a single vulnerability extracted from PDF and auto-create catalog items if missing"""
     if not current_user.es_admin and not current_user.permisos.vulnerabilidades.crear:
         raise HTTPException(status_code=403, detail="No tiene permisos para crear vulnerabilidades")
+    
+    # Auto-create catalog items if they don't exist
+    # Institution
+    if data.institucion:
+        existing_inst = await db.instituciones.find_one({"nombre": data.institucion})
+        if not existing_inst:
+            inst = Institucion(nombre=data.institucion)
+            doc = inst.model_dump()
+            doc['created_at'] = doc['created_at'].isoformat()
+            await db.instituciones.insert_one(doc)
+            logging.info(f"Auto-created institution: {data.institucion}")
+    
+    # Applications (list)
+    if data.aplicaciones:
+        for app_name in data.aplicaciones:
+            if app_name:
+                existing_app = await db.aplicaciones.find_one({"nombre": app_name})
+                if not existing_app:
+                    app = Aplicacion(nombre=app_name)
+                    doc = app.model_dump()
+                    doc['created_at'] = doc['created_at'].isoformat()
+                    await db.aplicaciones.insert_one(doc)
+                    logging.info(f"Auto-created application: {app_name}")
+    
+    # Provider
+    if data.proveedor:
+        existing_prov = await db.proveedores.find_one({"nombre": data.proveedor})
+        if not existing_prov:
+            prov = Proveedor(nombre=data.proveedor)
+            doc = prov.model_dump()
+            doc['created_at'] = doc['created_at'].isoformat()
+            await db.proveedores.insert_one(doc)
+            logging.info(f"Auto-created provider: {data.proveedor}")
+    
+    # Informe Pentest
+    if data.nombre_informe_pentest:
+        existing_informe = await db.informes_pentest.find_one({"nombre": data.nombre_informe_pentest})
+        if not existing_informe:
+            informe = InformePentest(nombre=data.nombre_informe_pentest)
+            doc = informe.model_dump()
+            doc['created_at'] = doc['created_at'].isoformat()
+            await db.informes_pentest.insert_one(doc)
+            logging.info(f"Auto-created informe pentest: {data.nombre_informe_pentest}")
     
     vuln = Vulnerabilidad(
         fecha_hallazgo=data.fecha_hallazgo,
