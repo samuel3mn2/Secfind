@@ -445,6 +445,13 @@ La aplicación crea automáticamente un usuario administrador al iniciar:
 - **6 KPIs**: Total, Críticas Abiertas, Corregidas, Pendientes, En Proceso, Para Re Test
 - Gráficos de pastel y barras
 - Filtros por año, institución, severidad, proveedor, aplicación
+- **Botón "Generar Reporte PDF"** para exportar reportes
+
+### Reportes PDF
+- **Reporte Ejecutivo**: KPIs + gráficos de pastel (severidad, estatus) + barras (instituciones)
+- **Reporte por Institución**: Resumen + tabla de vulnerabilidades coloreada
+- **Reporte por Informe Pentest**: Detalle de vulnerabilidades de un pentest
+- **Reporte Vista Comité**: Tabla ejecutiva con selección de informes y severidades
 
 ### Vista Comité (Para Presentaciones)
 - **Resumen ejecutivo por informe de pentest** (Alcance)
@@ -454,10 +461,21 @@ La aplicación crea automáticamente un usuario administrador al iniciar:
 - **Exportar a CSV** para análisis
 - **Exportar a Imagen PNG** con fondo blanco para PowerPoint
 
+### Auditoría del Sistema
+- **Historial completo** de cambios en vulnerabilidades
+- **Registro automático** de creación, actualización y eliminación
+- **Detalle de cambios**: campo modificado, valor anterior, valor nuevo
+- **Solo administradores** pueden acceder
+
 ### Gestión de Vulnerabilidades
 - Búsqueda y filtros múltiples
 - Importar desde Excel, CSV y **PDF con IA**
 - Exportar a Excel y CSV
+- **Acciones Masivas**:
+  - Selección múltiple con checkboxes
+  - Cambiar estatus de varias vulnerabilidades
+  - Asignar responsable en lote
+  - Actualizar fecha de compromiso en grupo
 
 ### Seguimiento de Riesgos
 - Vulnerabilidades con fecha de compromiso

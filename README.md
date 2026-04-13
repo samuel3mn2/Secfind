@@ -1,6 +1,6 @@
 # SecFind - Sistema de Gestión de Vulnerabilidades
 
-Sistema web completo para la gestión de vulnerabilidades de ciberseguridad, diseñado para reemplazar flujos de trabajo basados en Excel. Incluye dashboard ejecutivo con KPIs, gráficos interactivos, módulo CRUD completo, seguimiento de riesgos, **Vista Comité para presentaciones ejecutivas** e importación inteligente desde PDF con IA.
+Sistema web completo para la gestión de vulnerabilidades de ciberseguridad, diseñado para reemplazar flujos de trabajo basados en Excel. Incluye dashboard ejecutivo con KPIs, gráficos interactivos, módulo CRUD completo, seguimiento de riesgos, **Vista Comité para presentaciones ejecutivas**, **reportes PDF**, **auditoría del sistema** e importación inteligente desde PDF con IA.
 
 ![Dashboard](https://img.shields.io/badge/Dashboard-6%20KPIs%20%2B%20Gráficos-blue)
 ![Stack](https://img.shields.io/badge/Stack-FastAPI%20%2B%20React%20%2B%20MongoDB-green)
@@ -17,6 +17,13 @@ Sistema web completo para la gestión de vulnerabilidades de ciberseguridad, dis
 - **Gráfico de evolución temporal** (mensual/trimestral)
 - **Gráficos de pastel y barras** por Severidad, Estatus e Institución
 - **6 filtros dinámicos**: Año, Institución, Informe Pentest, Severidad, Proveedor, Aplicación
+- **Botón "Generar Reporte PDF"** para exportar reportes
+
+### 🆕 Reportes PDF
+- **Reporte Ejecutivo**: KPIs + gráficos de pastel (severidad, estatus) + barras (instituciones)
+- **Reporte por Institución**: Resumen + tabla de vulnerabilidades con colores por severidad
+- **Reporte por Informe Pentest**: Detalle de vulnerabilidades de un pentest específico
+- **Reporte Vista Comité**: Tabla ejecutiva con selección de informes y severidades
 
 ### 🆕 Vista Comité (Para Presentaciones Ejecutivas)
 - **Resumen por informe de pentest** (Alcance)
@@ -27,11 +34,23 @@ Sistema web completo para la gestión de vulnerabilidades de ciberseguridad, dis
 - **Exportar a CSV** para análisis
 - **Exportar a Imagen PNG (fondo blanco)** para presentaciones PowerPoint
 
+### 🆕 Auditoría del Sistema
+- **Historial completo** de todos los cambios en vulnerabilidades
+- **Registro automático** de creación, actualización y eliminación
+- **Detalle de cambios**: campo modificado, valor anterior, valor nuevo
+- **Filtros** por entidad, acción, usuario y rango de fechas
+- **Solo administradores** pueden acceder
+
 ### Gestión de Vulnerabilidades
 - Tabla CRUD con búsqueda y múltiples filtros
 - Campos dropdown predefinidos desde catálogos
 - Multi-select para aplicaciones
 - Paginación
+- **🆕 Acciones Masivas**:
+  - Selección múltiple con checkboxes
+  - Cambiar estatus de múltiples vulnerabilidades
+  - Asignar responsable en lote
+  - Actualizar fecha de compromiso en grupo
 
 ### Seguimiento de Riesgos
 - Página dedicada para vulnerabilidades con fecha de compromiso
@@ -52,6 +71,8 @@ Sistema web completo para la gestión de vulnerabilidades de ciberseguridad, dis
 - Exportar a CSV y Excel
 - Importar desde CSV y Excel
 - **🆕 Importar desde PDF con IA** (extrae vulnerabilidades automáticamente)
+  - Auto-creación de catálogos (institución, aplicación, proveedor, informe)
+  - Comparación insensible a mayúsculas/minúsculas para evitar duplicados
 
 ---
 
@@ -178,15 +199,17 @@ Frontend disponible en: `http://localhost:3000`
 secfind/
 ├── backend/
 │   ├── server.py              # API FastAPI (todos los endpoints)
+│   ├── pdf_reports.py         # Generación de reportes PDF
 │   ├── requirements.txt       # Dependencias Python
 │   └── .env                   # Variables de entorno
 ├── frontend/
 │   ├── src/
 │   │   ├── pages/
-│   │   │   ├── Dashboard.jsx          # Dashboard con KPIs
-│   │   │   ├── Vulnerabilidades.jsx   # CRUD de vulnerabilidades
+│   │   │   ├── Dashboard.jsx          # Dashboard con KPIs y Reportes PDF
+│   │   │   ├── Vulnerabilidades.jsx   # CRUD + Acciones Masivas
 │   │   │   ├── SeguimientoRiesgos.jsx # Seguimiento de fechas
 │   │   │   ├── VistaComite.jsx        # Vista ejecutiva para comités
+│   │   │   ├── Auditoria.jsx          # Historial de cambios
 │   │   │   ├── Configuracion.jsx      # Módulo de configuración
 │   │   │   ├── ImportarPDF.jsx        # Importación con IA
 │   │   │   ├── Instituciones.jsx
@@ -223,6 +246,7 @@ secfind/
 | POST | `/api/vulnerabilidades` | Crear vulnerabilidad |
 | PUT | `/api/vulnerabilidades/{id}` | Actualizar |
 | DELETE | `/api/vulnerabilidades/{id}` | Eliminar |
+| POST | `/api/vulnerabilidades/bulk-update` | **Acciones masivas** |
 
 ### Dashboard
 | Método | Endpoint | Descripción |
@@ -230,6 +254,14 @@ secfind/
 | GET | `/api/dashboard/stats` | KPIs con filtros |
 | GET | `/api/dashboard/tendencias` | Evolución temporal |
 | GET | `/api/dashboard/kpi-detail` | Detalle de KPIs |
+
+### Reportes PDF
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/reportes/ejecutivo` | Reporte ejecutivo con gráficos |
+| GET | `/api/reportes/institucion/{nombre}` | Reporte por institución |
+| GET | `/api/reportes/informe/{nombre}` | Reporte por informe pentest |
+| GET | `/api/reportes/vista-comite` | Reporte Vista Comité |
 
 ### Seguimiento de Riesgos
 | Método | Endpoint | Descripción |
@@ -241,6 +273,11 @@ secfind/
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
 | GET | `/api/vista-comite` | Agregación por informe (Alcance) |
+
+### Auditoría
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/historial` | Historial de cambios (solo admin) |
 
 ### Configuración
 | Método | Endpoint | Descripción |
