@@ -42,6 +42,7 @@ const DEFAULT_PERMISSIONS = {
   dashboard: { ver: true, crear: false, editar: false, eliminar: false },
   vulnerabilidades: { ver: true, crear: false, editar: false, eliminar: false },
   configuracion: { ver: false, crear: false, editar: false, eliminar: false },
+  auditoria: { ver: false, crear: false, editar: false, eliminar: false },
 };
 
 export default function Usuarios() {
@@ -486,6 +487,21 @@ export default function Usuarios() {
                           onCheckedChange={(checked) => handlePermissionChange("configuracion", "eliminar", checked)}
                         />
                         Eliminar
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Auditoría Permissions */}
+                  <div className="p-4 rounded-lg bg-zinc-800/50 border border-zinc-700">
+                    <h4 className="text-zinc-300 font-medium mb-3">Auditoría</h4>
+                    <p className="text-xs text-zinc-500 mb-3">Historial de cambios del sistema</p>
+                    <div className="flex flex-wrap gap-6">
+                      <label className="flex items-center gap-2 text-sm text-zinc-400">
+                        <Checkbox
+                          checked={formData.permisos.auditoria?.ver || false}
+                          onCheckedChange={(checked) => handlePermissionChange("auditoria", "ver", checked)}
+                        />
+                        Ver
                       </label>
                     </div>
                   </div>

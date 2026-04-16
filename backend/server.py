@@ -1155,6 +1155,48 @@ async def bulk_update_vulnerabilidades(
         "modified_count": result.modified_count
     }
 
+class BulkDeleteRequest(BaseModel):
+    ids: List[str]
+
+@api_router.post("/vulnerabilidades/bulk-delete")
+async def bulk_delete_vulnerabilidades(
+    data: BulkDeleteRequest,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Delete multiple vulnerabilities at once"""
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.eliminar:
+        raise HTTPException(status_code=403, detail="No tiene permisos para eliminar vulnerabilidades")
+    
+    if not data.ids:
+        raise HTTPException(status_code=400, detail="No se especificaron vulnerabilidades")
+    
+    # Get vulnerability names for audit log before deleting
+    vulns = await db.vulnerabilidades.find(
+        {"id": {"$in": data.ids}},
+        {"_id": 0, "vulnerabilidad": 1}
+    ).to_list(len(data.ids))
+    
+    vuln_names = [v.get("vulnerabilidad", "")[:30] for v in vulns[:5]]
+    
+    # Delete all matching documents
+    result = await db.vulnerabilidades.delete_many({"id": {"$in": data.ids}})
+    
+    # Register in audit log
+    await registrar_cambio(
+        entidad="vulnerabilidad",
+        entidad_id=f"bulk-delete-{len(data.ids)}",
+        entidad_nombre=f"Eliminación masiva de {result.deleted_count} vulnerabilidades",
+        accion="eliminar",
+        usuario_id=current_user.id,
+        usuario_nombre=current_user.username,
+        cambios=[{"campo": "ejemplos", "valor_anterior": ", ".join(vuln_names), "valor_nuevo": "(eliminados)"}]
+    )
+    
+    return {
+        "message": f"Se eliminaron {result.deleted_count} vulnerabilidades",
+        "deleted_count": result.deleted_count
+    }
+
 # ============ DASHBOARD ENDPOINTS ============
 
 # ============ HISTORIAL DE CAMBIOS ENDPOINT ============
@@ -1767,6 +1809,8 @@ async def import_excel(file: UploadFile = File(...), current_user: CurrentUser =
     if not (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
         raise HTTPException(status_code=400, detail="El archivo debe ser Excel (.xlsx o .xls)")
     
+    import re
+    
     contents = await file.read()
     df = pd.read_excel(io.BytesIO(contents))
     
@@ -1790,6 +1834,7 @@ async def import_excel(file: UploadFile = File(...), current_user: CurrentUser =
     
     records = df.to_dict('records')
     inserted_count = 0
+    catalogs_created = {"instituciones": 0, "aplicaciones": 0, "proveedores": 0, "informes": 0}
     
     for record in records:
         cleaned_record = {}
@@ -1801,6 +1846,69 @@ async def import_excel(file: UploadFile = File(...), current_user: CurrentUser =
             else:
                 cleaned_record[k] = str(v)
         
+        # Auto-create catalogs if they don't exist (case-insensitive)
+        # Institution
+        if cleaned_record.get("institucion"):
+            inst_name = cleaned_record["institucion"]
+            existing = await db.instituciones.find_one(
+                {"nombre": {"$regex": f"^{re.escape(inst_name)}$", "$options": "i"}}
+            )
+            if existing:
+                cleaned_record["institucion"] = existing["nombre"]
+            else:
+                inst = Institucion(nombre=inst_name)
+                doc = inst.model_dump()
+                doc['created_at'] = doc['created_at'].isoformat()
+                await db.instituciones.insert_one(doc)
+                catalogs_created["instituciones"] += 1
+        
+        # Application (single field 'aplicacion' -> convert to list 'aplicaciones')
+        if cleaned_record.get("aplicacion"):
+            app_name = cleaned_record["aplicacion"]
+            existing = await db.aplicaciones.find_one(
+                {"nombre": {"$regex": f"^{re.escape(app_name)}$", "$options": "i"}}
+            )
+            if existing:
+                cleaned_record["aplicaciones"] = [existing["nombre"]]
+            else:
+                app = Aplicacion(nombre=app_name)
+                doc = app.model_dump()
+                doc['created_at'] = doc['created_at'].isoformat()
+                await db.aplicaciones.insert_one(doc)
+                cleaned_record["aplicaciones"] = [app_name]
+                catalogs_created["aplicaciones"] += 1
+            del cleaned_record["aplicacion"]
+        
+        # Provider
+        if cleaned_record.get("proveedor"):
+            prov_name = cleaned_record["proveedor"]
+            existing = await db.proveedores.find_one(
+                {"nombre": {"$regex": f"^{re.escape(prov_name)}$", "$options": "i"}}
+            )
+            if existing:
+                cleaned_record["proveedor"] = existing["nombre"]
+            else:
+                prov = Proveedor(nombre=prov_name)
+                doc = prov.model_dump()
+                doc['created_at'] = doc['created_at'].isoformat()
+                await db.proveedores.insert_one(doc)
+                catalogs_created["proveedores"] += 1
+        
+        # Informe Pentest
+        if cleaned_record.get("nombre_informe_pentest"):
+            inf_name = cleaned_record["nombre_informe_pentest"]
+            existing = await db.informes_pentest.find_one(
+                {"nombre": {"$regex": f"^{re.escape(inf_name)}$", "$options": "i"}}
+            )
+            if existing:
+                cleaned_record["nombre_informe_pentest"] = existing["nombre"]
+            else:
+                informe = InformePentest(nombre=inf_name)
+                doc = informe.model_dump()
+                doc['created_at'] = doc['created_at'].isoformat()
+                await db.informes_pentest.insert_one(doc)
+                catalogs_created["informes"] += 1
+        
         vuln = Vulnerabilidad(**cleaned_record)
         doc = vuln.model_dump()
         doc['created_at'] = doc['created_at'].isoformat()
@@ -1808,7 +1916,21 @@ async def import_excel(file: UploadFile = File(...), current_user: CurrentUser =
         await db.vulnerabilidades.insert_one(doc)
         inserted_count += 1
     
-    return {"message": f"Se importaron {inserted_count} registros exitosamente"}
+    catalog_msg = []
+    if catalogs_created["instituciones"]:
+        catalog_msg.append(f"{catalogs_created['instituciones']} instituciones")
+    if catalogs_created["aplicaciones"]:
+        catalog_msg.append(f"{catalogs_created['aplicaciones']} aplicaciones")
+    if catalogs_created["proveedores"]:
+        catalog_msg.append(f"{catalogs_created['proveedores']} proveedores")
+    if catalogs_created["informes"]:
+        catalog_msg.append(f"{catalogs_created['informes']} informes")
+    
+    msg = f"Se importaron {inserted_count} registros exitosamente"
+    if catalog_msg:
+        msg += f". Se crearon: {', '.join(catalog_msg)}"
+    
+    return {"message": msg, "inserted": inserted_count, "catalogs_created": catalogs_created}
 
 @api_router.delete("/vulnerabilidades")
 async def delete_all_vulnerabilidades(current_user: CurrentUser = Depends(get_current_user)):

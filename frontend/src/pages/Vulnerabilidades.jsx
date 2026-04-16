@@ -200,6 +200,7 @@ export default function Vulnerabilidades() {
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState([]);
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [bulkAction, setBulkAction] = useState({ estatus: "", responsable: "", fecha_compromiso: "" });
   const [applyingBulk, setApplyingBulk] = useState(false);
 
@@ -436,6 +437,24 @@ export default function Vulnerabilidades() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    
+    setApplyingBulk(true);
+    try {
+      const response = await axios.post(`${API}/vulnerabilidades/bulk-delete`, { ids: selectedIds });
+      toast.success(response.data.message);
+      setShowBulkDeleteConfirm(false);
+      setSelectedIds([]);
+      fetchVulnerabilidades();
+    } catch (error) {
+      console.error("Error in bulk delete:", error);
+      toast.error(error.response?.data?.detail || "Error al eliminar");
+    } finally {
+      setApplyingBulk(false);
+    }
+  };
+
   const paginatedData = vulnerabilidades.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
@@ -649,7 +668,17 @@ export default function Vulnerabilidades() {
                   data-testid="bulk-action-btn"
                 >
                   <Layers className="w-4 h-4 mr-2" />
-                  Acciones Masivas
+                  Editar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                  onClick={() => setShowBulkDeleteConfirm(true)}
+                  data-testid="bulk-delete-btn"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Eliminar
                 </Button>
                 <Button
                   variant="ghost"
@@ -1292,6 +1321,44 @@ export default function Vulnerabilidades() {
               data-testid="apply-bulk-btn"
             >
               {applyingBulk ? "Aplicando..." : "Aplicar Cambios"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Confirmation Modal */}
+      <Dialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+        <DialogContent className="bg-zinc-900 border-zinc-800 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-400">
+              <Trash2 className="w-5 h-5" />
+              Confirmar Eliminación Masiva
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-zinc-300">
+              ¿Estás seguro de que deseas eliminar <strong className="text-red-400">{selectedIds.length}</strong> vulnerabilidad{selectedIds.length > 1 ? "es" : ""}?
+            </p>
+            <div className="bg-red-950/30 border border-red-500/30 rounded-lg p-3 text-sm text-red-300">
+              <strong>Advertencia:</strong> Esta acción no se puede deshacer. Todas las vulnerabilidades seleccionadas serán eliminadas permanentemente.
+            </div>
+          </div>
+          <DialogFooter className="gap-2 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowBulkDeleteConfirm(false)}
+              className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleBulkDelete}
+              disabled={applyingBulk}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              data-testid="confirm-bulk-delete-btn"
+            >
+              {applyingBulk ? "Eliminando..." : "Eliminar Todo"}
             </Button>
           </DialogFooter>
         </DialogContent>
