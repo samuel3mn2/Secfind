@@ -153,7 +153,7 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - **Contraseña**: admin123
 
 ## Estadísticas Actuales
-- 225 vulnerabilidades
+- 235 vulnerabilidades
 - 8 instituciones
 - 48 aplicaciones
 - 4 proveedores
@@ -161,6 +161,15 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - 2 usuarios (admin, sfernandez)
 
 ## Última Actualización: Abril 2026
+### Cambios Completados (Iteración 8)
+- ✅ **Notificaciones por Email** - Módulo completo en Configuración:
+  - Configuración SMTP (Gmail u otro servidor)
+  - Alertas configurables: 7, 3, 1 días antes del vencimiento
+  - Opción de enviar a responsables además de administradores
+  - Resumen semanal automático
+  - Botones: Probar Conexión, Enviar Email de Prueba, Ejecutar Ahora
+- ✅ Burbuja "Made with Emergent" removida de la UI
+
 ### Cambios Completados (Iteración 7)
 - ✅ Eliminación masiva de vulnerabilidades con confirmación
 - ✅ Auto-creación de catálogos en importación Excel (case-insensitive)
@@ -169,9 +178,11 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 ## Backlog
 
 ### P2 (Media Prioridad)
-- [ ] Notificaciones por email de fechas de compromiso
+- [ ] Detección de duplicados en importación
 - [ ] Historial de cambios en catálogos de configuración (instituciones, aplicaciones, etc.)
 
 ### P3 (Baja Prioridad)
 - [ ] Dashboard comparativo por períodos
 - [ ] Integración con herramientas de scanning
+- [ ] Ejecución automática programada de notificaciones (cron job)
+
