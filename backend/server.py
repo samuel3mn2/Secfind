@@ -2210,16 +2210,19 @@ async def import_excel(file: UploadFile = File(...), current_user: CurrentUser =
         'Fecha Hallazgo': 'fecha_hallazgo',
         'Institución': 'institucion',
         'Aplicación': 'aplicacion',
+        'Aplicaciones': 'aplicacion',
         'Vulnerabilidad': 'vulnerabilidad',
         'Recomendaciones': 'recomendaciones',
         'Severidad': 'severidad',
         'Riesgo Asociado': 'riesgo_asociado',
         'Descripción Riesgo': 'descripcion_riesgo',
+        'Descripción del Riesgo': 'descripcion_riesgo',
         'Responsable': 'responsable',
         'Fecha Compromiso': 'fecha_compromiso',
         'Estatus': 'estatus',
         'Resultado Re Test': 'resultado_re_test',
         'Nombre Informe Pentest': 'nombre_informe_pentest',
+        'Informe Pentest': 'nombre_informe_pentest',
         'Proveedor': 'proveedor'
     }
     df = df.rename(columns=column_mapping)
