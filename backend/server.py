@@ -15,6 +15,7 @@ import io
 import bcrypt
 import jwt
 from pdf_reports import generate_executive_report, generate_institution_report, generate_vista_comite_report
+from email_service import EmailService, generate_alert_email, generate_weekly_summary_email
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -279,6 +280,39 @@ def calcular_cambios(original: dict, actualizado: dict, campos_excluir: list = N
                 "valor_nuevo": valor_nuevo
             })
     return cambios
+
+# ============ NOTIFICATION CONFIG MODEL ============
+
+class AlertConfig(BaseModel):
+    dias_7: bool = True
+    dias_3: bool = True
+    dias_1: bool = True
+
+class NotificacionConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default="config_notificaciones")
+    habilitado: bool = False
+    smtp_servidor: str = "smtp.gmail.com"
+    smtp_puerto: int = 587
+    smtp_email: str = ""
+    smtp_password: str = ""
+    smtp_usar_tls: bool = True
+    alertas: AlertConfig = AlertConfig()
+    enviar_a_responsables: bool = False
+    resumen_semanal: bool = True
+    ultima_ejecucion: Optional[str] = None
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class NotificacionConfigUpdate(BaseModel):
+    habilitado: Optional[bool] = None
+    smtp_servidor: Optional[str] = None
+    smtp_puerto: Optional[int] = None
+    smtp_email: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_usar_tls: Optional[bool] = None
+    alertas: Optional[AlertConfig] = None
+    enviar_a_responsables: Optional[bool] = None
+    resumen_semanal: Optional[bool] = None
 
 # ============ AUTH HELPERS ============
 
@@ -766,6 +800,272 @@ async def delete_informe_pentest(informe_id: str, current_user: CurrentUser = De
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Informe no encontrado")
     return {"message": "Informe eliminado exitosamente"}
+
+# ============ NOTIFICATION CONFIGURATION ENDPOINTS ============
+
+@api_router.get("/config/notificaciones")
+async def get_notificacion_config(current_user: CurrentUser = Depends(get_current_user)):
+    """Get notification configuration (admin only)"""
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden ver la configuración de notificaciones")
+    
+    config = await db.configuracion.find_one({"id": "config_notificaciones"}, {"_id": 0})
+    if not config:
+        # Return default config
+        default_config = NotificacionConfig()
+        return default_config.model_dump()
+    
+    # Don't expose the password in responses
+    if config.get("smtp_password"):
+        config["smtp_password"] = "********"
+    return config
+
+@api_router.put("/config/notificaciones")
+async def update_notificacion_config(
+    data: NotificacionConfigUpdate,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Update notification configuration (admin only)"""
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden modificar la configuración")
+    
+    # Get existing config or create default
+    existing = await db.configuracion.find_one({"id": "config_notificaciones"})
+    
+    update_data = data.model_dump(exclude_unset=True)
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    # If password is masked, don't update it
+    if update_data.get("smtp_password") == "********":
+        del update_data["smtp_password"]
+    
+    if existing:
+        await db.configuracion.update_one(
+            {"id": "config_notificaciones"},
+            {"$set": update_data}
+        )
+    else:
+        new_config = NotificacionConfig(**update_data)
+        doc = new_config.model_dump()
+        doc["updated_at"] = doc["updated_at"].isoformat()
+        await db.configuracion.insert_one(doc)
+    
+    return {"message": "Configuración actualizada exitosamente"}
+
+@api_router.post("/config/notificaciones/test")
+async def test_notificacion_config(current_user: CurrentUser = Depends(get_current_user)):
+    """Test SMTP connection (admin only)"""
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden probar la configuración")
+    
+    config = await db.configuracion.find_one({"id": "config_notificaciones"}, {"_id": 0})
+    if not config:
+        raise HTTPException(status_code=400, detail="No hay configuración SMTP guardada")
+    
+    if not config.get("smtp_email") or not config.get("smtp_password"):
+        raise HTTPException(status_code=400, detail="Faltan credenciales SMTP")
+    
+    email_service = EmailService({
+        "servidor": config.get("smtp_servidor", "smtp.gmail.com"),
+        "puerto": config.get("smtp_puerto", 587),
+        "email": config.get("smtp_email"),
+        "password": config.get("smtp_password"),
+        "usar_tls": config.get("smtp_usar_tls", True)
+    })
+    
+    result = email_service.test_connection()
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["message"])
+    
+    return {"message": "Conexión SMTP exitosa"}
+
+@api_router.post("/config/notificaciones/send-test-email")
+async def send_test_email(current_user: CurrentUser = Depends(get_current_user)):
+    """Send a test email to verify the configuration (admin only)"""
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden enviar emails de prueba")
+    
+    config = await db.configuracion.find_one({"id": "config_notificaciones"}, {"_id": 0})
+    if not config:
+        raise HTTPException(status_code=400, detail="No hay configuración SMTP guardada")
+    
+    email_service = EmailService({
+        "servidor": config.get("smtp_servidor", "smtp.gmail.com"),
+        "puerto": config.get("smtp_puerto", 587),
+        "email": config.get("smtp_email"),
+        "password": config.get("smtp_password"),
+        "usar_tls": config.get("smtp_usar_tls", True)
+    })
+    
+    # Get current user's email or use SMTP email
+    user = await db.usuarios.find_one({"id": current_user.id}, {"_id": 0, "email": 1})
+    to_email = user.get("email") if user and user.get("email") else config.get("smtp_email")
+    
+    # Generate test email
+    test_vulns = [
+        {"vulnerabilidad": "Test - SQL Injection en login", "institucion": "Test Corp", "severidad": "Critica", "fecha_compromiso": "2026-04-20", "responsable": "Admin"},
+        {"vulnerabilidad": "Test - XSS en formulario", "institucion": "Test Corp", "severidad": "Alta", "fecha_compromiso": "2026-04-22", "responsable": "Admin"}
+    ]
+    html_content = generate_alert_email(test_vulns, 7)
+    
+    result = email_service.send_email([to_email], "SecFind - Email de Prueba", html_content)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["message"])
+    
+    return {"message": f"Email de prueba enviado a {to_email}"}
+
+@api_router.post("/notificaciones/ejecutar")
+async def ejecutar_notificaciones(current_user: CurrentUser = Depends(get_current_user)):
+    """Manually trigger notification check (admin only)"""
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden ejecutar notificaciones")
+    
+    config = await db.configuracion.find_one({"id": "config_notificaciones"}, {"_id": 0})
+    if not config or not config.get("habilitado"):
+        raise HTTPException(status_code=400, detail="Las notificaciones no están habilitadas")
+    
+    if not config.get("smtp_email") or not config.get("smtp_password"):
+        raise HTTPException(status_code=400, detail="Configuración SMTP incompleta")
+    
+    email_service = EmailService({
+        "servidor": config.get("smtp_servidor", "smtp.gmail.com"),
+        "puerto": config.get("smtp_puerto", 587),
+        "email": config.get("smtp_email"),
+        "password": config.get("smtp_password"),
+        "usar_tls": config.get("smtp_usar_tls", True)
+    })
+    
+    # Get admin emails
+    admins = await db.usuarios.find({"es_admin": True, "activo": True}, {"_id": 0, "email": 1}).to_list(100)
+    admin_emails = [a["email"] for a in admins if a.get("email")]
+    
+    if not admin_emails:
+        admin_emails = [config.get("smtp_email")]
+    
+    today = datetime.now(timezone.utc).date()
+    emails_sent = 0
+    alertas = config.get("alertas", {})
+    
+    # Check each alert threshold
+    for dias, habilitado in [
+        (1, alertas.get("dias_1", True)),
+        (3, alertas.get("dias_3", True)),
+        (7, alertas.get("dias_7", True))
+    ]:
+        if not habilitado:
+            continue
+        
+        target_date = today + timedelta(days=dias)
+        target_str = target_date.strftime("%Y-%m-%d")
+        
+        # Find vulnerabilities expiring on this date
+        vulns = await db.vulnerabilidades.find({
+            "fecha_compromiso": target_str,
+            "estatus": {"$in": ["Pendiente", "En Proceso"]}
+        }, {"_id": 0}).to_list(1000)
+        
+        if vulns:
+            html_content = generate_alert_email(vulns, dias)
+            recipients = admin_emails.copy()
+            
+            # Add responsables if enabled
+            if config.get("enviar_a_responsables"):
+                for v in vulns:
+                    resp = v.get("responsable")
+                    if resp:
+                        # Try to find user email by name
+                        user = await db.usuarios.find_one({"nombre": resp, "activo": True}, {"_id": 0, "email": 1})
+                        if user and user.get("email") and user["email"] not in recipients:
+                            recipients.append(user["email"])
+            
+            result = email_service.send_email(
+                recipients,
+                f"SecFind - {len(vulns)} vulnerabilidad(es) vence(n) en {dias} día(s)",
+                html_content
+            )
+            if result["success"]:
+                emails_sent += 1
+    
+    # Update last execution time
+    await db.configuracion.update_one(
+        {"id": "config_notificaciones"},
+        {"$set": {"ultima_ejecucion": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {"message": f"Proceso completado. {emails_sent} alerta(s) enviada(s)"}
+
+@api_router.post("/notificaciones/resumen-semanal")
+async def enviar_resumen_semanal(current_user: CurrentUser = Depends(get_current_user)):
+    """Manually send weekly summary (admin only)"""
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden enviar el resumen")
+    
+    config = await db.configuracion.find_one({"id": "config_notificaciones"}, {"_id": 0})
+    if not config or not config.get("habilitado"):
+        raise HTTPException(status_code=400, detail="Las notificaciones no están habilitadas")
+    
+    email_service = EmailService({
+        "servidor": config.get("smtp_servidor", "smtp.gmail.com"),
+        "puerto": config.get("smtp_puerto", 587),
+        "email": config.get("smtp_email"),
+        "password": config.get("smtp_password"),
+        "usar_tls": config.get("smtp_usar_tls", True)
+    })
+    
+    # Get admin emails
+    admins = await db.usuarios.find({"es_admin": True, "activo": True}, {"_id": 0, "email": 1}).to_list(100)
+    admin_emails = [a["email"] for a in admins if a.get("email")]
+    
+    if not admin_emails:
+        admin_emails = [config.get("smtp_email")]
+    
+    today = datetime.now(timezone.utc).date()
+    
+    # Calculate stats
+    vencidas = await db.vulnerabilidades.count_documents({
+        "fecha_compromiso": {"$lt": today.strftime("%Y-%m-%d")},
+        "estatus": {"$in": ["Pendiente", "En Proceso"]}
+    })
+    
+    proximas_7 = await db.vulnerabilidades.count_documents({
+        "fecha_compromiso": {"$gte": today.strftime("%Y-%m-%d"), "$lte": (today + timedelta(days=7)).strftime("%Y-%m-%d")},
+        "estatus": {"$in": ["Pendiente", "En Proceso"]}
+    })
+    
+    proximas_30 = await db.vulnerabilidades.count_documents({
+        "fecha_compromiso": {"$gte": today.strftime("%Y-%m-%d"), "$lte": (today + timedelta(days=30)).strftime("%Y-%m-%d")},
+        "estatus": {"$in": ["Pendiente", "En Proceso"]}
+    })
+    
+    total_pendientes = await db.vulnerabilidades.count_documents({
+        "estatus": {"$in": ["Pendiente", "En Proceso"]}
+    })
+    
+    stats = {
+        "vencidas": vencidas,
+        "proximas_7_dias": proximas_7,
+        "proximas_30_dias": proximas_30,
+        "total_pendientes": total_pendientes
+    }
+    
+    # Get upcoming vulnerabilities for the list
+    vulns = await db.vulnerabilidades.find({
+        "fecha_compromiso": {"$gte": today.strftime("%Y-%m-%d"), "$lte": (today + timedelta(days=30)).strftime("%Y-%m-%d")},
+        "estatus": {"$in": ["Pendiente", "En Proceso"]}
+    }, {"_id": 0}).sort("fecha_compromiso", 1).to_list(20)
+    
+    html_content = generate_weekly_summary_email(stats, vulns)
+    
+    result = email_service.send_email(
+        admin_emails,
+        "SecFind - Resumen Semanal de Vulnerabilidades",
+        html_content
+    )
+    
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["message"])
+    
+    return {"message": f"Resumen semanal enviado a {len(admin_emails)} administrador(es)"}
 
 # Initialize default institutions if none exist
 async def init_instituciones():

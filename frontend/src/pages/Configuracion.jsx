@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, Users, AppWindow, Truck, FileText } from "lucide-react";
+import { Building2, Users, AppWindow, Truck, FileText, Bell } from "lucide-react";
 import Instituciones from "@/pages/Instituciones";
 import Usuarios from "@/pages/Usuarios";
 import Aplicaciones from "@/pages/Aplicaciones";
 import Proveedores from "@/pages/Proveedores";
 import InformesPentest from "@/pages/InformesPentest";
+import Notificaciones from "@/pages/Notificaciones";
 
 export default function Configuracion() {
   const { isAdmin, canView } = useAuth();
@@ -71,6 +72,16 @@ export default function Configuracion() {
               Usuarios
             </TabsTrigger>
           )}
+          {canViewUsers && (
+            <TabsTrigger 
+              value="notificaciones" 
+              className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white"
+              data-testid="tab-notificaciones"
+            >
+              <Bell className="w-4 h-4 mr-2" />
+              Notificaciones
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="instituciones" className="mt-6">
@@ -92,6 +103,12 @@ export default function Configuracion() {
         {canViewUsers && (
           <TabsContent value="usuarios" className="mt-6">
             <Usuarios />
+          </TabsContent>
+        )}
+
+        {canViewUsers && (
+          <TabsContent value="notificaciones" className="mt-6">
+            <Notificaciones />
           </TabsContent>
         )}
       </Tabs>
