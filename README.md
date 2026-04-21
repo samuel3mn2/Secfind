@@ -1,11 +1,12 @@
 # SecFind - Sistema de Gestión de Vulnerabilidades
 
-Sistema web completo para la gestión de vulnerabilidades de ciberseguridad, diseñado para reemplazar flujos de trabajo basados en Excel. Incluye dashboard ejecutivo con KPIs, gráficos interactivos, módulo CRUD completo, seguimiento de riesgos, **Vista Comité para presentaciones ejecutivas**, **reportes PDF**, **auditoría del sistema** e importación inteligente desde PDF con IA.
+Sistema web completo para la gestión de vulnerabilidades de ciberseguridad, diseñado para reemplazar flujos de trabajo basados en Excel. Incluye dashboard ejecutivo con KPIs, gráficos interactivos, módulo CRUD completo, seguimiento de riesgos, **Vista Comité para presentaciones ejecutivas**, **reportes PDF**, **auditoría del sistema**, **notificaciones por email** e importación inteligente desde PDF con IA.
 
 ![Dashboard](https://img.shields.io/badge/Dashboard-6%20KPIs%20%2B%20Gráficos-blue)
 ![Stack](https://img.shields.io/badge/Stack-FastAPI%20%2B%20React%20%2B%20MongoDB-green)
 ![Idioma](https://img.shields.io/badge/Idioma-Español-red)
 ![AI](https://img.shields.io/badge/AI-GPT--4.1--mini-purple)
+![Docker](https://img.shields.io/badge/Docker-Ready-blue)
 
 ---
 
@@ -19,13 +20,13 @@ Sistema web completo para la gestión de vulnerabilidades de ciberseguridad, dis
 - **6 filtros dinámicos**: Año, Institución, Informe Pentest, Severidad, Proveedor, Aplicación
 - **Botón "Generar Reporte PDF"** para exportar reportes
 
-### 🆕 Reportes PDF
+### Reportes PDF
 - **Reporte Ejecutivo**: KPIs + gráficos de pastel (severidad, estatus) + barras (instituciones)
 - **Reporte por Institución**: Resumen + tabla de vulnerabilidades con colores por severidad
 - **Reporte por Informe Pentest**: Detalle de vulnerabilidades de un pentest específico
 - **Reporte Vista Comité**: Tabla ejecutiva con selección de informes y severidades
 
-### 🆕 Vista Comité (Para Presentaciones Ejecutivas)
+### Vista Comité (Para Presentaciones Ejecutivas)
 - **Resumen por informe de pentest** (Alcance)
 - **Ratios Pendiente/Total** por severidad (Crítico, Alto, Medio, Bajo)
 - **Tiempo Activo (meses)** desde el hallazgo más antiguo
@@ -34,23 +35,32 @@ Sistema web completo para la gestión de vulnerabilidades de ciberseguridad, dis
 - **Exportar a CSV** para análisis
 - **Exportar a Imagen PNG (fondo blanco)** para presentaciones PowerPoint
 
-### 🆕 Auditoría del Sistema
+### Auditoría del Sistema
 - **Historial completo** de todos los cambios en vulnerabilidades
 - **Registro automático** de creación, actualización y eliminación
 - **Detalle de cambios**: campo modificado, valor anterior, valor nuevo
 - **Filtros** por entidad, acción, usuario y rango de fechas
 - **Solo administradores** pueden acceder
 
+### 🆕 Notificaciones por Email
+- **Configuración SMTP** flexible (Gmail, Outlook, otros)
+- **Alertas configurables**: 7, 3, 1 días antes del vencimiento
+- **Envío a administradores** y opcionalmente a responsables
+- **Resumen semanal** automático los lunes
+- **Botones de prueba**: Probar conexión, Enviar email de prueba
+
 ### Gestión de Vulnerabilidades
 - Tabla CRUD con búsqueda y múltiples filtros
+- **Selector de responsables con búsqueda** (combobox)
 - Campos dropdown predefinidos desde catálogos
 - Multi-select para aplicaciones
 - Paginación
-- **🆕 Acciones Masivas**:
+- **Acciones Masivas**:
   - Selección múltiple con checkboxes
   - Cambiar estatus de múltiples vulnerabilidades
-  - Asignar responsable en lote
+  - Asignar responsable en lote (con búsqueda)
   - Actualizar fecha de compromiso en grupo
+  - **Eliminación masiva** con confirmación
 
 ### Seguimiento de Riesgos
 - Página dedicada para vulnerabilidades con fecha de compromiso
@@ -64,15 +74,16 @@ Sistema web completo para la gestión de vulnerabilidades de ciberseguridad, dis
 - **Aplicaciones**: Catálogo de sistemas evaluados
 - **Proveedores**: Empresas de pentest
 - **Informes Pentest**: Nombres de informes
-- **Usuarios**: Gestión con permisos por módulo
-- **🆕 Actualización en cascada**: Al renombrar instituciones, aplicaciones, proveedores o informes, las vulnerabilidades se actualizan automáticamente
+- **🆕 Responsables**: Catálogo con nombre y email para notificaciones
+- **Usuarios**: Gestión con permisos por módulo (Dashboard, Vulnerabilidades, Configuración, Auditoría)
+- **🆕 Notificaciones**: Configuración SMTP y alertas
+- **Actualización en cascada**: Al renombrar elementos, las vulnerabilidades se actualizan automáticamente
 
 ### Importar/Exportar
 - Exportar a CSV y Excel
-- Importar desde CSV y Excel
-- **🆕 Importar desde PDF con IA** (extrae vulnerabilidades automáticamente)
-  - Auto-creación de catálogos (institución, aplicación, proveedor, informe)
-  - Comparación insensible a mayúsculas/minúsculas para evitar duplicados
+- Importar desde CSV y Excel (con **auto-creación de catálogos**)
+- **Importar desde PDF con IA** (extrae vulnerabilidades automáticamente)
+- **📥 [Descargar Plantilla Excel](./plantillas/plantilla_vulnerabilidades.xlsx)**
 
 ---
 
@@ -200,6 +211,7 @@ secfind/
 ├── backend/
 │   ├── server.py              # API FastAPI (todos los endpoints)
 │   ├── pdf_reports.py         # Generación de reportes PDF
+│   ├── email_service.py       # Servicio de notificaciones por email
 │   ├── requirements.txt       # Dependencias Python
 │   └── .env                   # Variables de entorno
 ├── frontend/
@@ -211,6 +223,8 @@ secfind/
 │   │   │   ├── VistaComite.jsx        # Vista ejecutiva para comités
 │   │   │   ├── Auditoria.jsx          # Historial de cambios
 │   │   │   ├── Configuracion.jsx      # Módulo de configuración
+│   │   │   ├── Notificaciones.jsx     # Config de notificaciones email
+│   │   │   ├── Responsables.jsx       # Catálogo de responsables
 │   │   │   ├── ImportarPDF.jsx        # Importación con IA
 │   │   │   ├── Instituciones.jsx
 │   │   │   ├── Aplicaciones.jsx
@@ -226,8 +240,11 @@ secfind/
 │   │   └── App.js
 │   ├── package.json
 │   └── .env
+├── plantillas/
+│   └── plantilla_vulnerabilidades.xlsx  # Plantilla para importar
 ├── README.md
-└── INSTALACION_WINDOWS.md
+├── INSTALACION_WINDOWS.md
+└── DOCKER.md                  # Guía de instalación con Docker
 ```
 
 ---
@@ -286,7 +303,17 @@ secfind/
 | GET/POST/PUT/DELETE | `/api/config/aplicaciones` | CRUD Aplicaciones |
 | GET/POST/PUT/DELETE | `/api/config/proveedores` | CRUD Proveedores |
 | GET/POST/PUT/DELETE | `/api/config/informes-pentest` | CRUD Informes |
+| GET/POST/PUT/DELETE | `/api/config/responsables` | **CRUD Responsables (con email)** |
+| GET/PUT | `/api/config/notificaciones` | **Config notificaciones email** |
+| POST | `/api/config/notificaciones/test` | **Probar conexión SMTP** |
+| POST | `/api/config/notificaciones/send-test-email` | **Enviar email de prueba** |
 | GET/POST/PUT/DELETE | `/api/users` | CRUD Usuarios |
+
+### Notificaciones
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| POST | `/api/notificaciones/ejecutar` | **Ejecutar alertas manualmente** |
+| POST | `/api/notificaciones/resumen-semanal` | **Enviar resumen semanal** |
 
 ### Importar/Exportar
 | Método | Endpoint | Descripción |

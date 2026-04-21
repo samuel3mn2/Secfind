@@ -161,6 +161,13 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - 2 usuarios (admin, sfernandez)
 
 ## Última Actualización: Abril 2026
+### Cambios Completados (Iteración 10)
+- ✅ **Documentación actualizada**:
+  - README.md actualizado con nuevas funcionalidades
+  - DOCKER.md creado con guía completa de instalación Docker
+  - INSTALACION_WINDOWS.md actualizado
+  - Plantilla Excel creada en /plantillas/plantilla_vulnerabilidades.xlsx
+
 ### Cambios Completados (Iteración 9)
 - ✅ **Catálogo de Responsables** - Nueva sección en Configuración:
   - CRUD de responsables con nombre y email

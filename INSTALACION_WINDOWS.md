@@ -1,6 +1,8 @@
 # Guía de Instalación SecFind en Windows 11
 ## Para Principiantes - Paso a Paso Completo
 
+> **¿Prefieres Docker?** Si ya tienes Docker instalado, consulta la guía [DOCKER.md](./DOCKER.md) para una instalación más rápida.
+
 ---
 
 ## PARTE 1: DESCARGAR E INSTALAR PROGRAMAS NECESARIOS
@@ -326,15 +328,20 @@ MongoDB es la base de datos donde se guardarán las vulnerabilidades.
 
 ### PASO 10: Importar tus datos de Excel
 
-1. **En la aplicación web**, haz clic en **"Vulnerabilidades"** en el menú de la izquierda
+1. **Descarga la plantilla de Excel** desde la carpeta `plantillas/plantilla_vulnerabilidades.xlsx`
+   - O usa tu propio archivo Excel con una hoja llamada "Consolidado"
 
-2. **Haz clic en el botón "Excel"** (con el icono de subir archivo)
+2. **En la aplicación web**, haz clic en **"Vulnerabilidades"** en el menú de la izquierda
 
-3. **Selecciona tu archivo Excel** con las vulnerabilidades
+3. **Haz clic en el botón "Excel"** (con el icono de subir archivo)
 
-4. **Espera** a que se importen los datos
+4. **Selecciona tu archivo Excel** con las vulnerabilidades
 
-5. **¡Listo!** Ahora puedes ver todas tus vulnerabilidades en el Dashboard
+5. **Espera** a que se importen los datos
+
+6. **¡Listo!** Ahora puedes ver todas tus vulnerabilidades en el Dashboard
+
+> **Nota:** Si una institución, aplicación, proveedor o informe no existe en los catálogos, el sistema los creará automáticamente.
 
 ---
 
@@ -484,8 +491,24 @@ La aplicación crea automáticamente un usuario administrador al iniciar:
 
 ### Configuración
 - Instituciones, Aplicaciones, Proveedores, Informes Pentest
+- **Responsables**: Catálogo con nombre y email para notificaciones
 - Gestión de usuarios con permisos
+- **Notificaciones por email**: Alertas de vencimiento configurables
 - **Actualización en cascada**: Al renombrar elementos, las vulnerabilidades se actualizan automáticamente
+
+---
+
+## PLANTILLA DE EXCEL
+
+Puedes descargar la plantilla de Excel para importar vulnerabilidades desde:
+```
+plantillas/plantilla_vulnerabilidades.xlsx
+```
+
+La plantilla incluye:
+- Todos los campos necesarios con validaciones
+- Ejemplos de datos
+- Hoja de instrucciones detalladas
 
 ---
 
