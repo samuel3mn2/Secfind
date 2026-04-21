@@ -200,6 +200,24 @@ class InformePentestUpdate(BaseModel):
     nombre: Optional[str] = None
     activo: Optional[bool] = None
 
+# Responsable model
+class Responsable(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    nombre: str
+    email: Optional[str] = None
+    activo: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ResponsableCreate(BaseModel):
+    nombre: str
+    email: Optional[str] = None
+
+class ResponsableUpdate(BaseModel):
+    nombre: Optional[str] = None
+    email: Optional[str] = None
+    activo: Optional[bool] = None
+
 class DropdownOptions(BaseModel):
     severidades: List[str]
     estatus: List[str]
@@ -209,6 +227,7 @@ class DropdownOptions(BaseModel):
     informes_pentest: List[str]
     años: List[int]
     proveedores: List[str]
+    responsables: List[dict]  # [{nombre, email}]
 
 class DashboardStats(BaseModel):
     total_vulnerabilidades: int
@@ -801,6 +820,64 @@ async def delete_informe_pentest(informe_id: str, current_user: CurrentUser = De
         raise HTTPException(status_code=404, detail="Informe no encontrado")
     return {"message": "Informe eliminado exitosamente"}
 
+# ============ RESPONSABLES ENDPOINTS ============
+
+@api_router.get("/config/responsables", response_model=List[Responsable])
+async def get_responsables(current_user: CurrentUser = Depends(get_current_user)):
+    docs = await db.responsables.find({}, {"_id": 0}).sort("nombre", 1).to_list(1000)
+    return docs
+
+@api_router.post("/config/responsables", response_model=Responsable)
+async def create_responsable(data: ResponsableCreate, current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.configuracion.crear:
+        raise HTTPException(status_code=403, detail="No tiene permisos para crear")
+    
+    # Check if already exists
+    existing = await db.responsables.find_one({"nombre": {"$regex": f"^{data.nombre}$", "$options": "i"}})
+    if existing:
+        raise HTTPException(status_code=400, detail="Ya existe un responsable con ese nombre")
+    
+    responsable = Responsable(nombre=data.nombre, email=data.email)
+    doc = responsable.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.responsables.insert_one(doc)
+    return responsable
+
+@api_router.put("/config/responsables/{responsable_id}", response_model=Responsable)
+async def update_responsable(responsable_id: str, data: ResponsableUpdate, current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.configuracion.editar:
+        raise HTTPException(status_code=403, detail="No tiene permisos para editar")
+    
+    existing = await db.responsables.find_one({"id": responsable_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Responsable no encontrado")
+    
+    update_data = data.model_dump(exclude_unset=True)
+    
+    # If name is being changed, update all vulnerabilities with this responsable
+    if "nombre" in update_data and update_data["nombre"] != existing["nombre"]:
+        old_name = existing["nombre"]
+        new_name = update_data["nombre"]
+        await db.vulnerabilidades.update_many(
+            {"responsable": old_name},
+            {"$set": {"responsable": new_name}}
+        )
+    
+    await db.responsables.update_one({"id": responsable_id}, {"$set": update_data})
+    
+    updated = await db.responsables.find_one({"id": responsable_id}, {"_id": 0})
+    return updated
+
+@api_router.delete("/config/responsables/{responsable_id}")
+async def delete_responsable(responsable_id: str, current_user: CurrentUser = Depends(get_current_user)):
+    if not current_user.es_admin and not current_user.permisos.configuracion.eliminar:
+        raise HTTPException(status_code=403, detail="No tiene permisos para eliminar")
+    
+    result = await db.responsables.delete_one({"id": responsable_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Responsable no encontrado")
+    return {"message": "Responsable eliminado exitosamente"}
+
 # ============ NOTIFICATION CONFIGURATION ENDPOINTS ============
 
 @api_router.get("/config/notificaciones")
@@ -973,10 +1050,15 @@ async def ejecutar_notificaciones(current_user: CurrentUser = Depends(get_curren
                 for v in vulns:
                     resp = v.get("responsable")
                     if resp:
-                        # Try to find user email by name
-                        user = await db.usuarios.find_one({"nombre": resp, "activo": True}, {"_id": 0, "email": 1})
-                        if user and user.get("email") and user["email"] not in recipients:
-                            recipients.append(user["email"])
+                        # First try to find email in responsables catalog
+                        responsable = await db.responsables.find_one({"nombre": resp, "activo": True}, {"_id": 0, "email": 1})
+                        if responsable and responsable.get("email") and responsable["email"] not in recipients:
+                            recipients.append(responsable["email"])
+                        else:
+                            # Fallback: try to find user email by name
+                            user = await db.usuarios.find_one({"nombre": resp, "activo": True}, {"_id": 0, "email": 1})
+                            if user and user.get("email") and user["email"] not in recipients:
+                                recipients.append(user["email"])
             
             result = email_service.send_email(
                 recipients,
@@ -1227,6 +1309,15 @@ async def get_dropdown_options():
         informes = await db.vulnerabilidades.distinct("nombre_informe_pentest")
         informes = [i for i in informes if i]
     
+    # Get responsables from catalog
+    responsables_docs = await db.responsables.find({"activo": True}, {"_id": 0, "nombre": 1, "email": 1}).to_list(1000)
+    responsables = [{"nombre": r["nombre"], "email": r.get("email", "")} for r in responsables_docs] if responsables_docs else []
+    
+    # Fallback: get unique responsables from vulnerabilities if catalog is empty
+    if not responsables:
+        resp_names = await db.vulnerabilidades.distinct("responsable")
+        responsables = [{"nombre": r, "email": ""} for r in resp_names if r]
+    
     años = set()
     vulns = await db.vulnerabilidades.find({}, {"fecha_hallazgo": 1, "_id": 0}).to_list(10000)
     for v in vulns:
@@ -1247,7 +1338,8 @@ async def get_dropdown_options():
         resultado_retest=DEFAULT_RESULTADO_RETEST,
         informes_pentest=sorted(informes),
         años=sorted(list(años), reverse=True),
-        proveedores=sorted(proveedores)
+        proveedores=sorted(proveedores),
+        responsables=sorted(responsables, key=lambda x: x["nombre"])
     )
 
 # ============ VULNERABILIDADES ENDPOINTS ============

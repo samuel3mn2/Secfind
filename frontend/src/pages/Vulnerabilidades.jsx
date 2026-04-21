@@ -55,6 +55,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   Plus,
   Search,
@@ -1093,10 +1094,19 @@ export default function Vulnerabilidades() {
 
                 <div className="space-y-2">
                   <Label className="text-zinc-400">Responsable</Label>
-                  <Input
+                  <SearchableSelect
                     value={formData.responsable || ""}
-                    onChange={(e) => setFormData({ ...formData, responsable: e.target.value })}
-                    className="bg-black/20 border-zinc-700 text-white"
+                    onChange={(value) => setFormData({ ...formData, responsable: value })}
+                    options={(options?.responsables || []).map(r => ({
+                      value: r.nombre,
+                      label: r.nombre,
+                      subtext: r.email || null
+                    }))}
+                    placeholder="Seleccionar responsable..."
+                    searchPlaceholder="Buscar responsable..."
+                    emptyText="No se encontraron responsables"
+                    allowCreate={true}
+                    onCreateNew={(name) => setFormData({ ...formData, responsable: name })}
                     data-testid="input-responsable"
                   />
                 </div>
@@ -1277,11 +1287,19 @@ export default function Vulnerabilidades() {
               {/* Responsable */}
               <div className="space-y-2">
                 <Label className="text-zinc-300">Asignar Responsable</Label>
-                <Input
+                <SearchableSelect
                   value={bulkAction.responsable || ""}
-                  onChange={(e) => setBulkAction({...bulkAction, responsable: e.target.value})}
-                  placeholder="Nombre del responsable..."
-                  className="bg-black/20 border-zinc-700 text-white"
+                  onChange={(value) => setBulkAction({...bulkAction, responsable: value})}
+                  options={(options?.responsables || []).map(r => ({
+                    value: r.nombre,
+                    label: r.nombre,
+                    subtext: r.email || null
+                  }))}
+                  placeholder="-- No cambiar --"
+                  searchPlaceholder="Buscar responsable..."
+                  emptyText="No se encontraron responsables"
+                  allowCreate={true}
+                  onCreateNew={(name) => setBulkAction({...bulkAction, responsable: name})}
                   data-testid="bulk-responsable"
                 />
               </div>
