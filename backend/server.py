@@ -124,6 +124,7 @@ class VulnerabilidadBase(BaseModel):
     fecha_compromiso: Optional[str] = None
     estatus: Optional[str] = None
     resultado_re_test: Optional[str] = None
+    veces_en_retest: Optional[int] = 0
     nombre_informe_pentest: Optional[str] = None
     proveedor: Optional[str] = None
 
@@ -2221,6 +2222,8 @@ async def import_excel(file: UploadFile = File(...), current_user: CurrentUser =
         'Fecha Compromiso': 'fecha_compromiso',
         'Estatus': 'estatus',
         'Resultado Re Test': 'resultado_re_test',
+        'Veces en Retest': 'veces_en_retest',
+        'Veces en Re Test': 'veces_en_retest',
         'Nombre Informe Pentest': 'nombre_informe_pentest',
         'Informe Pentest': 'nombre_informe_pentest',
         'Proveedor': 'proveedor'

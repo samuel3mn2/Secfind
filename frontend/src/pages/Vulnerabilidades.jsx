@@ -218,6 +218,7 @@ export default function Vulnerabilidades() {
     fecha_compromiso: "",
     estatus: "",
     resultado_re_test: "",
+    veces_en_retest: 0,
     nombre_informe_pentest: "",
     proveedor: "",
   });
@@ -295,6 +296,7 @@ export default function Vulnerabilidades() {
         fecha_compromiso: "",
         estatus: "",
         resultado_re_test: "",
+        veces_en_retest: 0,
         nombre_informe_pentest: "",
         proveedor: "",
       });
@@ -896,6 +898,10 @@ export default function Vulnerabilidades() {
                     <p className="text-white">{viewingVuln.resultado_re_test || "-"}</p>
                   </div>
                   <div className="space-y-1">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Veces en Retest</p>
+                    <p className="text-white font-mono">{viewingVuln.veces_en_retest || 0}</p>
+                  </div>
+                  <div className="space-y-1">
                     <p className="text-xs text-zinc-500 uppercase tracking-wide">Proveedor</p>
                     <p className="text-white">{viewingVuln.proveedor || "-"}</p>
                   </div>
@@ -1147,6 +1153,18 @@ export default function Vulnerabilidades() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-zinc-400">Veces en Retest</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.veces_en_retest || 0}
+                    onChange={(e) => setFormData({ ...formData, veces_en_retest: parseInt(e.target.value) || 0 })}
+                    className="bg-black/20 border-zinc-700 text-white"
+                    data-testid="input-veces-retest"
+                  />
                 </div>
 
                 <div className="space-y-2">
