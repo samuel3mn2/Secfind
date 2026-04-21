@@ -415,6 +415,19 @@ server {
 
 ---
 
+## Instalación Local (Sin Analytics)
+
+Para instalaciones locales o en servidores propios, es necesario reemplazar el archivo `index.html` para eliminar scripts de analytics externos que pueden causar errores de CORS.
+
+**Pasos:**
+1. Copiar `plantillas/instalacion_local/index.html`
+2. Pegar en `frontend/public/index.html` (reemplazar el existente)
+3. Reiniciar el frontend
+
+Este archivo limpio ya está incluido en la carpeta `plantillas/instalacion_local/`.
+
+---
+
 ## Solución de Problemas
 
 ### MongoDB no conecta

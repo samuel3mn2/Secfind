@@ -252,7 +252,12 @@ MongoDB es la base de datos donde se guardarán las vulnerabilidades.
      ```
    - Presiona Enter
 
-3. **Instalar las dependencias:**
+3. **⚠️ IMPORTANTE: Reemplazar index.html para instalación local:**
+   - Copia el archivo `plantillas/instalacion_local/index.html`
+   - Pégalo en `frontend/public/` reemplazando el existente
+   - Esto elimina scripts de analytics externos que causan errores en instalaciones locales
+
+4. **Instalar las dependencias:**
    - Escribe:
      ```
      yarn install
@@ -261,7 +266,7 @@ MongoDB es la base de datos donde se guardarán las vulnerabilidades.
    - Espera a que termine (puede tardar 3-5 minutos)
    - Verás muchas líneas de texto descargando paquetes
 
-4. **Crear el archivo de configuración:**
+5. **Crear el archivo de configuración:**
    - Escribe:
      ```
      echo REACT_APP_BACKEND_URL=http://localhost:8001 > .env

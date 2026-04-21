@@ -61,7 +61,17 @@ git clone <url-del-repositorio>
 cd secfind
 ```
 
-### Paso 2: Crear archivo docker-compose.yml
+### Paso 3: Reemplazar index.html para instalación local
+
+**⚠️ IMPORTANTE:** Antes de construir, reemplaza el archivo `index.html`:
+
+```bash
+cp plantillas/instalacion_local/index.html frontend/public/index.html
+```
+
+Esto elimina scripts de analytics externos que causan errores en instalaciones locales.
+
+### Paso 4: Crear archivo docker-compose.yml
 Crea un archivo `docker-compose.yml` en la raíz del proyecto:
 
 ```yaml
