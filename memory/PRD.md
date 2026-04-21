@@ -98,6 +98,7 @@ REACT_APP_BACKEND_URL=http://localhost:8001
   - [x] Cambiar estatus de múltiples vulnerabilidades
   - [x] Asignar responsable en lote
   - [x] Actualizar fecha de compromiso en grupo
+  - [x] **Eliminación masiva** con confirmación y registro en auditoría
   - [x] Registro en historial de auditoría
 
 ### Importación de PDF con IA
@@ -109,6 +110,11 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - [x] Detecta elementos nuevos para agregar al catálogo
 - [x] Revisión individual antes de guardar
 - [x] **Auto-creación de catálogos**: Al agregar vulnerabilidad, crea automáticamente institución, aplicación, proveedor e informe si no existen
+
+### Importación de Excel
+- [x] Mapeo automático de columnas
+- [x] Conversión de fechas
+- [x] **Auto-creación de catálogos** (NUEVO - Abr 2026): Al importar Excel, crea automáticamente instituciones, aplicaciones, proveedores e informes si no existen (matching case-insensitive)
 
 ### Seguimiento de Riesgos
 - [x] Página dedicada /seguimiento-riesgos
@@ -127,7 +133,7 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 ### Sistema de Autenticación
 - [x] JWT con bcrypt
 - [x] Usuario admin por defecto (admin/admin123)
-- [x] Permisos por módulo
+- [x] Permisos por módulo (Dashboard, Vulnerabilidades, Configuración, **Auditoría**)
 
 ## Rutas de la Aplicación
 - `/` - Dashboard (6 KPIs + Generar Reportes PDF)
@@ -147,11 +153,18 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - **Contraseña**: admin123
 
 ## Estadísticas Actuales
-- 219 vulnerabilidades
-- 6 instituciones
+- 225 vulnerabilidades
+- 8 instituciones
 - 48 aplicaciones
 - 4 proveedores
 - 27 informes pentest
+- 2 usuarios (admin, sfernandez)
+
+## Última Actualización: Abril 2026
+### Cambios Completados (Iteración 7)
+- ✅ Eliminación masiva de vulnerabilidades con confirmación
+- ✅ Auto-creación de catálogos en importación Excel (case-insensitive)
+- ✅ Permisos de Auditoría en configuración de usuarios
 
 ## Backlog
 
