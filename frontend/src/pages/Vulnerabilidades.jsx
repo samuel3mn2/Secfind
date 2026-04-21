@@ -73,6 +73,8 @@ import {
   CheckSquare,
   Square,
   Layers,
+  Columns,
+  Settings2,
 } from "lucide-react";
 import ImportarPDF from "@/pages/ImportarPDF";
 
@@ -106,6 +108,40 @@ const StatusBadge = ({ status }) => {
       {status}
     </span>
   );
+};
+
+// Available columns configuration
+const ALL_COLUMNS = [
+  { id: "fecha_hallazgo", label: "Fecha", default: true },
+  { id: "institucion", label: "Institución", default: true },
+  { id: "aplicaciones", label: "Aplicaciones", default: true },
+  { id: "vulnerabilidad", label: "Vulnerabilidad", default: true },
+  { id: "severidad", label: "Severidad", default: true },
+  { id: "estatus", label: "Estatus", default: true },
+  { id: "responsable", label: "Responsable", default: true },
+  { id: "fecha_compromiso", label: "Fecha Compromiso", default: false },
+  { id: "resultado_re_test", label: "Resultado Retest", default: false },
+  { id: "veces_en_retest", label: "Veces Retest", default: false },
+  { id: "nombre_informe_pentest", label: "Informe Pentest", default: false },
+  { id: "proveedor", label: "Proveedor", default: false },
+];
+
+// Get default visible columns
+const getDefaultColumns = () => ALL_COLUMNS.filter(c => c.default).map(c => c.id);
+
+// Load saved columns from localStorage
+const loadSavedColumns = () => {
+  try {
+    const saved = localStorage.getItem("vuln_visible_columns");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Validate that all saved columns exist
+      return parsed.filter(id => ALL_COLUMNS.some(c => c.id === id));
+    }
+  } catch (e) {
+    console.error("Error loading saved columns:", e);
+  }
+  return getDefaultColumns();
 };
 
 // Multi-select component for applications
@@ -204,6 +240,32 @@ export default function Vulnerabilidades() {
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [bulkAction, setBulkAction] = useState({ estatus: "", responsable: "", fecha_compromiso: "" });
   const [applyingBulk, setApplyingBulk] = useState(false);
+
+  // Column visibility state
+  const [visibleColumns, setVisibleColumns] = useState(loadSavedColumns);
+  const [showColumnSelector, setShowColumnSelector] = useState(false);
+
+  // Toggle column visibility
+  const toggleColumn = (columnId) => {
+    setVisibleColumns(prev => {
+      const newColumns = prev.includes(columnId)
+        ? prev.filter(id => id !== columnId)
+        : [...prev, columnId];
+      // Save to localStorage
+      localStorage.setItem("vuln_visible_columns", JSON.stringify(newColumns));
+      return newColumns;
+    });
+  };
+
+  // Reset to default columns
+  const resetColumns = () => {
+    const defaults = getDefaultColumns();
+    setVisibleColumns(defaults);
+    localStorage.setItem("vuln_visible_columns", JSON.stringify(defaults));
+  };
+
+  // Check if column is visible
+  const isColumnVisible = (columnId) => visibleColumns.includes(columnId);
 
   const [formData, setFormData] = useState({
     fecha_hallazgo: "",
@@ -646,6 +708,54 @@ export default function Vulnerabilidades() {
                   <FileSpreadsheet className="w-4 h-4 mr-1" />
                   Exportar
                 </Button>
+
+                {/* Column Selector */}
+                <Popover open={showColumnSelector} onOpenChange={setShowColumnSelector}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                      data-testid="column-selector-btn"
+                    >
+                      <Settings2 className="w-4 h-4 mr-1" />
+                      Columnas
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56 p-0 bg-zinc-900 border-zinc-700" align="end">
+                    <div className="p-3 border-b border-zinc-700">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-white">Columnas visibles</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-indigo-400 hover:text-indigo-300"
+                          onClick={resetColumns}
+                        >
+                          Restablecer
+                        </Button>
+                      </div>
+                    </div>
+                    <ScrollArea className="h-[300px]">
+                      <div className="p-2 space-y-1">
+                        {ALL_COLUMNS.map((col) => (
+                          <div
+                            key={col.id}
+                            className="flex items-center gap-2 p-2 rounded hover:bg-zinc-800 cursor-pointer"
+                            onClick={() => toggleColumn(col.id)}
+                          >
+                            <Checkbox
+                              checked={isColumnVisible(col.id)}
+                              onCheckedChange={() => toggleColumn(col.id)}
+                              className="border-zinc-600"
+                            />
+                            <span className="text-sm text-zinc-300">{col.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
           </div>
@@ -715,20 +825,25 @@ export default function Vulnerabilidades() {
                       />
                     </TableHead>
                   )}
-                  <TableHead className="text-zinc-400">Fecha</TableHead>
-                  <TableHead className="text-zinc-400">Institución</TableHead>
-                  <TableHead className="text-zinc-400">Aplicaciones</TableHead>
-                  <TableHead className="text-zinc-400 min-w-[200px]">Vulnerabilidad</TableHead>
-                  <TableHead className="text-zinc-400">Severidad</TableHead>
-                  <TableHead className="text-zinc-400">Estatus</TableHead>
-                  <TableHead className="text-zinc-400">Responsable</TableHead>
+                  {isColumnVisible("fecha_hallazgo") && <TableHead className="text-zinc-400">Fecha</TableHead>}
+                  {isColumnVisible("institucion") && <TableHead className="text-zinc-400">Institución</TableHead>}
+                  {isColumnVisible("aplicaciones") && <TableHead className="text-zinc-400">Aplicaciones</TableHead>}
+                  {isColumnVisible("vulnerabilidad") && <TableHead className="text-zinc-400 min-w-[200px]">Vulnerabilidad</TableHead>}
+                  {isColumnVisible("severidad") && <TableHead className="text-zinc-400">Severidad</TableHead>}
+                  {isColumnVisible("estatus") && <TableHead className="text-zinc-400">Estatus</TableHead>}
+                  {isColumnVisible("responsable") && <TableHead className="text-zinc-400">Responsable</TableHead>}
+                  {isColumnVisible("fecha_compromiso") && <TableHead className="text-zinc-400">F. Compromiso</TableHead>}
+                  {isColumnVisible("resultado_re_test") && <TableHead className="text-zinc-400">Res. Retest</TableHead>}
+                  {isColumnVisible("veces_en_retest") && <TableHead className="text-zinc-400">Veces Retest</TableHead>}
+                  {isColumnVisible("nombre_informe_pentest") && <TableHead className="text-zinc-400">Informe</TableHead>}
+                  {isColumnVisible("proveedor") && <TableHead className="text-zinc-400">Proveedor</TableHead>}
                   <TableHead className="text-zinc-400 text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={canModify ? 9 : 8} className="text-center py-12 text-zinc-500">
+                    <TableCell colSpan={visibleColumns.length + (canModify ? 2 : 1)} className="text-center py-12 text-zinc-500">
                       No se encontraron vulnerabilidades
                     </TableCell>
                   </TableRow>
@@ -749,25 +864,58 @@ export default function Vulnerabilidades() {
                           />
                         </TableCell>
                       )}
-                      <TableCell className="text-zinc-300 font-mono text-xs">
-                        {vuln.fecha_hallazgo || "-"}
-                      </TableCell>
-                      <TableCell className="text-zinc-300">{vuln.institucion || "-"}</TableCell>
-                      <TableCell className="text-zinc-300 max-w-[150px]">
-                        <span className="truncate block" title={formatAplicaciones(vuln)}>
-                          {formatAplicaciones(vuln)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-zinc-100 max-w-[300px] truncate">
-                        {vuln.vulnerabilidad || "-"}
-                      </TableCell>
-                      <TableCell>
-                        <SeverityBadge severity={vuln.severidad} />
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={vuln.estatus} />
-                      </TableCell>
-                      <TableCell className="text-zinc-300">{vuln.responsable || "-"}</TableCell>
+                      {isColumnVisible("fecha_hallazgo") && (
+                        <TableCell className="text-zinc-300 font-mono text-xs">
+                          {vuln.fecha_hallazgo || "-"}
+                        </TableCell>
+                      )}
+                      {isColumnVisible("institucion") && (
+                        <TableCell className="text-zinc-300">{vuln.institucion || "-"}</TableCell>
+                      )}
+                      {isColumnVisible("aplicaciones") && (
+                        <TableCell className="text-zinc-300 max-w-[150px]">
+                          <span className="truncate block" title={formatAplicaciones(vuln)}>
+                            {formatAplicaciones(vuln)}
+                          </span>
+                        </TableCell>
+                      )}
+                      {isColumnVisible("vulnerabilidad") && (
+                        <TableCell className="text-zinc-100 max-w-[300px] truncate">
+                          {vuln.vulnerabilidad || "-"}
+                        </TableCell>
+                      )}
+                      {isColumnVisible("severidad") && (
+                        <TableCell>
+                          <SeverityBadge severity={vuln.severidad} />
+                        </TableCell>
+                      )}
+                      {isColumnVisible("estatus") && (
+                        <TableCell>
+                          <StatusBadge status={vuln.estatus} />
+                        </TableCell>
+                      )}
+                      {isColumnVisible("responsable") && (
+                        <TableCell className="text-zinc-300">{vuln.responsable || "-"}</TableCell>
+                      )}
+                      {isColumnVisible("fecha_compromiso") && (
+                        <TableCell className="text-zinc-300 font-mono text-xs">{vuln.fecha_compromiso || "-"}</TableCell>
+                      )}
+                      {isColumnVisible("resultado_re_test") && (
+                        <TableCell className="text-zinc-300">{vuln.resultado_re_test || "-"}</TableCell>
+                      )}
+                      {isColumnVisible("veces_en_retest") && (
+                        <TableCell className="text-zinc-300 text-center">{vuln.veces_en_retest || 0}</TableCell>
+                      )}
+                      {isColumnVisible("nombre_informe_pentest") && (
+                        <TableCell className="text-zinc-300 max-w-[150px]">
+                          <span className="truncate block" title={vuln.nombre_informe_pentest}>
+                            {vuln.nombre_informe_pentest || "-"}
+                          </span>
+                        </TableCell>
+                      )}
+                      {isColumnVisible("proveedor") && (
+                        <TableCell className="text-zinc-300">{vuln.proveedor || "-"}</TableCell>
+                      )}
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button
