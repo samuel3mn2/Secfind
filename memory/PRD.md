@@ -161,6 +161,17 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - 2 usuarios (admin, sfernandez)
 
 ## Última Actualización: Abril 2026
+### Cambios Completados (Iteración 9)
+- ✅ **Catálogo de Responsables** - Nueva sección en Configuración:
+  - CRUD de responsables con nombre y email
+  - Buscador integrado en la tabla
+  - Actualización en cascada (cambiar nombre actualiza vulnerabilidades)
+- ✅ **Campo Responsable mejorado** en Vulnerabilidades:
+  - Ahora es un combobox con búsqueda (SearchableSelect)
+  - Muestra nombre y email del responsable
+  - Permite crear nuevo si no existe
+  - También implementado en acciones masivas
+
 ### Cambios Completados (Iteración 8)
 - ✅ **Notificaciones por Email** - Módulo completo en Configuración:
   - Configuración SMTP (Gmail u otro servidor)
