@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Query, Depends, Header
+from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Query, Depends, Header, Request
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -1347,32 +1347,36 @@ async def get_dropdown_options():
 
 @api_router.get("/vulnerabilidades", response_model=List[Vulnerabilidad])
 async def get_vulnerabilidades(
+    request: Request,
     severidad: Optional[str] = None,
     estatus: Optional[str] = None,
-    institucion: Optional[str] = None,
-    aplicacion: Optional[str] = None,
+    aplicacion: Optional[List[str]] = Query(None),
     search: Optional[str] = None,
     año: Optional[int] = None,
-    informe_pentest: Optional[str] = None,
     proveedor: Optional[str] = None,
     current_user: CurrentUser = Depends(get_current_user)
 ):
     if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
         raise HTTPException(status_code=403, detail="No tiene permisos para ver vulnerabilidades")
     
+    # Get multi-value params manually
+    instituciones = request.query_params.getlist("institucion")
+    aplicaciones = request.query_params.getlist("aplicacion")
+    informes = request.query_params.getlist("informe_pentest")
+    
     query = {}
     if severidad:
         query["severidad"] = severidad
     if estatus:
         query["estatus"] = estatus
-    if institucion:
-        query["institucion"] = institucion
-    if aplicacion:
-        query["aplicaciones"] = aplicacion  # Search in array
+    if instituciones:
+        query["institucion"] = {"$in": instituciones}
+    if aplicaciones:
+        query["aplicaciones"] = {"$in": aplicaciones}
     if proveedor:
         query["proveedor"] = proveedor
-    if informe_pentest:
-        query["nombre_informe_pentest"] = informe_pentest
+    if informes:
+        query["nombre_informe_pentest"] = {"$in": informes}
     if año:
         query["fecha_hallazgo"] = {"$regex": f"^{año}"}
     if search:
@@ -1967,10 +1971,9 @@ async def get_kpi_detail(
 
 @api_router.get("/seguimiento-riesgos")
 async def get_seguimiento_riesgos(
+    request: Request,
     filtro: Optional[str] = None,  # "vencidas", "proximas", "todas"
     severidad: Optional[str] = None,
-    institucion: Optional[str] = None,
-    informe_pentest: Optional[str] = None,
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """
@@ -1981,6 +1984,11 @@ async def get_seguimiento_riesgos(
     """
     if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
         raise HTTPException(status_code=403, detail="No tiene permisos para ver el seguimiento de riesgos")
+    
+    # Get multi-value params
+    instituciones = request.query_params.getlist("institucion")
+    aplicaciones = request.query_params.getlist("aplicacion")
+    informes = request.query_params.getlist("informe_pentest")
     
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     future_30 = (datetime.now(timezone.utc) + timedelta(days=30)).strftime("%Y-%m-%d")
@@ -2001,10 +2009,12 @@ async def get_seguimiento_riesgos(
     
     if severidad:
         query["severidad"] = severidad
-    if institucion:
-        query["institucion"] = institucion
-    if informe_pentest:
-        query["nombre_informe_pentest"] = informe_pentest
+    if instituciones:
+        query["institucion"] = {"$in": instituciones}
+    if aplicaciones:
+        query["aplicaciones"] = {"$in": aplicaciones}
+    if informes:
+        query["nombre_informe_pentest"] = {"$in": informes}
     
     vulns = await db.vulnerabilidades.find(query, {"_id": 0}).to_list(10000)
     

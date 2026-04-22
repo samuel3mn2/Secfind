@@ -28,6 +28,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
 import {
   AlertTriangle,
   Clock,
@@ -110,8 +111,9 @@ export default function SeguimientoRiesgos() {
   const [options, setOptions] = useState(null);
   const [filterEstado, setFilterEstado] = useState("all");
   const [filterSeveridad, setFilterSeveridad] = useState("");
-  const [filterInstitucion, setFilterInstitucion] = useState("");
-  const [filterInforme, setFilterInforme] = useState("");
+  const [filterInstitucion, setFilterInstitucion] = useState([]);
+  const [filterInforme, setFilterInforme] = useState([]);
+  const [filterAplicacion, setFilterAplicacion] = useState([]);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingVuln, setViewingVuln] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -142,8 +144,9 @@ export default function SeguimientoRiesgos() {
       const params = new URLSearchParams();
       if (filterEstado && filterEstado !== "all") params.append("filtro", filterEstado);
       if (filterSeveridad && filterSeveridad !== "all") params.append("severidad", filterSeveridad);
-      if (filterInstitucion && filterInstitucion !== "all") params.append("institucion", filterInstitucion);
-      if (filterInforme && filterInforme !== "all") params.append("informe_pentest", filterInforme);
+      if (filterInstitucion.length > 0) filterInstitucion.forEach(v => params.append("institucion", v));
+      if (filterInforme.length > 0) filterInforme.forEach(v => params.append("informe_pentest", v));
+      if (filterAplicacion.length > 0) filterAplicacion.forEach(v => params.append("aplicacion", v));
 
       const response = await axios.get(`${API}/seguimiento-riesgos?${params.toString()}`);
       setVulnerabilidades(response.data);
@@ -154,7 +157,7 @@ export default function SeguimientoRiesgos() {
     } finally {
       setLoading(false);
     }
-  }, [filterEstado, filterSeveridad, filterInstitucion, filterInforme]);
+  }, [filterEstado, filterSeveridad, filterInstitucion, filterInforme, filterAplicacion]);
 
   useEffect(() => {
     fetchOptions();
@@ -324,41 +327,46 @@ export default function SeguimientoRiesgos() {
               </SelectContent>
             </Select>
 
-            <Select value={filterInstitucion} onValueChange={setFilterInstitucion}>
-              <SelectTrigger className="w-[150px] bg-black/20 border-zinc-700 text-white" data-testid="filter-institucion">
-                <SelectValue placeholder="Institución" />
-              </SelectTrigger>
-              <SelectContent className="bg-zinc-900 border-zinc-700">
-                <SelectItem value="all">Todas</SelectItem>
-                {options?.instituciones?.map((i) => (
-                  <SelectItem key={i} value={i}>{i}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelectFilter
+              options={options?.instituciones || []}
+              selected={filterInstitucion}
+              onChange={setFilterInstitucion}
+              placeholder="Institución"
+              searchPlaceholder="Buscar institución..."
+              allLabel="Todas las instituciones"
+              data-testid="filter-institucion"
+            />
 
-            <Select value={filterInforme} onValueChange={setFilterInforme}>
-              <SelectTrigger className="w-[180px] bg-black/20 border-zinc-700 text-white" data-testid="filter-informe">
-                <SelectValue placeholder="Informe Pentest" />
-              </SelectTrigger>
-              <SelectContent className="bg-zinc-900 border-zinc-700 max-h-[300px]">
-                <SelectItem value="all">Todos</SelectItem>
-                {options?.informes_pentest?.map((i) => (
-                  <SelectItem key={i} value={i} className="truncate">
-                    {i.length > 40 ? i.substring(0, 40) + "..." : i}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelectFilter
+              options={options?.aplicaciones || []}
+              selected={filterAplicacion}
+              onChange={setFilterAplicacion}
+              placeholder="Aplicación"
+              searchPlaceholder="Buscar aplicación..."
+              allLabel="Todas las aplicaciones"
+              data-testid="filter-aplicacion"
+            />
 
-            {(filterEstado !== "all" || filterSeveridad || filterInstitucion || filterInforme) && (
+            <MultiSelectFilter
+              options={options?.informes_pentest || []}
+              selected={filterInforme}
+              onChange={setFilterInforme}
+              placeholder="Informe"
+              searchPlaceholder="Buscar informe..."
+              allLabel="Todos los informes"
+              data-testid="filter-informe"
+            />
+
+            {(filterEstado !== "all" || filterSeveridad || filterInstitucion.length > 0 || filterInforme.length > 0 || filterAplicacion.length > 0) && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => {
                   setFilterEstado("all");
                   setFilterSeveridad("");
-                  setFilterInstitucion("");
-                  setFilterInforme("");
+                  setFilterInstitucion([]);
+                  setFilterInforme([]);
+                  setFilterAplicacion([]);
                 }}
                 className="text-zinc-400 hover:text-white"
               >

@@ -56,6 +56,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
 import {
   Plus,
   Search,
@@ -220,10 +221,10 @@ export default function Vulnerabilidades() {
   const [search, setSearch] = useState("");
   const [filterSeveridad, setFilterSeveridad] = useState("");
   const [filterEstatus, setFilterEstatus] = useState("");
-  const [filterInstitucion, setFilterInstitucion] = useState("");
+  const [filterInstitucion, setFilterInstitucion] = useState([]);
   const [filterAño, setFilterAño] = useState("");
-  const [filterAplicacion, setFilterAplicacion] = useState("");
-  const [filterInforme, setFilterInforme] = useState("");
+  const [filterAplicacion, setFilterAplicacion] = useState([]);
+  const [filterInforme, setFilterInforme] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingVuln, setViewingVuln] = useState(null);
@@ -304,10 +305,10 @@ export default function Vulnerabilidades() {
       if (search) params.append("search", search);
       if (filterSeveridad && filterSeveridad !== "all") params.append("severidad", filterSeveridad);
       if (filterEstatus && filterEstatus !== "all") params.append("estatus", filterEstatus);
-      if (filterInstitucion && filterInstitucion !== "all") params.append("institucion", filterInstitucion);
+      if (filterInstitucion.length > 0) filterInstitucion.forEach(v => params.append("institucion", v));
       if (filterAño && filterAño !== "all") params.append("año", filterAño);
-      if (filterAplicacion && filterAplicacion !== "all") params.append("aplicacion", filterAplicacion);
-      if (filterInforme && filterInforme !== "all") params.append("informe_pentest", filterInforme);
+      if (filterAplicacion.length > 0) filterAplicacion.forEach(v => params.append("aplicacion", v));
+      if (filterInforme.length > 0) filterInforme.forEach(v => params.append("informe_pentest", v));
 
       const response = await axios.get(`${API}/vulnerabilidades?${params.toString()}`);
       setVulnerabilidades(response.data);
@@ -616,41 +617,35 @@ export default function Vulnerabilidades() {
                 </SelectContent>
               </Select>
 
-              <Select value={filterInstitucion} onValueChange={setFilterInstitucion}>
-                <SelectTrigger className="w-[140px] bg-black/20 border-zinc-700 text-white" data-testid="filter-institucion">
-                  <SelectValue placeholder="Institución" />
-                </SelectTrigger>
-                <SelectContent className="bg-zinc-900 border-zinc-700">
-                  <SelectItem value="all">Todas</SelectItem>
-                  {options?.instituciones?.map((i) => (
-                    <SelectItem key={i} value={i}>{i}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <MultiSelectFilter
+                options={options?.instituciones || []}
+                selected={filterInstitucion}
+                onChange={setFilterInstitucion}
+                placeholder="Institución"
+                searchPlaceholder="Buscar institución..."
+                allLabel="Todas las instituciones"
+                data-testid="filter-institucion"
+              />
 
-              <Select value={filterAplicacion} onValueChange={setFilterAplicacion}>
-                <SelectTrigger className="w-[140px] bg-black/20 border-zinc-700 text-white" data-testid="filter-aplicacion">
-                  <SelectValue placeholder="Aplicación" />
-                </SelectTrigger>
-                <SelectContent className="bg-zinc-900 border-zinc-700 max-h-[300px]">
-                  <SelectItem value="all">Todas</SelectItem>
-                  {options?.aplicaciones?.map((a) => (
-                    <SelectItem key={a} value={a}>{a}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <MultiSelectFilter
+                options={options?.aplicaciones || []}
+                selected={filterAplicacion}
+                onChange={setFilterAplicacion}
+                placeholder="Aplicación"
+                searchPlaceholder="Buscar aplicación..."
+                allLabel="Todas las aplicaciones"
+                data-testid="filter-aplicacion"
+              />
 
-              <Select value={filterInforme} onValueChange={setFilterInforme}>
-                <SelectTrigger className="w-[160px] bg-black/20 border-zinc-700 text-white" data-testid="filter-informe">
-                  <SelectValue placeholder="Informe" />
-                </SelectTrigger>
-                <SelectContent className="bg-zinc-900 border-zinc-700 max-h-[300px]">
-                  <SelectItem value="all">Todos</SelectItem>
-                  {options?.informes_pentest?.map((i) => (
-                    <SelectItem key={i} value={i}>{i.length > 40 ? i.substring(0, 40) + "..." : i}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <MultiSelectFilter
+                options={options?.informes_pentest || []}
+                selected={filterInforme}
+                onChange={setFilterInforme}
+                placeholder="Informe"
+                searchPlaceholder="Buscar informe..."
+                allLabel="Todos los informes"
+                data-testid="filter-informe"
+              />
 
               {/* Import/Export */}
               <div className="flex gap-2 ml-auto">
