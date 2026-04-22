@@ -22,27 +22,33 @@ async def limpiar_base_datos():
     
     # Preguntar qué limpiar
     print("¿Qué deseas limpiar?\n")
-    print("  1. Solo vulnerabilidades (mantiene catálogos)")
-    print("  2. Vulnerabilidades + Aplicaciones")
+    print("  1. Solo vulnerabilidades y auditoría (mantiene catálogos)")
+    print("  2. Vulnerabilidades + Aplicaciones + Auditoría")
     print("  3. TODO (reset completo, excepto usuarios)")
-    print("  4. Cancelar\n")
+    print("  4. Solo logs de Auditoría")
+    print("  5. Cancelar\n")
     
-    opcion = input("Selecciona una opción (1-4): ").strip()
+    opcion = input("Selecciona una opción (1-5): ").strip()
     
-    if opcion == "4" or opcion == "":
+    if opcion == "5" or opcion == "":
         print("\n❌ Operación cancelada.")
         client.close()
         return
     
     print("\n" + "-"*40)
     
-    # Siempre limpiar vulnerabilidades y auditoría
+    # Opción 4: Solo auditoría
+    if opcion == "4":
+        result = await db.historial_cambios.delete_many({})
+        print(f"✓ Logs de auditoría eliminados: {result.deleted_count}")
+    
+    # Opciones 1, 2, 3: Vulnerabilidades y auditoría
     if opcion in ["1", "2", "3"]:
         result = await db.vulnerabilidades.delete_many({})
         print(f"✓ Vulnerabilidades eliminadas: {result.deleted_count}")
         
         result = await db.historial_cambios.delete_many({})
-        print(f"✓ Registros de auditoría eliminados: {result.deleted_count}")
+        print(f"✓ Logs de auditoría eliminados: {result.deleted_count}")
     
     # Opción 2 y 3: También aplicaciones
     if opcion in ["2", "3"]:
@@ -75,6 +81,7 @@ async def limpiar_base_datos():
     # Mostrar conteo final
     print("Estado actual de la base de datos:")
     print(f"  - Vulnerabilidades: {await db.vulnerabilidades.count_documents({})}")
+    print(f"  - Logs Auditoría: {await db.historial_cambios.count_documents({})}")
     print(f"  - Aplicaciones: {await db.aplicaciones.count_documents({})}")
     print(f"  - Instituciones: {await db.instituciones.count_documents({})}")
     print(f"  - Proveedores: {await db.proveedores.count_documents({})}")
