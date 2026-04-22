@@ -20,6 +20,14 @@ async def limpiar_base_datos():
     client = AsyncIOMotorClient(MONGO_URL)
     db = client[DB_NAME]
     
+    # Show all collections first
+    print("Colecciones encontradas en la base de datos:")
+    collections = await db.list_collection_names()
+    for c in sorted(collections):
+        count = await db[c].count_documents({})
+        print(f"  - {c}: {count} documentos")
+    print()
+    
     # Preguntar qué limpiar
     print("¿Qué deseas limpiar?\n")
     print("  1. Solo vulnerabilidades y auditoría (mantiene catálogos)")
@@ -39,16 +47,27 @@ async def limpiar_base_datos():
     
     # Opción 4: Solo auditoría
     if opcion == "4":
-        result = await db.historial_cambios.delete_many({})
-        print(f"✓ Logs de auditoría eliminados: {result.deleted_count}")
+        # Try all possible collection names for audit logs
+        result1 = await db.historial_cambios.delete_many({})
+        result2 = await db.auditoria.delete_many({})
+        result3 = await db.historial.delete_many({})
+        total = result1.deleted_count + result2.deleted_count + result3.deleted_count
+        print(f"✓ Logs de auditoría eliminados: {total}")
+        print(f"  - historial_cambios: {result1.deleted_count}")
+        print(f"  - auditoria: {result2.deleted_count}")
+        print(f"  - historial: {result3.deleted_count}")
     
     # Opciones 1, 2, 3: Vulnerabilidades y auditoría
     if opcion in ["1", "2", "3"]:
         result = await db.vulnerabilidades.delete_many({})
         print(f"✓ Vulnerabilidades eliminadas: {result.deleted_count}")
         
-        result = await db.historial_cambios.delete_many({})
-        print(f"✓ Logs de auditoría eliminados: {result.deleted_count}")
+        # Delete from all possible audit collection names
+        result1 = await db.historial_cambios.delete_many({})
+        result2 = await db.auditoria.delete_many({})
+        result3 = await db.historial.delete_many({})
+        total = result1.deleted_count + result2.deleted_count + result3.deleted_count
+        print(f"✓ Logs de auditoría eliminados: {total}")
     
     # Opción 2 y 3: También aplicaciones
     if opcion in ["2", "3"]:
@@ -80,13 +99,10 @@ async def limpiar_base_datos():
     
     # Mostrar conteo final
     print("Estado actual de la base de datos:")
-    print(f"  - Vulnerabilidades: {await db.vulnerabilidades.count_documents({})}")
-    print(f"  - Logs Auditoría: {await db.historial_cambios.count_documents({})}")
-    print(f"  - Aplicaciones: {await db.aplicaciones.count_documents({})}")
-    print(f"  - Instituciones: {await db.instituciones.count_documents({})}")
-    print(f"  - Proveedores: {await db.proveedores.count_documents({})}")
-    print(f"  - Informes: {await db.informes_pentest.count_documents({})}")
-    print(f"  - Usuarios: {await db.usuarios.count_documents({})}")
+    collections = await db.list_collection_names()
+    for c in sorted(collections):
+        count = await db[c].count_documents({})
+        print(f"  - {c}: {count} documentos")
     print()
     
     client.close()
