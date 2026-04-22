@@ -161,6 +161,13 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - 2 usuarios (admin, sfernandez)
 
 ## Última Actualización: Abril 2026
+### Cambios Completados (Iteración 11 - Vista Comité Fix)
+- ✅ **Vista Comité - Corrección de bugs**:
+  - **Nombres de informe completos**: Eliminado truncado de texto que cortaba los nombres largos
+  - **Lógica de filtros corregida**: Al deseleccionar severidades (Crítico/Alto/Medio/Bajo), los totales "Pend./Total" y "% Pend." ahora se recalculan correctamente solo con las severidades activas
+  - También corregido en exportación CSV para respetar los filtros de severidad
+  - Mejorado el display en el popover de filtros (nombres completos sin truncar)
+
 ### Cambios Completados (Iteración 10)
 - ✅ **Documentación actualizada**:
   - README.md actualizado con nuevas funcionalidades

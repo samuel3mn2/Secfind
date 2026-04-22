@@ -194,8 +194,27 @@ export default function VistaComite() {
       if (selectedSeveridades.includes("Baja")) cells.push(`${row.bajas_pendientes}/${row.bajas_total}`);
       cells.push(row.responsable || "-");
       cells.push(row.tiempo_activo_meses !== null ? row.tiempo_activo_meses : "-");
-      cells.push(`${row.total_pendientes}/${row.total_hallazgos}`);
-      const pct = row.total_hallazgos > 0 ? Math.round((row.total_pendientes / row.total_hallazgos) * 100) : 0;
+      // Calculate totals based on selected severities
+      let pendientes = 0;
+      let hallazgos = 0;
+      if (selectedSeveridades.includes("Critica")) {
+        pendientes += row.criticas_pendientes;
+        hallazgos += row.criticas_total;
+      }
+      if (selectedSeveridades.includes("Alta")) {
+        pendientes += row.altas_pendientes;
+        hallazgos += row.altas_total;
+      }
+      if (selectedSeveridades.includes("Media")) {
+        pendientes += row.medias_pendientes;
+        hallazgos += row.medias_total;
+      }
+      if (selectedSeveridades.includes("Baja")) {
+        pendientes += row.bajas_pendientes;
+        hallazgos += row.bajas_total;
+      }
+      cells.push(`${pendientes}/${hallazgos}`);
+      const pct = hallazgos > 0 ? Math.round((pendientes / hallazgos) * 100) : 0;
       cells.push(`${pct}%`);
       return cells;
     });
@@ -243,18 +262,51 @@ export default function VistaComite() {
     }
   };
 
-  // Calculate totals
+  // Helper function to calculate totals based on selected severities
+  const calcRowTotals = (row) => {
+    let pendientes = 0;
+    let hallazgos = 0;
+    if (selectedSeveridades.includes("Critica")) {
+      pendientes += row.criticas_pendientes;
+      hallazgos += row.criticas_total;
+    }
+    if (selectedSeveridades.includes("Alta")) {
+      pendientes += row.altas_pendientes;
+      hallazgos += row.altas_total;
+    }
+    if (selectedSeveridades.includes("Media")) {
+      pendientes += row.medias_pendientes;
+      hallazgos += row.medias_total;
+    }
+    if (selectedSeveridades.includes("Baja")) {
+      pendientes += row.bajas_pendientes;
+      hallazgos += row.bajas_total;
+    }
+    return { pendientes, hallazgos };
+  };
+
+  // Calculate totals based on selected severities
   const totals = data.reduce((acc, row) => {
-    acc.criticas_pendientes += row.criticas_pendientes;
-    acc.criticas_total += row.criticas_total;
-    acc.altas_pendientes += row.altas_pendientes;
-    acc.altas_total += row.altas_total;
-    acc.medias_pendientes += row.medias_pendientes;
-    acc.medias_total += row.medias_total;
-    acc.bajas_pendientes += row.bajas_pendientes;
-    acc.bajas_total += row.bajas_total;
-    acc.total_pendientes += row.total_pendientes;
-    acc.total_hallazgos += row.total_hallazgos;
+    if (selectedSeveridades.includes("Critica")) {
+      acc.criticas_pendientes += row.criticas_pendientes;
+      acc.criticas_total += row.criticas_total;
+    }
+    if (selectedSeveridades.includes("Alta")) {
+      acc.altas_pendientes += row.altas_pendientes;
+      acc.altas_total += row.altas_total;
+    }
+    if (selectedSeveridades.includes("Media")) {
+      acc.medias_pendientes += row.medias_pendientes;
+      acc.medias_total += row.medias_total;
+    }
+    if (selectedSeveridades.includes("Baja")) {
+      acc.bajas_pendientes += row.bajas_pendientes;
+      acc.bajas_total += row.bajas_total;
+    }
+    // Totals based on selected severities only
+    const rowTotals = calcRowTotals(row);
+    acc.total_pendientes += rowTotals.pendientes;
+    acc.total_hallazgos += rowTotals.hallazgos;
     return acc;
   }, {
     criticas_pendientes: 0, criticas_total: 0,
@@ -449,8 +501,8 @@ export default function VistaComite() {
                           checked={selectedInformes.includes(informe)}
                           onCheckedChange={() => handleInformeToggle(informe)}
                         />
-                        <Label className="text-sm text-zinc-300 cursor-pointer truncate">
-                          {informe.length > 45 ? informe.substring(0, 45) + "..." : informe}
+                        <Label className="text-sm text-zinc-300 cursor-pointer break-words whitespace-normal">
+                          {informe}
                         </Label>
                       </div>
                     ))}
@@ -541,8 +593,8 @@ export default function VistaComite() {
                       className="border-zinc-800 hover:bg-zinc-800/50"
                       data-testid={`comite-row-${idx}`}
                     >
-                      <TableCell className="text-white font-medium">
-                        {row.informe.length > 50 ? row.informe.substring(0, 50) + "..." : row.informe}
+                      <TableCell className="text-white font-medium whitespace-normal break-words">
+                        {row.informe}
                       </TableCell>
                       {selectedSeveridades.includes("Critica") && (
                         <TableCell className="text-center">
@@ -575,10 +627,16 @@ export default function VistaComite() {
                         ) : <span className="text-zinc-600">-</span>}
                       </TableCell>
                       <TableCell className="text-center">
-                        <RatioCell pending={row.total_pendientes} total={row.total_hallazgos} />
+                        {(() => {
+                          const { pendientes, hallazgos } = calcRowTotals(row);
+                          return <RatioCell pending={pendientes} total={hallazgos} />;
+                        })()}
                       </TableCell>
                       <TableCell className="text-center">
-                        <PercentageCell pending={row.total_pendientes} total={row.total_hallazgos} />
+                        {(() => {
+                          const { pendientes, hallazgos } = calcRowTotals(row);
+                          return <PercentageCell pending={pendientes} total={hallazgos} />;
+                        })()}
                       </TableCell>
                     </TableRow>
                   ))}
