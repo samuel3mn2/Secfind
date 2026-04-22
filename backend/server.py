@@ -2261,20 +2261,29 @@ async def import_excel(file: UploadFile = File(...), current_user: CurrentUser =
                 catalogs_created["instituciones"] += 1
         
         # Application (single field 'aplicacion' -> convert to list 'aplicaciones')
+        # Support multiple apps separated by _, /, or ,
         if cleaned_record.get("aplicacion"):
-            app_name = cleaned_record["aplicacion"]
-            existing = await db.aplicaciones.find_one(
-                {"nombre": {"$regex": f"^{re.escape(app_name)}$", "$options": "i"}}
-            )
-            if existing:
-                cleaned_record["aplicaciones"] = [existing["nombre"]]
-            else:
-                app = Aplicacion(nombre=app_name)
-                doc = app.model_dump()
-                doc['created_at'] = doc['created_at'].isoformat()
-                await db.aplicaciones.insert_one(doc)
-                cleaned_record["aplicaciones"] = [app_name]
-                catalogs_created["aplicaciones"] += 1
+            app_raw = str(cleaned_record["aplicacion"]).strip()
+            # Split by multiple separators: _, /, or comma
+            # Use regex to split by any of these separators
+            app_names = re.split(r'[_/,]', app_raw)
+            app_names = [name.strip() for name in app_names if name.strip()]
+            
+            cleaned_record["aplicaciones"] = []
+            for app_name in app_names:
+                existing = await db.aplicaciones.find_one(
+                    {"nombre": {"$regex": f"^{re.escape(app_name)}$", "$options": "i"}}
+                )
+                if existing:
+                    if existing["nombre"] not in cleaned_record["aplicaciones"]:
+                        cleaned_record["aplicaciones"].append(existing["nombre"])
+                else:
+                    app = Aplicacion(nombre=app_name)
+                    doc = app.model_dump()
+                    doc['created_at'] = doc['created_at'].isoformat()
+                    await db.aplicaciones.insert_one(doc)
+                    cleaned_record["aplicaciones"].append(app_name)
+                    catalogs_created["aplicaciones"] += 1
             del cleaned_record["aplicacion"]
         
         # Provider
