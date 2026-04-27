@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import axios from "axios";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Table,
@@ -41,9 +42,9 @@ import {
   TrendingUp,
   Clock,
   Image,
+  Search,
 } from "lucide-react";
 import html2canvas from "html2canvas";
-import { useRef } from "react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -91,8 +92,14 @@ export default function VistaComite() {
   const [selectedInformes, setSelectedInformes] = useState([]);
   const [selectedSeveridades, setSelectedSeveridades] = useState(["Critica", "Alta", "Media", "Baja"]);
   const [informesPopoverOpen, setInformesPopoverOpen] = useState(false);
+  const [informeSearch, setInformeSearch] = useState("");
 
   const canViewModule = isAdmin || canView("vulnerabilidades");
+
+  // Filter informes by search
+  const filteredInformes = options?.informes_pentest?.filter(
+    informe => informe.toLowerCase().includes(informeSearch.toLowerCase())
+  ) || [];
 
   const fetchOptions = async () => {
     try {
@@ -468,8 +475,17 @@ export default function VistaComite() {
                   <ChevronDown className="w-4 h-4 ml-2" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[350px] bg-zinc-900 border-zinc-700 p-0" align="start">
-                <div className="p-3 border-b border-zinc-700">
+              <PopoverContent className="w-[400px] bg-zinc-900 border-zinc-700 p-0" align="start">
+                <div className="p-3 border-b border-zinc-700 space-y-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                    <Input
+                      placeholder="Buscar informe..."
+                      value={informeSearch}
+                      onChange={(e) => setInformeSearch(e.target.value)}
+                      className="pl-9 bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                    />
+                  </div>
                   <div className="flex gap-2">
                     <Button
                       variant="ghost"
@@ -489,9 +505,9 @@ export default function VistaComite() {
                     </Button>
                   </div>
                 </div>
-                <ScrollArea className="h-[250px]">
+                <ScrollArea className="h-[300px]">
                   <div className="p-2 space-y-1">
-                    {options?.informes_pentest?.map((informe) => (
+                    {filteredInformes.map((informe) => (
                       <div
                         key={informe}
                         className="flex items-center space-x-2 p-2 rounded hover:bg-zinc-800 cursor-pointer"

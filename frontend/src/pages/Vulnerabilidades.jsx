@@ -219,8 +219,8 @@ export default function Vulnerabilidades() {
   const [loading, setLoading] = useState(true);
   const [options, setOptions] = useState(null);
   const [search, setSearch] = useState("");
-  const [filterSeveridad, setFilterSeveridad] = useState("");
-  const [filterEstatus, setFilterEstatus] = useState("");
+  const [filterSeveridad, setFilterSeveridad] = useState([]);
+  const [filterEstatus, setFilterEstatus] = useState([]);
   const [filterInstitucion, setFilterInstitucion] = useState([]);
   const [filterAño, setFilterAño] = useState("");
   const [filterAplicacion, setFilterAplicacion] = useState([]);
@@ -303,8 +303,8 @@ export default function Vulnerabilidades() {
     try {
       const params = new URLSearchParams();
       if (search) params.append("search", search);
-      if (filterSeveridad && filterSeveridad !== "all") params.append("severidad", filterSeveridad);
-      if (filterEstatus && filterEstatus !== "all") params.append("estatus", filterEstatus);
+      if (filterSeveridad.length > 0) filterSeveridad.forEach(v => params.append("severidad", v));
+      if (filterEstatus.length > 0) filterEstatus.forEach(v => params.append("estatus", v));
       if (filterInstitucion.length > 0) filterInstitucion.forEach(v => params.append("institucion", v));
       if (filterAño && filterAño !== "all") params.append("año", filterAño);
       if (filterAplicacion.length > 0) filterAplicacion.forEach(v => params.append("aplicacion", v));
@@ -548,7 +548,17 @@ export default function Vulnerabilidades() {
           </h1>
           <p className="text-zinc-500 mt-1">
             {vulnerabilidades.length} registros encontrados
+            {(filterSeveridad.length > 0 || filterEstatus.length > 0 || filterInstitucion.length > 0 || filterAplicacion.length > 0 || filterInforme.length > 0 || (filterAño && filterAño !== "all")) && (
+              <span className="ml-2 text-indigo-400">(filtrado)</span>
+            )}
           </p>
+          {(filterSeveridad.length > 0 || filterEstatus.length > 0) && (
+            <p className="text-xs text-zinc-400 mt-0.5">
+              {filterSeveridad.length > 0 && <span>Severidad: <span className="text-white">{filterSeveridad.join(", ")}</span></span>}
+              {filterSeveridad.length > 0 && filterEstatus.length > 0 && <span className="mx-2">|</span>}
+              {filterEstatus.length > 0 && <span>Estatus: <span className="text-white">{filterEstatus.join(", ")}</span></span>}
+            </p>
+          )}
         </div>
         {canAdd && (
           <Button
@@ -593,29 +603,25 @@ export default function Vulnerabilidades() {
                 </SelectContent>
               </Select>
 
-              <Select value={filterSeveridad} onValueChange={setFilterSeveridad}>
-                <SelectTrigger className="w-[120px] bg-black/20 border-zinc-700 text-white" data-testid="filter-severidad">
-                  <SelectValue placeholder="Severidad" />
-                </SelectTrigger>
-                <SelectContent className="bg-zinc-900 border-zinc-700">
-                  <SelectItem value="all">Todas</SelectItem>
-                  {options?.severidades?.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <MultiSelectFilter
+                options={options?.severidades || []}
+                selected={filterSeveridad}
+                onChange={setFilterSeveridad}
+                placeholder="Severidad"
+                searchPlaceholder="Buscar severidad..."
+                allLabel="Todas las severidades"
+                data-testid="filter-severidad"
+              />
 
-              <Select value={filterEstatus} onValueChange={setFilterEstatus}>
-                <SelectTrigger className="w-[130px] bg-black/20 border-zinc-700 text-white" data-testid="filter-estatus">
-                  <SelectValue placeholder="Estatus" />
-                </SelectTrigger>
-                <SelectContent className="bg-zinc-900 border-zinc-700">
-                  <SelectItem value="all">Todos</SelectItem>
-                  {options?.estatus?.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <MultiSelectFilter
+                options={options?.estatus || []}
+                selected={filterEstatus}
+                onChange={setFilterEstatus}
+                placeholder="Estatus"
+                searchPlaceholder="Buscar estatus..."
+                allLabel="Todos los estatus"
+                data-testid="filter-estatus"
+              />
 
               <MultiSelectFilter
                 options={options?.instituciones || []}

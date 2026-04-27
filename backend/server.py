@@ -1348,9 +1348,6 @@ async def get_dropdown_options():
 @api_router.get("/vulnerabilidades", response_model=List[Vulnerabilidad])
 async def get_vulnerabilidades(
     request: Request,
-    severidad: Optional[str] = None,
-    estatus: Optional[str] = None,
-    aplicacion: Optional[List[str]] = Query(None),
     search: Optional[str] = None,
     año: Optional[int] = None,
     proveedor: Optional[str] = None,
@@ -1360,15 +1357,17 @@ async def get_vulnerabilidades(
         raise HTTPException(status_code=403, detail="No tiene permisos para ver vulnerabilidades")
     
     # Get multi-value params manually
+    severidades = request.query_params.getlist("severidad")
+    estatus_list = request.query_params.getlist("estatus")
     instituciones = request.query_params.getlist("institucion")
     aplicaciones = request.query_params.getlist("aplicacion")
     informes = request.query_params.getlist("informe_pentest")
     
     query = {}
-    if severidad:
-        query["severidad"] = severidad
-    if estatus:
-        query["estatus"] = estatus
+    if severidades:
+        query["severidad"] = {"$in": severidades}
+    if estatus_list:
+        query["estatus"] = {"$in": estatus_list}
     if instituciones:
         query["institucion"] = {"$in": instituciones}
     if aplicaciones:
@@ -1988,7 +1987,6 @@ async def get_kpi_detail(
 async def get_seguimiento_riesgos(
     request: Request,
     filtro: Optional[str] = None,  # "vencidas", "proximas", "todas"
-    severidad: Optional[str] = None,
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """
@@ -2001,6 +1999,7 @@ async def get_seguimiento_riesgos(
         raise HTTPException(status_code=403, detail="No tiene permisos para ver el seguimiento de riesgos")
     
     # Get multi-value params
+    severidades = request.query_params.getlist("severidad")
     instituciones = request.query_params.getlist("institucion")
     aplicaciones = request.query_params.getlist("aplicacion")
     informes = request.query_params.getlist("informe_pentest")
@@ -2022,8 +2021,8 @@ async def get_seguimiento_riesgos(
             {"fecha_compromiso": {"$lte": future_30}}
         ]
     
-    if severidad:
-        query["severidad"] = severidad
+    if severidades:
+        query["severidad"] = {"$in": severidades}
     if instituciones:
         query["institucion"] = {"$in": instituciones}
     if aplicaciones:

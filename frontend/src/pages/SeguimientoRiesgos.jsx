@@ -110,7 +110,7 @@ export default function SeguimientoRiesgos() {
   const [loading, setLoading] = useState(true);
   const [options, setOptions] = useState(null);
   const [filterEstado, setFilterEstado] = useState("all");
-  const [filterSeveridad, setFilterSeveridad] = useState("");
+  const [filterSeveridad, setFilterSeveridad] = useState([]);
   const [filterInstitucion, setFilterInstitucion] = useState([]);
   const [filterInforme, setFilterInforme] = useState([]);
   const [filterAplicacion, setFilterAplicacion] = useState([]);
@@ -143,7 +143,7 @@ export default function SeguimientoRiesgos() {
     try {
       const params = new URLSearchParams();
       if (filterEstado && filterEstado !== "all") params.append("filtro", filterEstado);
-      if (filterSeveridad && filterSeveridad !== "all") params.append("severidad", filterSeveridad);
+      if (filterSeveridad.length > 0) filterSeveridad.forEach(v => params.append("severidad", v));
       if (filterInstitucion.length > 0) filterInstitucion.forEach(v => params.append("institucion", v));
       if (filterInforme.length > 0) filterInforme.forEach(v => params.append("informe_pentest", v));
       if (filterAplicacion.length > 0) filterAplicacion.forEach(v => params.append("aplicacion", v));
@@ -315,17 +315,15 @@ export default function SeguimientoRiesgos() {
       <Card className="bg-[#18181b] border-[#27272a]">
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-4">
-            <Select value={filterSeveridad} onValueChange={setFilterSeveridad}>
-              <SelectTrigger className="w-[130px] bg-black/20 border-zinc-700 text-white" data-testid="filter-severidad">
-                <SelectValue placeholder="Severidad" />
-              </SelectTrigger>
-              <SelectContent className="bg-zinc-900 border-zinc-700">
-                <SelectItem value="all">Todas</SelectItem>
-                {options?.severidades?.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelectFilter
+              options={options?.severidades || []}
+              selected={filterSeveridad}
+              onChange={setFilterSeveridad}
+              placeholder="Severidad"
+              searchPlaceholder="Buscar severidad..."
+              allLabel="Todas las severidades"
+              data-testid="filter-severidad"
+            />
 
             <MultiSelectFilter
               options={options?.instituciones || []}

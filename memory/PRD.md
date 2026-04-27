@@ -165,20 +165,22 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - ✅ **Vista Comité - Corrección de bugs**:
   - **Nombres de informe completos**: Eliminado truncado de texto que cortaba los nombres largos
   - **Lógica de filtros corregida**: Al deseleccionar severidades, los totales se recalculan correctamente
+  - **Buscador de informes agregado**: Popover con campo de búsqueda para filtrar informes fácilmente
   - También corregido en exportación CSV
 - ✅ **Sincronización Estatus ↔ Resultado Re-Test**:
-  - Al importar Excel o actualizar vulnerabilidad, el estatus se sincroniza automáticamente:
-    - Re-Test = "Corregido" → Estatus = "Cerrado"
-    - Re-Test = "Desestimado" → Estatus = "Cerrado"
-    - Re-Test = "Vulnerable" → Estatus = "Pendiente"
-    - Re-Test = "Impedimento" → Estatus = "Pendiente"
-  - Esto asegura que Dashboard y Vista Comité muestren información correcta
+  - Al importar Excel o actualizar vulnerabilidad, el estatus se sincroniza automáticamente (solo si estatus está vacío)
+  - Re-Test = "Corregido/Desestimado" → Estatus = "Cerrado"
+  - Re-Test = "Vulnerable/Impedimento" → Estatus = "Pendiente"
+  - "En Proceso" se mantiene si ya está definido y se considera pendiente en reportes
 - ✅ **Filtros Multi-Select en Dashboard**:
-  - Informe Pentest: Ahora permite seleccionar múltiples informes (antes solo 1)
-  - Severidad: Ahora permite seleccionar múltiples severidades (antes solo 1)
-  - Nombres de informe completos en dropdown (sin truncado)
+  - Informe Pentest y Severidad: Permiten seleccionar múltiples valores
+- ✅ **Filtros Multi-Select en Vulnerabilidades**:
+  - Severidad y Estatus: Cambiados de Select simple a Multi-Select
+  - Resumen de filtros activos en encabezado
+- ✅ **Filtros Multi-Select en Seguimiento de Riesgos**:
+  - Severidad: Cambiado a Multi-Select
 - ✅ **Nombres de informe completos en todos los módulos**:
-  - Dashboard, Vulnerabilidades y Seguimiento de Riesgos muestran nombres completos
+  - Dashboard, Vulnerabilidades, Seguimiento y Vista Comité
 
 ### Cambios Completados (Iteración 10)
 - ✅ **Documentación actualizada**:
