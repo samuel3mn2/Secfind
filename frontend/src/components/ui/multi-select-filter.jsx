@@ -156,13 +156,14 @@ export function MultiSelectFilter({
                       isSelected ? "bg-indigo-950/50" : "hover:bg-zinc-800"
                     )}
                     onClick={() => handleToggle(option)}
+                    title={option}
                   >
                     <Checkbox
                       checked={isSelected}
-                      className="border-zinc-600"
+                      className="border-zinc-600 shrink-0"
                     />
                     <span className={cn(
-                      "text-sm truncate flex-1",
+                      "text-sm break-words whitespace-normal flex-1",
                       isSelected ? "text-white" : "text-zinc-300"
                     )}>
                       {option}

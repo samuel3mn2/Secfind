@@ -161,7 +161,7 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - 2 usuarios (admin, sfernandez)
 
 ## Última Actualización: Abril 2026
-### Cambios Completados (Iteración 11 - Vista Comité Fix + Lógica Re-Test)
+### Cambios Completados (Iteración 11 - Vista Comité Fix + Lógica Re-Test + Filtros Multi-Select)
 - ✅ **Vista Comité - Corrección de bugs**:
   - **Nombres de informe completos**: Eliminado truncado de texto que cortaba los nombres largos
   - **Lógica de filtros corregida**: Al deseleccionar severidades, los totales se recalculan correctamente
@@ -173,6 +173,12 @@ REACT_APP_BACKEND_URL=http://localhost:8001
     - Re-Test = "Vulnerable" → Estatus = "Pendiente"
     - Re-Test = "Impedimento" → Estatus = "Pendiente"
   - Esto asegura que Dashboard y Vista Comité muestren información correcta
+- ✅ **Filtros Multi-Select en Dashboard**:
+  - Informe Pentest: Ahora permite seleccionar múltiples informes (antes solo 1)
+  - Severidad: Ahora permite seleccionar múltiples severidades (antes solo 1)
+  - Nombres de informe completos en dropdown (sin truncado)
+- ✅ **Nombres de informe completos en todos los módulos**:
+  - Dashboard, Vulnerabilidades y Seguimiento de Riesgos muestran nombres completos
 
 ### Cambios Completados (Iteración 10)
 - ✅ **Documentación actualizada**:

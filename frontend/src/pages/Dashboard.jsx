@@ -27,6 +27,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Shield, AlertTriangle, CheckCircle2, Clock, TrendingUp, Filter, X, ExternalLink, PlayCircle, RefreshCw, FileText, Download } from "lucide-react";
+import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
 import {
   PieChart,
   Pie,
@@ -136,8 +137,8 @@ export default function Dashboard() {
   // Filters
   const [filterAño, setFilterAño] = useState("");
   const [filterInstitucion, setFilterInstitucion] = useState("");
-  const [filterInforme, setFilterInforme] = useState("");
-  const [filterSeveridad, setFilterSeveridad] = useState("");
+  const [filterInforme, setFilterInforme] = useState([]);
+  const [filterSeveridad, setFilterSeveridad] = useState([]);
   const [filterProveedor, setFilterProveedor] = useState("");
 
   // KPI Detail Modal
@@ -189,8 +190,8 @@ export default function Dashboard() {
       const params = new URLSearchParams();
       if (filterAño && filterAño !== "all") params.append("año", filterAño);
       if (filterInstitucion && filterInstitucion !== "all") params.append("institucion", filterInstitucion);
-      if (filterInforme && filterInforme !== "all") params.append("informe_pentest", filterInforme);
-      if (filterSeveridad && filterSeveridad !== "all") params.append("severidad", filterSeveridad);
+      if (filterInforme.length > 0) filterInforme.forEach(v => params.append("informe_pentest", v));
+      if (filterSeveridad.length > 0) filterSeveridad.forEach(v => params.append("severidad", v));
       if (filterProveedor && filterProveedor !== "all") params.append("proveedor", filterProveedor);
       
       const response = await axios.get(`${API}/dashboard/stats?${params.toString()}`);
@@ -217,8 +218,8 @@ export default function Dashboard() {
       params.append("tipo", tipo);
       if (filterAño && filterAño !== "all") params.append("año", filterAño);
       if (filterInstitucion && filterInstitucion !== "all") params.append("institucion", filterInstitucion);
-      if (filterInforme && filterInforme !== "all") params.append("informe_pentest", filterInforme);
-      if (filterSeveridad && filterSeveridad !== "all") params.append("severidad", filterSeveridad);
+      if (filterInforme.length > 0) filterInforme.forEach(v => params.append("informe_pentest", v));
+      if (filterSeveridad.length > 0) filterSeveridad.forEach(v => params.append("severidad", v));
       if (filterProveedor && filterProveedor !== "all") params.append("proveedor", filterProveedor);
       
       const response = await axios.get(`${API}/dashboard/kpi-detail?${params.toString()}`);
@@ -234,12 +235,12 @@ export default function Dashboard() {
   const clearFilters = () => {
     setFilterAño("");
     setFilterInstitucion("");
-    setFilterInforme("");
-    setFilterSeveridad("");
+    setFilterInforme([]);
+    setFilterSeveridad([]);
     setFilterProveedor("");
   };
 
-  const hasActiveFilters = filterAño || filterInstitucion || filterInforme || filterSeveridad || filterProveedor;
+  const hasActiveFilters = filterAño || filterInstitucion || filterInforme.length > 0 || filterSeveridad.length > 0 || filterProveedor;
 
   const generateReport = async (type, customParams = {}) => {
     setGeneratingReport(true);
@@ -250,7 +251,7 @@ export default function Dashboard() {
       if (type === "ejecutivo") {
         if (filterAño) params.append("año", filterAño);
         if (filterInstitucion) params.append("institucion", filterInstitucion);
-        if (filterInforme) params.append("informe_pentest", filterInforme);
+        if (filterInforme.length > 0) filterInforme.forEach(v => params.append("informe_pentest", v));
         if (params.toString()) url += `?${params.toString()}`;
       } else if (type.startsWith("institucion/")) {
         // URL already has institution
@@ -435,35 +436,29 @@ export default function Dashboard() {
             {/* Informe Pentest Filter */}
             <div className="space-y-1.5">
               <label className="text-xs text-zinc-500 font-medium">Informe Pentest</label>
-              <Select value={filterInforme} onValueChange={setFilterInforme}>
-                <SelectTrigger className="bg-black/20 border-zinc-700 text-white" data-testid="filter-informe">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent className="bg-zinc-900 border-zinc-700 max-h-[300px]">
-                  <SelectItem value="all">Todos los informes</SelectItem>
-                  {options?.informes_pentest?.map((informe) => (
-                    <SelectItem key={informe} value={informe} className="text-xs">
-                      {informe.length > 40 ? `${informe.substring(0, 40)}...` : informe}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <MultiSelectFilter
+                options={options?.informes_pentest || []}
+                selected={filterInforme}
+                onChange={setFilterInforme}
+                placeholder="Todos los informes"
+                searchPlaceholder="Buscar informe..."
+                allLabel="Todos los informes"
+                data-testid="filter-informe"
+              />
             </div>
 
             {/* Severidad Filter */}
             <div className="space-y-1.5">
               <label className="text-xs text-zinc-500 font-medium">Severidad</label>
-              <Select value={filterSeveridad} onValueChange={setFilterSeveridad}>
-                <SelectTrigger className="bg-black/20 border-zinc-700 text-white" data-testid="filter-severidad">
-                  <SelectValue placeholder="Todas" />
-                </SelectTrigger>
-                <SelectContent className="bg-zinc-900 border-zinc-700">
-                  <SelectItem value="all">Todas las severidades</SelectItem>
-                  {options?.severidades?.map((sev) => (
-                    <SelectItem key={sev} value={sev}>{sev}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <MultiSelectFilter
+                options={options?.severidades || []}
+                selected={filterSeveridad}
+                onChange={setFilterSeveridad}
+                placeholder="Todas las severidades"
+                searchPlaceholder="Buscar severidad..."
+                allLabel="Todas las severidades"
+                data-testid="filter-severidad"
+              />
             </div>
 
             {/* Proveedor Filter */}
@@ -933,18 +928,18 @@ export default function Dashboard() {
                 </Button>
               )}
 
-              {filterInforme && filterInforme !== "all" && (
+              {filterInforme.length === 1 && (
                 <Button
                   variant="outline"
                   className="w-full justify-start border-zinc-700 text-white hover:bg-zinc-800"
-                  onClick={() => generateReport(`informe/${encodeURIComponent(filterInforme)}`)}
+                  onClick={() => generateReport(`informe/${encodeURIComponent(filterInforme[0])}`)}
                   disabled={generatingReport}
                   data-testid="report-informe-btn"
                 >
                   <Download className="w-4 h-4 mr-3 text-orange-400" />
                   <div className="text-left">
                     <div className="font-medium">Reporte por Informe Pentest</div>
-                    <div className="text-xs text-zinc-500 truncate max-w-[280px]">{filterInforme}</div>
+                    <div className="text-xs text-zinc-500 truncate max-w-[280px]">{filterInforme[0]}</div>
                   </div>
                 </Button>
               )}

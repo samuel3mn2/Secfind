@@ -1651,25 +1651,28 @@ async def get_historial(
 
 @api_router.get("/dashboard/stats")
 async def get_dashboard_stats(
+    request: Request,
     año: Optional[int] = None,
     institucion: Optional[str] = None,
-    informe_pentest: Optional[str] = None,
-    severidad: Optional[str] = None,
     proveedor: Optional[str] = None,
     current_user: CurrentUser = Depends(get_current_user)
 ):
     if not current_user.es_admin and not current_user.permisos.dashboard.ver:
         raise HTTPException(status_code=403, detail="No tiene permisos para ver el dashboard")
     
+    # Get multiple values from query params
+    informe_pentest_list = request.query_params.getlist("informe_pentest")
+    severidad_list = request.query_params.getlist("severidad")
+    
     base_query = {}
     if año:
         base_query["fecha_hallazgo"] = {"$regex": f"^{año}"}
     if institucion:
         base_query["institucion"] = institucion
-    if informe_pentest:
-        base_query["nombre_informe_pentest"] = informe_pentest
-    if severidad:
-        base_query["severidad"] = severidad
+    if informe_pentest_list:
+        base_query["nombre_informe_pentest"] = {"$in": informe_pentest_list}
+    if severidad_list:
+        base_query["severidad"] = {"$in": severidad_list}
     if proveedor:
         base_query["proveedor"] = proveedor
     
@@ -1937,16 +1940,19 @@ async def get_vista_comite(
 
 @api_router.get("/dashboard/kpi-detail")
 async def get_kpi_detail(
+    request: Request,
     tipo: str,
     año: Optional[int] = None,
     institucion: Optional[str] = None,
-    informe_pentest: Optional[str] = None,
-    severidad: Optional[str] = None,
     proveedor: Optional[str] = None,
     current_user: CurrentUser = Depends(get_current_user)
 ):
     if not current_user.es_admin and not current_user.permisos.dashboard.ver:
         raise HTTPException(status_code=403, detail="No tiene permisos para ver el dashboard")
+    
+    # Get multiple values from query params
+    informe_pentest_list = request.query_params.getlist("informe_pentest")
+    severidad_list = request.query_params.getlist("severidad")
     
     query = {}
     
@@ -1954,10 +1960,10 @@ async def get_kpi_detail(
         query["fecha_hallazgo"] = {"$regex": f"^{año}"}
     if institucion:
         query["institucion"] = institucion
-    if informe_pentest:
-        query["nombre_informe_pentest"] = informe_pentest
-    if severidad:
-        query["severidad"] = severidad
+    if informe_pentest_list:
+        query["nombre_informe_pentest"] = {"$in": informe_pentest_list}
+    if severidad_list:
+        query["severidad"] = {"$in": severidad_list}
     if proveedor:
         query["proveedor"] = proveedor
     
