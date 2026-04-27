@@ -2342,13 +2342,17 @@ async def import_excel(file: UploadFile = File(...), current_user: CurrentUser =
                 catalogs_created["informes"] += 1
         
         # Sincronizar estatus basado en resultado de retest
+        # Solo aplicar mapeo si el estatus está vacío o nulo
         # Mapeo: Corregido/Desestimado -> Cerrado, Vulnerable/Impedimento -> Pendiente
         resultado_retest = cleaned_record.get("resultado_re_test", "").strip().lower() if cleaned_record.get("resultado_re_test") else ""
+        estatus_actual = cleaned_record.get("estatus", "").strip() if cleaned_record.get("estatus") else ""
         
-        if resultado_retest in ["corregido", "desestimado"]:
-            cleaned_record["estatus"] = "Cerrado"
-        elif resultado_retest in ["vulnerable", "impedimento"]:
-            cleaned_record["estatus"] = "Pendiente"
+        # Solo sobrescribir si el estatus está vacío
+        if not estatus_actual:
+            if resultado_retest in ["corregido", "desestimado"]:
+                cleaned_record["estatus"] = "Cerrado"
+            elif resultado_retest in ["vulnerable", "impedimento"]:
+                cleaned_record["estatus"] = "Pendiente"
         
         vuln = Vulnerabilidad(**cleaned_record)
         doc = vuln.model_dump()
