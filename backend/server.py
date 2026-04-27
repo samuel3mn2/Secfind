@@ -1437,6 +1437,15 @@ async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate, c
     
     update_dict = vuln_data.model_dump(exclude_unset=True)
     
+    # Sincronizar estatus basado en resultado de retest
+    # Mapeo: Corregido/Desestimado -> Cerrado, Vulnerable/Impedimento -> Pendiente
+    if "resultado_re_test" in update_dict:
+        resultado_retest = (update_dict.get("resultado_re_test") or "").strip().lower()
+        if resultado_retest in ["corregido", "desestimado"]:
+            update_dict["estatus"] = "Cerrado"
+        elif resultado_retest in ["vulnerable", "impedimento"]:
+            update_dict["estatus"] = "Pendiente"
+    
     # Calcular cambios antes de actualizar
     cambios = calcular_cambios(existing, update_dict)
     
@@ -2325,6 +2334,15 @@ async def import_excel(file: UploadFile = File(...), current_user: CurrentUser =
                 doc['created_at'] = doc['created_at'].isoformat()
                 await db.informes_pentest.insert_one(doc)
                 catalogs_created["informes"] += 1
+        
+        # Sincronizar estatus basado en resultado de retest
+        # Mapeo: Corregido/Desestimado -> Cerrado, Vulnerable/Impedimento -> Pendiente
+        resultado_retest = cleaned_record.get("resultado_re_test", "").strip().lower() if cleaned_record.get("resultado_re_test") else ""
+        
+        if resultado_retest in ["corregido", "desestimado"]:
+            cleaned_record["estatus"] = "Cerrado"
+        elif resultado_retest in ["vulnerable", "impedimento"]:
+            cleaned_record["estatus"] = "Pendiente"
         
         vuln = Vulnerabilidad(**cleaned_record)
         doc = vuln.model_dump()
