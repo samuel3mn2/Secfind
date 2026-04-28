@@ -683,10 +683,11 @@ async def update_aplicacion(app_id: str, data: AplicacionUpdate, current_user: C
         if "nombre" in update_dict and update_dict["nombre"] != existing.get("nombre"):
             old_name = existing.get("nombre")
             new_name = update_dict["nombre"]
-            # Update in array field 'aplicaciones'
+            # Update all occurrences in array field 'aplicaciones' using arrayFilters
             await db.vulnerabilidades.update_many(
                 {"aplicaciones": old_name},
-                {"$set": {"aplicaciones.$": new_name}}
+                {"$set": {"aplicaciones.$[elem]": new_name}},
+                array_filters=[{"elem": old_name}]
             )
             logging.info(f"Cascade update: Aplicación '{old_name}' -> '{new_name}' in vulnerabilities")
         
