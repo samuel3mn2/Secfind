@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import axios from "axios";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
@@ -96,10 +96,21 @@ export default function VistaComite() {
 
   const canViewModule = isAdmin || canView("vulnerabilidades");
 
-  // Filter informes by search
-  const filteredInformes = options?.informes_pentest?.filter(
-    informe => informe.toLowerCase().includes(informeSearch.toLowerCase())
-  ) || [];
+  // Clear search when popover closes
+  useEffect(() => {
+    if (!informesPopoverOpen) {
+      setInformeSearch("");
+    }
+  }, [informesPopoverOpen]);
+
+  // Filter informes by search - use useMemo for better performance
+  const filteredInformes = React.useMemo(() => {
+    if (!informeSearch.trim()) return options?.informes_pentest || [];
+    const searchLower = informeSearch.toLowerCase().trim();
+    return (options?.informes_pentest || []).filter(
+      informe => informe.toLowerCase().includes(searchLower)
+    );
+  }, [options?.informes_pentest, informeSearch]);
 
   const fetchOptions = async () => {
     try {

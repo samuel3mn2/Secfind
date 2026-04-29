@@ -26,10 +26,21 @@ export function MultiSelectFilter({
   const [open, setOpen] = React.useState(false);
   const [searchValue, setSearchValue] = React.useState("");
 
-  // Filter options based on search
-  const filteredOptions = options.filter(option => 
-    option.toLowerCase().includes(searchValue.toLowerCase())
-  );
+  // Clear search when popover closes
+  React.useEffect(() => {
+    if (!open) {
+      setSearchValue("");
+    }
+  }, [open]);
+
+  // Filter options based on search - use useMemo for better performance
+  const filteredOptions = React.useMemo(() => {
+    if (!searchValue.trim()) return options;
+    const searchLower = searchValue.toLowerCase().trim();
+    return options.filter(option => 
+      option.toLowerCase().includes(searchLower)
+    );
+  }, [options, searchValue]);
 
   // Handle select/deselect
   const handleToggle = (value) => {
@@ -107,6 +118,7 @@ export function MultiSelectFilter({
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
             className="flex h-10 w-full bg-transparent py-3 text-sm text-white placeholder:text-zinc-500 outline-none"
+            autoFocus
           />
           {searchValue && (
             <X 
@@ -116,30 +128,32 @@ export function MultiSelectFilter({
           )}
         </div>
 
-        {/* Select All Option */}
-        <div 
-          className="flex items-center gap-2 p-3 border-b border-zinc-800 cursor-pointer hover:bg-zinc-800"
-          onClick={handleSelectAll}
-        >
-          <Checkbox
-            checked={isAllSelected}
-            className="border-zinc-600"
-          />
-          <span className={cn(
-            "text-sm font-medium",
-            isAllSelected ? "text-indigo-400" : "text-zinc-300"
-          )}>
-            {allLabel}
-          </span>
-          {isAllSelected && (
-            <span className="text-xs text-zinc-500 ml-auto">
-              (Limpiar)
+        {/* Select All Option - only show when not searching */}
+        {!searchValue && (
+          <div 
+            className="flex items-center gap-2 p-3 border-b border-zinc-800 cursor-pointer hover:bg-zinc-800"
+            onClick={handleSelectAll}
+          >
+            <Checkbox
+              checked={isAllSelected}
+              className="border-zinc-600"
+            />
+            <span className={cn(
+              "text-sm font-medium",
+              isAllSelected ? "text-indigo-400" : "text-zinc-300"
+            )}>
+              {allLabel}
             </span>
-          )}
-        </div>
+            {isAllSelected && (
+              <span className="text-xs text-zinc-500 ml-auto">
+                (Limpiar)
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Options List */}
-        <ScrollArea className="h-[250px]">
+        <ScrollArea className="h-[250px]" key={searchValue}>
           <div className="p-2 space-y-1">
             {filteredOptions.length === 0 ? (
               <div className="py-6 text-center text-sm text-zinc-500">
