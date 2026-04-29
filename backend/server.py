@@ -2270,9 +2270,14 @@ async def import_excel(file: UploadFile = File(...), current_user: CurrentUser =
                 cleaned_record[k] = str(v)
         
         # Auto-create catalogs if they don't exist (case-insensitive)
-        # Institution
+        # Institution - Normalize name first
         if cleaned_record.get("institucion"):
             inst_name = cleaned_record["institucion"]
+            # Normalize: remove line breaks, normalize spaces
+            inst_name = re.sub(r'[\n\r]+', ' ', inst_name)
+            inst_name = re.sub(r'\s+', ' ', inst_name).strip()
+            cleaned_record["institucion"] = inst_name
+            
             existing = await db.instituciones.find_one(
                 {"nombre": {"$regex": f"^{re.escape(inst_name)}$", "$options": "i"}}
             )
@@ -2326,9 +2331,15 @@ async def import_excel(file: UploadFile = File(...), current_user: CurrentUser =
                 await db.proveedores.insert_one(doc)
                 catalogs_created["proveedores"] += 1
         
-        # Informe Pentest
+        # Informe Pentest - Normalize name first
         if cleaned_record.get("nombre_informe_pentest"):
             inf_name = cleaned_record["nombre_informe_pentest"]
+            # Normalize: remove line breaks, normalize spaces, replace comma-space with underscore
+            inf_name = re.sub(r'[\n\r]+', ' ', inf_name)  # Replace line breaks with space
+            inf_name = re.sub(r'\s+', ' ', inf_name).strip()  # Normalize multiple spaces
+            inf_name = re.sub(r',\s+', '_', inf_name)  # Replace ", " with "_" for consistency
+            cleaned_record["nombre_informe_pentest"] = inf_name
+            
             existing = await db.informes_pentest.find_one(
                 {"nombre": {"$regex": f"^{re.escape(inf_name)}$", "$options": "i"}}
             )
