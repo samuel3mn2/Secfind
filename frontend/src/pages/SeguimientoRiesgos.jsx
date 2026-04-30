@@ -472,8 +472,10 @@ export default function SeguimientoRiesgos() {
                         <SeverityBadge severity={vuln.severidad} />
                       </TableCell>
                       <TableCell className="text-zinc-300">{vuln.institucion || "-"}</TableCell>
-                      <TableCell className="text-zinc-100 max-w-[300px] truncate">
-                        {vuln.vulnerabilidad || "-"}
+                      <TableCell className="text-zinc-100">
+                        <span className="whitespace-normal break-words">
+                          {vuln.vulnerabilidad || "-"}
+                        </span>
                       </TableCell>
                       <TableCell className="text-zinc-300">{vuln.responsable || "-"}</TableCell>
                       <TableCell className="text-right">

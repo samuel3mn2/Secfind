@@ -874,15 +874,17 @@ export default function Vulnerabilidades() {
                         <TableCell className="text-zinc-300">{vuln.institucion || "-"}</TableCell>
                       )}
                       {isColumnVisible("aplicaciones") && (
-                        <TableCell className="text-zinc-300 max-w-[150px]">
-                          <span className="truncate block" title={formatAplicaciones(vuln)}>
+                        <TableCell className="text-zinc-300">
+                          <span className="whitespace-normal break-words" title={formatAplicaciones(vuln)}>
                             {formatAplicaciones(vuln)}
                           </span>
                         </TableCell>
                       )}
                       {isColumnVisible("vulnerabilidad") && (
-                        <TableCell className="text-zinc-100 max-w-[300px] truncate">
-                          {vuln.vulnerabilidad || "-"}
+                        <TableCell className="text-zinc-100">
+                          <span className="whitespace-normal break-words">
+                            {vuln.vulnerabilidad || "-"}
+                          </span>
                         </TableCell>
                       )}
                       {isColumnVisible("severidad") && (
@@ -908,8 +910,8 @@ export default function Vulnerabilidades() {
                         <TableCell className="text-zinc-300 text-center">{vuln.veces_en_retest || 0}</TableCell>
                       )}
                       {isColumnVisible("nombre_informe_pentest") && (
-                        <TableCell className="text-zinc-300 max-w-[150px]">
-                          <span className="truncate block" title={vuln.nombre_informe_pentest}>
+                        <TableCell className="text-zinc-300">
+                          <span className="whitespace-normal break-words" title={vuln.nombre_informe_pentest}>
                             {vuln.nombre_informe_pentest || "-"}
                           </span>
                         </TableCell>
