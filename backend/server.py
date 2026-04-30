@@ -1988,6 +1988,8 @@ async def get_kpi_detail(
 async def get_seguimiento_riesgos(
     request: Request,
     filtro: Optional[str] = None,  # "vencidas", "proximas", "todas"
+    mes: Optional[str] = None,  # "01" to "12"
+    año_compromiso: Optional[str] = None,  # "2024", "2025", etc.
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """
@@ -1995,6 +1997,7 @@ async def get_seguimiento_riesgos(
     - vencidas: past due date, not resolved
     - proximas: due within next 30 days
     - todas: all with fecha_compromiso
+    - mes/año_compromiso: filter by specific month/year of fecha_compromiso
     """
     if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
         raise HTTPException(status_code=403, detail="No tiene permisos para ver el seguimiento de riesgos")
@@ -2014,7 +2017,18 @@ async def get_seguimiento_riesgos(
         "estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]}
     }
     
-    if filtro == "vencidas":
+    # Filter by month/year of fecha_compromiso
+    if mes and mes != "all" and año_compromiso and año_compromiso != "all":
+        # Filter by specific month and year (YYYY-MM format)
+        prefix = f"{año_compromiso}-{mes}"
+        query["fecha_compromiso"] = {"$regex": f"^{prefix}"}
+    elif año_compromiso and año_compromiso != "all":
+        # Filter by year only
+        query["fecha_compromiso"] = {"$regex": f"^{año_compromiso}"}
+    elif mes and mes != "all":
+        # Filter by month only (any year)
+        query["fecha_compromiso"] = {"$regex": f"^\\d{{4}}-{mes}"}
+    elif filtro == "vencidas":
         query["fecha_compromiso"] = {"$lt": today, "$ne": None, "$ne": ""}
     elif filtro == "proximas":
         query["$and"] = [

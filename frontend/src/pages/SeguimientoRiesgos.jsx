@@ -114,12 +114,34 @@ export default function SeguimientoRiesgos() {
   const [filterInstitucion, setFilterInstitucion] = useState([]);
   const [filterInforme, setFilterInforme] = useState([]);
   const [filterAplicacion, setFilterAplicacion] = useState([]);
+  const [filterMes, setFilterMes] = useState("");
+  const [filterAño, setFilterAño] = useState("");
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingVuln, setViewingVuln] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
 
   const canViewModule = isAdmin || canView("vulnerabilidades");
+
+  // Generate year options (current year - 2 to current year + 2)
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
+  
+  // Month options
+  const monthOptions = [
+    { value: "01", label: "Enero" },
+    { value: "02", label: "Febrero" },
+    { value: "03", label: "Marzo" },
+    { value: "04", label: "Abril" },
+    { value: "05", label: "Mayo" },
+    { value: "06", label: "Junio" },
+    { value: "07", label: "Julio" },
+    { value: "08", label: "Agosto" },
+    { value: "09", label: "Septiembre" },
+    { value: "10", label: "Octubre" },
+    { value: "11", label: "Noviembre" },
+    { value: "12", label: "Diciembre" },
+  ];
 
   const fetchOptions = async () => {
     try {
@@ -147,6 +169,8 @@ export default function SeguimientoRiesgos() {
       if (filterInstitucion.length > 0) filterInstitucion.forEach(v => params.append("institucion", v));
       if (filterInforme.length > 0) filterInforme.forEach(v => params.append("informe_pentest", v));
       if (filterAplicacion.length > 0) filterAplicacion.forEach(v => params.append("aplicacion", v));
+      if (filterMes && filterMes !== "all") params.append("mes", filterMes);
+      if (filterAño && filterAño !== "all") params.append("año_compromiso", filterAño);
 
       const response = await axios.get(`${API}/seguimiento-riesgos?${params.toString()}`);
       setVulnerabilidades(response.data);
@@ -157,7 +181,7 @@ export default function SeguimientoRiesgos() {
     } finally {
       setLoading(false);
     }
-  }, [filterEstado, filterSeveridad, filterInstitucion, filterInforme, filterAplicacion]);
+  }, [filterEstado, filterSeveridad, filterInstitucion, filterInforme, filterAplicacion, filterMes, filterAño]);
 
   useEffect(() => {
     fetchOptions();
@@ -354,6 +378,32 @@ export default function SeguimientoRiesgos() {
               allLabel="Todos los informes"
               data-testid="filter-informe"
             />
+
+            {/* Month Filter */}
+            <Select value={filterMes} onValueChange={setFilterMes}>
+              <SelectTrigger className="w-[140px] bg-zinc-900 border-zinc-700 text-white" data-testid="filter-mes">
+                <SelectValue placeholder="Mes" />
+              </SelectTrigger>
+              <SelectContent className="bg-zinc-900 border-zinc-700">
+                <SelectItem value="all">Todos los meses</SelectItem>
+                {monthOptions.map((month) => (
+                  <SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Year Filter */}
+            <Select value={filterAño} onValueChange={setFilterAño}>
+              <SelectTrigger className="w-[120px] bg-zinc-900 border-zinc-700 text-white" data-testid="filter-año">
+                <SelectValue placeholder="Año" />
+              </SelectTrigger>
+              <SelectContent className="bg-zinc-900 border-zinc-700">
+                <SelectItem value="all">Todos los años</SelectItem>
+                {yearOptions.map((year) => (
+                  <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             {(filterEstado !== "all" || filterSeveridad || filterInstitucion.length > 0 || filterInforme.length > 0 || filterAplicacion.length > 0) && (
               <Button
