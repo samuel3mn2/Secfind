@@ -233,6 +233,7 @@ class DropdownOptions(BaseModel):
 class DashboardStats(BaseModel):
     total_vulnerabilidades: int
     criticas_abiertas: int
+    altas_abiertas: int
     vulnerabilidades_corregidas: int
     pendientes: int
     por_severidad: dict
@@ -1684,6 +1685,9 @@ async def get_dashboard_stats(
     criticas_query = {**base_query, "severidad": "Critica", "estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]}}
     criticas_abiertas = await db.vulnerabilidades.count_documents(criticas_query)
     
+    altas_query = {**base_query, "severidad": "Alta", "estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]}}
+    altas_abiertas = await db.vulnerabilidades.count_documents(altas_query)
+    
     corregidas_query = {**base_query, "estatus": {"$in": ["Corregido", "Cerrado"]}}
     corregidas = await db.vulnerabilidades.count_documents(corregidas_query)
     
@@ -1744,6 +1748,7 @@ async def get_dashboard_stats(
     return {
         "total_vulnerabilidades": total,
         "criticas_abiertas": criticas_abiertas,
+        "altas_abiertas": altas_abiertas,
         "vulnerabilidades_corregidas": corregidas,
         "pendientes": pendientes,
         "en_proceso": en_proceso,
@@ -1972,6 +1977,9 @@ async def get_kpi_detail(
     
     if tipo == "criticas_abiertas":
         query["severidad"] = "Critica"
+        query["estatus"] = {"$nin": ["Cerrado", "Corregido", "Desestimado"]}
+    elif tipo == "altas_abiertas":
+        query["severidad"] = "Alta"
         query["estatus"] = {"$nin": ["Cerrado", "Corregido", "Desestimado"]}
     elif tipo == "pendientes":
         query["estatus"] = {"$nin": ["Cerrado", "Corregido", "Desestimado"]}

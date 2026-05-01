@@ -529,6 +529,29 @@ export default function Dashboard() {
         </Card>
 
         <Card 
+          className="bg-[#18181b] border-[#27272a] kpi-card cursor-pointer hover:border-orange-500/50 transition-colors" 
+          data-testid="kpi-altas"
+          onClick={() => handleKpiClick("altas_abiertas", "Altas Abiertas")}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-zinc-500 text-xs font-medium">Altas Abiertas</p>
+                <p className="text-2xl font-bold text-orange-500 mt-1">
+                  {stats?.altas_abiertas || 0}
+                </p>
+                <p className="text-xs text-orange-400 mt-1 flex items-center gap-1">
+                  <ExternalLink className="w-3 h-3" /> Ver detalle
+                </p>
+              </div>
+              <div className="p-2 rounded-lg bg-orange-500/10">
+                <AlertTriangle className="w-5 h-5 text-orange-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
           className="bg-[#18181b] border-[#27272a] kpi-card cursor-pointer hover:border-green-500/50 transition-colors" 
           data-testid="kpi-corregidas"
           onClick={() => handleKpiClick("corregidas", "Vulnerabilidades Corregidas")}
@@ -823,6 +846,7 @@ export default function Dashboard() {
           <DialogHeader>
             <DialogTitle className="text-xl flex items-center gap-2">
               {kpiType === "criticas_abiertas" && <AlertTriangle className="w-5 h-5 text-red-500" />}
+              {kpiType === "altas_abiertas" && <AlertTriangle className="w-5 h-5 text-orange-500" />}
               {kpiType === "pendientes" && <Clock className="w-5 h-5 text-yellow-500" />}
               {kpiType === "corregidas" && <CheckCircle2 className="w-5 h-5 text-green-500" />}
               {kpiType === "total" && <Shield className="w-5 h-5 text-indigo-500" />}
