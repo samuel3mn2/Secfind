@@ -481,13 +481,13 @@ export default function Dashboard() {
       </Card>
 
       {/* KPI Cards - Clickable */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
         <Card 
           className="bg-[#18181b] border-[#27272a] kpi-card cursor-pointer hover:border-indigo-500/50 transition-colors" 
           data-testid="kpi-total"
           onClick={() => handleKpiClick("total", "Total Vulnerabilidades")}
         >
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-zinc-500 text-xs font-medium">Total</p>
@@ -510,7 +510,7 @@ export default function Dashboard() {
           data-testid="kpi-criticas"
           onClick={() => handleKpiClick("criticas_abiertas", "Críticas Abiertas")}
         >
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-zinc-500 text-xs font-medium">Críticas Abiertas</p>
@@ -533,7 +533,7 @@ export default function Dashboard() {
           data-testid="kpi-altas"
           onClick={() => handleKpiClick("altas_abiertas", "Altas Abiertas")}
         >
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-zinc-500 text-xs font-medium">Altas Abiertas</p>
@@ -556,7 +556,7 @@ export default function Dashboard() {
           data-testid="kpi-corregidas"
           onClick={() => handleKpiClick("corregidas", "Vulnerabilidades Corregidas")}
         >
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-zinc-500 text-xs font-medium">Corregidas</p>
@@ -579,7 +579,7 @@ export default function Dashboard() {
           data-testid="kpi-pendientes"
           onClick={() => handleKpiClick("pendientes", "Vulnerabilidades Pendientes")}
         >
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-zinc-500 text-xs font-medium">Pendientes</p>
@@ -602,7 +602,7 @@ export default function Dashboard() {
           data-testid="kpi-en-proceso"
           onClick={() => handleKpiClick("en_proceso", "En Proceso")}
         >
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-zinc-500 text-xs font-medium">En Proceso</p>
@@ -625,7 +625,7 @@ export default function Dashboard() {
           data-testid="kpi-para-retest"
           onClick={() => handleKpiClick("para_retest", "Para Re Test")}
         >
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-zinc-500 text-xs font-medium">Para Re Test</p>
