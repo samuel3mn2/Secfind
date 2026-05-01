@@ -197,6 +197,16 @@ export default function VistaComite() {
   const exportToCSV = () => {
     if (data.length === 0) return;
     
+    // Helper to escape CSV cell values that contain commas
+    const escapeCSV = (value) => {
+      if (value === null || value === undefined) return "";
+      const str = String(value);
+      if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+    
     const headers = ["Informe/Alcance"];
     if (selectedSeveridades.includes("Critica")) headers.push("Crítico");
     if (selectedSeveridades.includes("Alta")) headers.push("Alto");
@@ -205,12 +215,12 @@ export default function VistaComite() {
     headers.push("Responsable", "Tiempo Activo (meses)", "Pendiente/Total", "% Pendiente");
 
     const rows = data.map(row => {
-      const cells = [row.informe];
+      const cells = [escapeCSV(row.informe)];
       if (selectedSeveridades.includes("Critica")) cells.push(`${row.criticas_pendientes}/${row.criticas_total}`);
       if (selectedSeveridades.includes("Alta")) cells.push(`${row.altas_pendientes}/${row.altas_total}`);
       if (selectedSeveridades.includes("Media")) cells.push(`${row.medias_pendientes}/${row.medias_total}`);
       if (selectedSeveridades.includes("Baja")) cells.push(`${row.bajas_pendientes}/${row.bajas_total}`);
-      cells.push(row.responsable || "-");
+      cells.push(escapeCSV(row.responsable) || "-");
       cells.push(row.tiempo_activo_meses !== null ? row.tiempo_activo_meses : "-");
       // Calculate totals based on selected severities
       let pendientes = 0;

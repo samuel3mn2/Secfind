@@ -114,6 +114,7 @@ export default function SeguimientoRiesgos() {
   const [filterInstitucion, setFilterInstitucion] = useState([]);
   const [filterInforme, setFilterInforme] = useState([]);
   const [filterAplicacion, setFilterAplicacion] = useState([]);
+  const [filterResponsable, setFilterResponsable] = useState([]);
   const [filterMes, setFilterMes] = useState("");
   const [filterAño, setFilterAño] = useState("");
   const [showViewModal, setShowViewModal] = useState(false);
@@ -169,6 +170,7 @@ export default function SeguimientoRiesgos() {
       if (filterInstitucion.length > 0) filterInstitucion.forEach(v => params.append("institucion", v));
       if (filterInforme.length > 0) filterInforme.forEach(v => params.append("informe_pentest", v));
       if (filterAplicacion.length > 0) filterAplicacion.forEach(v => params.append("aplicacion", v));
+      if (filterResponsable.length > 0) filterResponsable.forEach(v => params.append("responsable", v));
       if (filterMes && filterMes !== "all") params.append("mes", filterMes);
       if (filterAño && filterAño !== "all") params.append("año_compromiso", filterAño);
 
@@ -181,7 +183,7 @@ export default function SeguimientoRiesgos() {
     } finally {
       setLoading(false);
     }
-  }, [filterEstado, filterSeveridad, filterInstitucion, filterInforme, filterAplicacion, filterMes, filterAño]);
+  }, [filterEstado, filterSeveridad, filterInstitucion, filterInforme, filterAplicacion, filterResponsable, filterMes, filterAño]);
 
   useEffect(() => {
     fetchOptions();
@@ -377,6 +379,16 @@ export default function SeguimientoRiesgos() {
               searchPlaceholder="Buscar informe..."
               allLabel="Todos los informes"
               data-testid="filter-informe"
+            />
+
+            <MultiSelectFilter
+              options={options?.responsables?.map(r => r.nombre) || []}
+              selected={filterResponsable}
+              onChange={setFilterResponsable}
+              placeholder="Responsable"
+              searchPlaceholder="Buscar responsable..."
+              allLabel="Todos los responsables"
+              data-testid="filter-responsable"
             />
 
             {/* Month Filter */}

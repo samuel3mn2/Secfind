@@ -1363,6 +1363,7 @@ async def get_vulnerabilidades(
     instituciones = request.query_params.getlist("institucion")
     aplicaciones = request.query_params.getlist("aplicacion")
     informes = request.query_params.getlist("informe_pentest")
+    responsables = request.query_params.getlist("responsable")
     
     query = {}
     if severidades:
@@ -1377,6 +1378,8 @@ async def get_vulnerabilidades(
         query["proveedor"] = proveedor
     if informes:
         query["nombre_informe_pentest"] = {"$in": informes}
+    if responsables:
+        query["responsable"] = {"$in": responsables}
     if año:
         query["fecha_hallazgo"] = {"$regex": f"^{año}"}
     if search:
@@ -1930,7 +1933,7 @@ async def get_vista_comite(
             "medias_total": data["medias_total"],
             "bajas_pendientes": data["bajas_pendientes"],
             "bajas_total": data["bajas_total"],
-            "responsable": ", ".join(responsables_list) if responsables_list else None,
+            "responsable": " | ".join(responsables_list) if responsables_list else None,
             "total_pendientes": data["total_pendientes"],
             "total_hallazgos": data["total_hallazgos"],
             "tiempo_activo_meses": tiempo_activo_meses
@@ -2045,6 +2048,11 @@ async def get_seguimiento_riesgos(
     if informes:
         query["nombre_informe_pentest"] = {"$in": informes}
     
+    # Get responsables filter
+    responsables = request.query_params.getlist("responsable")
+    if responsables:
+        query["responsable"] = {"$in": responsables}
+    
     vulns = await db.vulnerabilidades.find(query, {"_id": 0}).to_list(10000)
     
     # Add computed status for each vulnerability
@@ -2145,6 +2153,11 @@ async def export_csv(current_user: CurrentUser = Depends(get_current_user)):
     if not vulnerabilidades:
         raise HTTPException(status_code=404, detail="No hay datos para exportar")
     
+    # Convert array fields to pipe-separated strings for CSV compatibility
+    for vuln in vulnerabilidades:
+        if isinstance(vuln.get("aplicaciones"), list):
+            vuln["aplicaciones"] = " | ".join(vuln["aplicaciones"])
+    
     df = pd.DataFrame(vulnerabilidades)
     
     columns_to_remove = ['id', 'created_at', 'updated_at']
@@ -2171,6 +2184,11 @@ async def export_excel(current_user: CurrentUser = Depends(get_current_user)):
     
     if not vulnerabilidades:
         raise HTTPException(status_code=404, detail="No hay datos para exportar")
+    
+    # Convert array fields to pipe-separated strings for consistency
+    for vuln in vulnerabilidades:
+        if isinstance(vuln.get("aplicaciones"), list):
+            vuln["aplicaciones"] = " | ".join(vuln["aplicaciones"])
     
     df = pd.DataFrame(vulnerabilidades)
     
@@ -3020,7 +3038,7 @@ async def get_reporte_vista_comite(
             "medias_total": data["medias_total"],
             "bajas_pendientes": data["bajas_pendientes"],
             "bajas_total": data["bajas_total"],
-            "responsable": ", ".join(responsables_list) if responsables_list else None,
+            "responsable": " | ".join(responsables_list) if responsables_list else None,
             "total_pendientes": data["total_pendientes"],
             "total_hallazgos": data["total_hallazgos"],
             "tiempo_activo_meses": tiempo_activo_meses

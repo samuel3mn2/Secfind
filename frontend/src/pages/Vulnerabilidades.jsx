@@ -225,6 +225,7 @@ export default function Vulnerabilidades() {
   const [filterAño, setFilterAño] = useState("");
   const [filterAplicacion, setFilterAplicacion] = useState([]);
   const [filterInforme, setFilterInforme] = useState([]);
+  const [filterResponsable, setFilterResponsable] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingVuln, setViewingVuln] = useState(null);
@@ -309,6 +310,7 @@ export default function Vulnerabilidades() {
       if (filterAño && filterAño !== "all") params.append("año", filterAño);
       if (filterAplicacion.length > 0) filterAplicacion.forEach(v => params.append("aplicacion", v));
       if (filterInforme.length > 0) filterInforme.forEach(v => params.append("informe_pentest", v));
+      if (filterResponsable.length > 0) filterResponsable.forEach(v => params.append("responsable", v));
 
       const response = await axios.get(`${API}/vulnerabilidades?${params.toString()}`);
       setVulnerabilidades(response.data);
@@ -319,7 +321,7 @@ export default function Vulnerabilidades() {
     } finally {
       setLoading(false);
     }
-  }, [search, filterSeveridad, filterEstatus, filterInstitucion, filterAño, filterAplicacion, filterInforme]);
+  }, [search, filterSeveridad, filterEstatus, filterInstitucion, filterAño, filterAplicacion, filterInforme, filterResponsable]);
 
   useEffect(() => {
     fetchOptions();
@@ -449,7 +451,7 @@ export default function Vulnerabilidades() {
   const formatAplicaciones = (vuln) => {
     const apps = vuln.aplicaciones || [];
     if (apps.length === 0) return vuln.aplicacion || "-";
-    return apps.join(", ");
+    return apps.join(" | ");
   };
 
   // Bulk selection helpers
@@ -651,6 +653,16 @@ export default function Vulnerabilidades() {
                 searchPlaceholder="Buscar informe..."
                 allLabel="Todos los informes"
                 data-testid="filter-informe"
+              />
+
+              <MultiSelectFilter
+                options={options?.responsables?.map(r => r.nombre) || []}
+                selected={filterResponsable}
+                onChange={setFilterResponsable}
+                placeholder="Responsable"
+                searchPlaceholder="Buscar responsable..."
+                allLabel="Todos los responsables"
+                data-testid="filter-responsable"
               />
 
               {/* Import/Export */}
