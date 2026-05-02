@@ -1,5 +1,10 @@
 # SecFind - Sistema de Gestión de Vulnerabilidades
 
+## Última Actualización: 2025-12-01
+
+### Cambios Recientes
+- **Filtro Anual en Dashboard**: Agregada opción "Anual" en la gráfica de Evolución de Vulnerabilidades para ver el progreso año por año
+
 ## Problema Original
 Aplicación web para la Gestión de Vulnerabilidades de Ciberseguridad, reemplazando un flujo de trabajo basado en Excel. Permite operaciones CRUD sobre hallazgos de pentests con Dashboard visual e intuitivo para presentaciones ejecutivas.
 

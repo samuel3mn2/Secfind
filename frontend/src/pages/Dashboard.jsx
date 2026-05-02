@@ -659,6 +659,7 @@ export default function Dashboard() {
               <SelectContent className="bg-zinc-900 border-zinc-700">
                 <SelectItem value="mensual">Mensual</SelectItem>
                 <SelectItem value="trimestral">Trimestral</SelectItem>
+                <SelectItem value="anual">Anual</SelectItem>
               </SelectContent>
             </Select>
           </div>

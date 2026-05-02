@@ -1781,7 +1781,9 @@ async def get_dashboard_tendencias(
             year = fecha[:4]
             month = fecha[5:7] if len(fecha) >= 7 else "01"
             
-            if tipo == "trimestral":
+            if tipo == "anual":
+                periodo = year
+            elif tipo == "trimestral":
                 quarter = (int(month) - 1) // 3 + 1
                 periodo = f"{year}-Q{quarter}"
             else:
