@@ -1349,19 +1349,15 @@ export default function Vulnerabilidades() {
 
                 <div className="space-y-2">
                   <Label className="text-zinc-400">Nombre Informe Pentest</Label>
-                  <Select
+                  <SearchableSelect
+                    options={options?.informes_pentest || []}
                     value={formData.nombre_informe_pentest || ""}
-                    onValueChange={(v) => setFormData({ ...formData, nombre_informe_pentest: v })}
-                  >
-                    <SelectTrigger className="bg-black/20 border-zinc-700 text-white" data-testid="input-nombre-informe">
-                      <SelectValue placeholder="Seleccionar..." />
-                    </SelectTrigger>
-                    <SelectContent className="bg-zinc-900 border-zinc-700 max-h-[300px]">
-                      {options?.informes_pentest?.map((i) => (
-                        <SelectItem key={i} value={i}>{i}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onChange={(v) => setFormData({ ...formData, nombre_informe_pentest: v })}
+                    placeholder="Seleccionar informe..."
+                    searchPlaceholder="Buscar informe..."
+                    emptyText="No se encontraron informes"
+                    data-testid="input-nombre-informe"
+                  />
                 </div>
               </div>
 
