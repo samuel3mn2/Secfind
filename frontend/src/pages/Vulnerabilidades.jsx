@@ -577,21 +577,21 @@ export default function Vulnerabilidades() {
       {/* Filters & Actions */}
       <Card className="bg-[#18181b] border-[#27272a]">
         <CardContent className="p-4">
-          <div className="flex flex-col lg:flex-row gap-4">
-            {/* Search */}
-            <div className="relative flex-1">
+          <div className="space-y-4">
+            {/* Search - Full width row */}
+            <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 z-10" />
               <Input
                 placeholder="Buscar por vulnerabilidad, aplicación, responsable..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-10 bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-500 focus:text-white"
+                className="pl-10 bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-500 focus:text-white w-full"
                 style={{ color: 'white' }}
                 data-testid="search-input"
               />
             </div>
 
-            {/* Filters */}
+            {/* Filters Row */}
             <div className="flex flex-wrap gap-2">
               <Select value={filterAño} onValueChange={setFilterAño}>
                 <SelectTrigger className="w-[100px] bg-black/20 border-zinc-700 text-white" data-testid="filter-año">
