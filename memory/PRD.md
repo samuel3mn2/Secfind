@@ -5,6 +5,8 @@
 ### Cambios Recientes
 - **Filtro Anual en Dashboard**: Agregada opción "Anual" en la gráfica de Evolución de Vulnerabilidades para ver el progreso año por año
 - **Filtro por Año Específico**: Agregado selector para filtrar la gráfica de tendencias por un año específico (2023, 2024, 2025, 2026) o ver todos los años
+- **Filtro Tipo Fecha en Seguimiento**: Agregado filtro "Todas / Con fecha / Sin fecha" para mostrar todas las vulnerabilidades pendientes, solo las que tienen fecha de compromiso, o solo las que no la tienen
+- **Bug fix MongoDB**: Corregida query que usaba múltiples `$ne` incorrectamente, ahora usa `$nin` para filtrar valores nulos y vacíos
 
 ## Problema Original
 Aplicación web para la Gestión de Vulnerabilidades de Ciberseguridad, reemplazando un flujo de trabajo basado en Excel. Permite operaciones CRUD sobre hallazgos de pentests con Dashboard visual e intuitivo para presentaciones ejecutivas.

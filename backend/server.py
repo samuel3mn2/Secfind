@@ -2008,13 +2008,14 @@ async def get_seguimiento_riesgos(
     filtro: Optional[str] = None,  # "vencidas", "proximas", "todas"
     mes: Optional[str] = None,  # "01" to "12"
     año_compromiso: Optional[str] = None,  # "2024", "2025", etc.
+    tipo_fecha: Optional[str] = "con_fecha",  # "con_fecha", "sin_fecha", "todas"
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """
-    Get vulnerabilities with fecha_compromiso for risk tracking.
+    Get vulnerabilities for risk tracking.
+    - tipo_fecha: "con_fecha" (only with fecha_compromiso), "sin_fecha" (without), "todas" (all pending)
     - vencidas: past due date, not resolved
     - proximas: due within next 30 days
-    - todas: all with fecha_compromiso
     - mes/año_compromiso: filter by specific month/year of fecha_compromiso
     """
     if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
@@ -2029,30 +2030,41 @@ async def get_seguimiento_riesgos(
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     future_30 = (datetime.now(timezone.utc) + timedelta(days=30)).strftime("%Y-%m-%d")
     
-    # Base query: has fecha_compromiso and not resolved
+    # Base query: not resolved
     query = {
-        "fecha_compromiso": {"$exists": True, "$ne": None, "$ne": ""},
         "estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]}
     }
     
-    # Filter by month/year of fecha_compromiso
-    if mes and mes != "all" and año_compromiso and año_compromiso != "all":
-        # Filter by specific month and year (YYYY-MM format)
-        prefix = f"{año_compromiso}-{mes}"
-        query["fecha_compromiso"] = {"$regex": f"^{prefix}"}
-    elif año_compromiso and año_compromiso != "all":
-        # Filter by year only
-        query["fecha_compromiso"] = {"$regex": f"^{año_compromiso}"}
-    elif mes and mes != "all":
-        # Filter by month only (any year)
-        query["fecha_compromiso"] = {"$regex": f"^\\d{{4}}-{mes}"}
-    elif filtro == "vencidas":
-        query["fecha_compromiso"] = {"$lt": today, "$ne": None, "$ne": ""}
-    elif filtro == "proximas":
-        query["$and"] = [
-            {"fecha_compromiso": {"$gte": today}},
-            {"fecha_compromiso": {"$lte": future_30}}
+    # Filter by tipo_fecha
+    if tipo_fecha == "sin_fecha":
+        query["$or"] = [
+            {"fecha_compromiso": {"$exists": False}},
+            {"fecha_compromiso": None},
+            {"fecha_compromiso": ""}
         ]
+    elif tipo_fecha == "con_fecha":
+        query["fecha_compromiso"] = {"$exists": True, "$nin": [None, ""]}
+    # tipo_fecha == "todas" - no fecha_compromiso filter
+    
+    # Filter by month/year of fecha_compromiso (only applies when tipo_fecha is "con_fecha" or "todas")
+    if tipo_fecha != "sin_fecha":
+        if mes and mes != "all" and año_compromiso and año_compromiso != "all":
+            # Filter by specific month and year (YYYY-MM format)
+            prefix = f"{año_compromiso}-{mes}"
+            query["fecha_compromiso"] = {"$regex": f"^{prefix}"}
+        elif año_compromiso and año_compromiso != "all":
+            # Filter by year only
+            query["fecha_compromiso"] = {"$regex": f"^{año_compromiso}"}
+        elif mes and mes != "all":
+            # Filter by month only (any year)
+            query["fecha_compromiso"] = {"$regex": f"^\\d{{4}}-{mes}"}
+        elif filtro == "vencidas":
+            query["fecha_compromiso"] = {"$lt": today, "$nin": [None, ""]}
+        elif filtro == "proximas":
+            query["$and"] = [
+                {"fecha_compromiso": {"$gte": today}},
+                {"fecha_compromiso": {"$lte": future_30}}
+            ]
     
     if severidades:
         query["severidad"] = {"$in": severidades}
@@ -2116,19 +2128,19 @@ async def get_seguimiento_resumen(current_user: CurrentUser = Depends(get_curren
     future_30 = (datetime.now(timezone.utc) + timedelta(days=30)).strftime("%Y-%m-%d")
     
     base_query = {
-        "fecha_compromiso": {"$exists": True, "$ne": None, "$ne": ""},
+        "fecha_compromiso": {"$exists": True, "$nin": [None, ""]},
         "estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]}
     }
     
     # Count overdue
     vencidas = await db.vulnerabilidades.count_documents({
         **base_query,
-        "fecha_compromiso": {"$lt": today, "$ne": None, "$ne": ""}
+        "fecha_compromiso": {"$lt": today, "$nin": [None, ""]}
     })
     
     # Count critical (due within 7 days)
     criticas_query = {
-        "fecha_compromiso": {"$exists": True, "$ne": None, "$ne": ""},
+        "fecha_compromiso": {"$exists": True, "$nin": [None, ""]},
         "estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]},
         "$and": [
             {"fecha_compromiso": {"$gte": today}},
@@ -2139,7 +2151,7 @@ async def get_seguimiento_resumen(current_user: CurrentUser = Depends(get_curren
     
     # Count upcoming (due within 30 days)
     proximas_query = {
-        "fecha_compromiso": {"$exists": True, "$ne": None, "$ne": ""},
+        "fecha_compromiso": {"$exists": True, "$nin": [None, ""]},
         "estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]},
         "$and": [
             {"fecha_compromiso": {"$gt": future_7}},

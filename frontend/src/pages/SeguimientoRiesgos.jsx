@@ -117,6 +117,7 @@ export default function SeguimientoRiesgos() {
   const [filterResponsable, setFilterResponsable] = useState([]);
   const [filterMes, setFilterMes] = useState("");
   const [filterAño, setFilterAño] = useState("");
+  const [filterTipoFecha, setFilterTipoFecha] = useState("todas");  // "con_fecha", "sin_fecha", "todas"
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingVuln, setViewingVuln] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -173,6 +174,7 @@ export default function SeguimientoRiesgos() {
       if (filterResponsable.length > 0) filterResponsable.forEach(v => params.append("responsable", v));
       if (filterMes && filterMes !== "all") params.append("mes", filterMes);
       if (filterAño && filterAño !== "all") params.append("año_compromiso", filterAño);
+      if (filterTipoFecha) params.append("tipo_fecha", filterTipoFecha);
 
       const response = await axios.get(`${API}/seguimiento-riesgos?${params.toString()}`);
       setVulnerabilidades(response.data);
@@ -183,7 +185,7 @@ export default function SeguimientoRiesgos() {
     } finally {
       setLoading(false);
     }
-  }, [filterEstado, filterSeveridad, filterInstitucion, filterInforme, filterAplicacion, filterResponsable, filterMes, filterAño]);
+  }, [filterEstado, filterSeveridad, filterInstitucion, filterInforme, filterAplicacion, filterResponsable, filterMes, filterAño, filterTipoFecha]);
 
   useEffect(() => {
     fetchOptions();
@@ -246,7 +248,7 @@ export default function SeguimientoRiesgos() {
             Seguimiento de Riesgos
           </h1>
           <p className="text-zinc-500 mt-1">
-            Vulnerabilidades con fecha de compromiso pendiente
+            Control y seguimiento de vulnerabilidades pendientes
           </p>
         </div>
         <Button
@@ -341,6 +343,18 @@ export default function SeguimientoRiesgos() {
       <Card className="bg-[#18181b] border-[#27272a]">
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-4">
+            {/* Tipo Fecha Filter - NEW */}
+            <Select value={filterTipoFecha} onValueChange={setFilterTipoFecha}>
+              <SelectTrigger className="w-[150px] bg-zinc-900 border-zinc-700 text-white" data-testid="filter-tipo-fecha">
+                <SelectValue placeholder="Tipo fecha" />
+              </SelectTrigger>
+              <SelectContent className="bg-zinc-900 border-zinc-700">
+                <SelectItem value="todas">Todas</SelectItem>
+                <SelectItem value="con_fecha">Con fecha</SelectItem>
+                <SelectItem value="sin_fecha">Sin fecha</SelectItem>
+              </SelectContent>
+            </Select>
+
             <MultiSelectFilter
               options={options?.severidades || []}
               selected={filterSeveridad}
