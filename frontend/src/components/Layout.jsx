@@ -1,8 +1,10 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { Shield, LayoutDashboard, List, Menu, X, Settings, LogOut, User, CalendarClock, Users, History } from "lucide-react";
+import { Shield, LayoutDashboard, List, Menu, X, Settings, LogOut, User, CalendarClock, Users, History, Key } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,15 +13,70 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
+import axios from "axios";
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  });
+  const [changingPassword, setChangingPassword] = useState(false);
   const { user, logout, isAdmin, canView } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
     logout();
     navigate("/login");
+  };
+
+  const handleChangePassword = async () => {
+    // Validations
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+      toast.error("Todos los campos son requeridos");
+      return;
+    }
+    if (passwordForm.newPassword.length < 4) {
+      toast.error("La nueva contraseña debe tener al menos 4 caracteres");
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast.error("Las contraseñas nuevas no coinciden");
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      await axios.post(`${API}/auth/change-password`, {
+        current_password: passwordForm.currentPassword,
+        new_password: passwordForm.newPassword
+      });
+      toast.success("Contraseña actualizada correctamente");
+      setShowPasswordModal(false);
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    } catch (error) {
+      const message = error.response?.data?.detail || "Error al cambiar la contraseña";
+      toast.error(message);
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const openPasswordModal = () => {
+    setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    setShowPasswordModal(true);
   };
 
   const navItems = [
@@ -142,6 +199,14 @@ export const Layout = () => {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-zinc-700" />
                 <DropdownMenuItem 
+                  className="text-zinc-300 focus:text-white focus:bg-white/10 cursor-pointer"
+                  onClick={openPasswordModal}
+                  data-testid="change-password-btn"
+                >
+                  <Key className="w-4 h-4 mr-2" />
+                  Cambiar Contraseña
+                </DropdownMenuItem>
+                <DropdownMenuItem 
                   className="text-red-400 focus:text-red-400 focus:bg-red-500/10 cursor-pointer"
                   onClick={handleLogout}
                   data-testid="logout-btn"
@@ -190,6 +255,13 @@ export const Layout = () => {
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-zinc-700" />
               <DropdownMenuItem 
+                className="text-zinc-300 focus:text-white focus:bg-white/10 cursor-pointer"
+                onClick={openPasswordModal}
+              >
+                <Key className="w-4 h-4 mr-2" />
+                Cambiar Contraseña
+              </DropdownMenuItem>
+              <DropdownMenuItem 
                 className="text-red-400 focus:text-red-400 cursor-pointer"
                 onClick={handleLogout}
               >
@@ -205,6 +277,73 @@ export const Layout = () => {
           <Outlet />
         </main>
       </div>
+
+      {/* Change Password Modal */}
+      <Dialog open={showPasswordModal} onOpenChange={setShowPasswordModal}>
+        <DialogContent className="bg-zinc-900 border-zinc-700 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="w-5 h-5 text-indigo-400" />
+              Cambiar Contraseña
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="current-password" className="text-zinc-300">Contraseña Actual</Label>
+              <Input
+                id="current-password"
+                type="password"
+                value={passwordForm.currentPassword}
+                onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                className="bg-zinc-800 border-zinc-700 text-white"
+                placeholder="Ingresa tu contraseña actual"
+                data-testid="current-password-input"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-password" className="text-zinc-300">Nueva Contraseña</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={passwordForm.newPassword}
+                onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                className="bg-zinc-800 border-zinc-700 text-white"
+                placeholder="Ingresa tu nueva contraseña"
+                data-testid="new-password-input"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password" className="text-zinc-300">Confirmar Nueva Contraseña</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={passwordForm.confirmPassword}
+                onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                className="bg-zinc-800 border-zinc-700 text-white"
+                placeholder="Confirma tu nueva contraseña"
+                data-testid="confirm-password-input"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowPasswordModal(false)}
+              className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleChangePassword}
+              disabled={changingPassword}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              data-testid="save-password-btn"
+            >
+              {changingPassword ? "Guardando..." : "Guardar Cambios"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -446,6 +446,46 @@ async def get_me(current_user: CurrentUser = Depends(get_current_user)):
         created_at=user.get("created_at", datetime.now(timezone.utc))
     )
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+@api_router.post("/auth/change-password")
+async def change_password(data: ChangePasswordRequest, current_user: CurrentUser = Depends(get_current_user)):
+    """Allow any authenticated user to change their own password"""
+    # Get user with password hash
+    user = await db.usuarios.find_one({"id": current_user.id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # Verify current password
+    if not verify_password(data.current_password, user.get("password_hash", "")):
+        raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta")
+    
+    # Validate new password
+    if len(data.new_password) < 4:
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 4 caracteres")
+    
+    # Update password
+    new_hash = hash_password(data.new_password)
+    await db.usuarios.update_one(
+        {"id": current_user.id},
+        {"$set": {"password_hash": new_hash}}
+    )
+    
+    # Log the action in audit history
+    await registrar_cambio(
+        entidad="usuario",
+        entidad_id=current_user.id,
+        entidad_nombre=current_user.username,
+        accion="cambio_contraseña",
+        usuario_id=current_user.id,
+        usuario_nombre=current_user.username,
+        cambios=[{"campo": "password", "valor_anterior": "****", "valor_nuevo": "****"}]
+    )
+    
+    return {"message": "Contraseña actualizada correctamente"}
+
 # ============ USER MANAGEMENT ROUTES ============
 
 @api_router.get("/config/usuarios", response_model=List[UsuarioResponse])
