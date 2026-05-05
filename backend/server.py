@@ -1761,6 +1761,7 @@ async def get_dashboard_stats(
 @api_router.get("/dashboard/tendencias")
 async def get_dashboard_tendencias(
     tipo: str = "mensual",
+    año: str = None,
     current_user: CurrentUser = Depends(get_current_user)
 ):
     if not current_user.es_admin and not current_user.permisos.dashboard.ver:
@@ -1780,6 +1781,10 @@ async def get_dashboard_tendencias(
         try:
             year = fecha[:4]
             month = fecha[5:7] if len(fecha) >= 7 else "01"
+            
+            # Filter by year if specified
+            if año and year != año:
+                continue
             
             if tipo == "anual":
                 periodo = year

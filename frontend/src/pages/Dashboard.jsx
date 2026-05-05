@@ -133,6 +133,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [options, setOptions] = useState(null);
   const [tipoTendencia, setTipoTendencia] = useState("mensual");
+  const [añoTendencia, setAñoTendencia] = useState("");  // Empty = all years
   
   // Filters
   const [filterAño, setFilterAño] = useState("");
@@ -164,7 +165,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchTendencias();
-  }, [tipoTendencia]);
+  }, [tipoTendencia, añoTendencia]);
 
   const fetchOptions = async () => {
     try {
@@ -177,7 +178,10 @@ export default function Dashboard() {
 
   const fetchTendencias = async () => {
     try {
-      const response = await axios.get(`${API}/dashboard/tendencias?tipo=${tipoTendencia}`);
+      const params = new URLSearchParams();
+      params.append("tipo", tipoTendencia);
+      if (añoTendencia && añoTendencia !== "all") params.append("año", añoTendencia);
+      const response = await axios.get(`${API}/dashboard/tendencias?${params.toString()}`);
       setTendencias(response.data);
     } catch (error) {
       console.error("Error fetching tendencias:", error);
@@ -647,21 +651,36 @@ export default function Dashboard() {
       {/* Tendencias Chart - NEW */}
       <Card className="bg-[#18181b] border-[#27272a]" data-testid="chart-tendencias">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <CardTitle className="text-lg text-white flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-indigo-500" />
               Evolución de Vulnerabilidades
             </CardTitle>
-            <Select value={tipoTendencia} onValueChange={setTipoTendencia}>
-              <SelectTrigger className="w-[140px] bg-black/20 border-zinc-700 text-white" data-testid="tendencia-tipo">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-zinc-900 border-zinc-700">
-                <SelectItem value="mensual">Mensual</SelectItem>
-                <SelectItem value="trimestral">Trimestral</SelectItem>
-                <SelectItem value="anual">Anual</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              {/* Year Filter */}
+              <Select value={añoTendencia} onValueChange={setAñoTendencia}>
+                <SelectTrigger className="w-[130px] bg-black/20 border-zinc-700 text-white" data-testid="tendencia-año">
+                  <SelectValue placeholder="Todos los años" />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-900 border-zinc-700">
+                  <SelectItem value="all">Todos los años</SelectItem>
+                  {options?.años?.map((año) => (
+                    <SelectItem key={año} value={String(año)}>{año}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {/* Type Filter */}
+              <Select value={tipoTendencia} onValueChange={setTipoTendencia}>
+                <SelectTrigger className="w-[120px] bg-black/20 border-zinc-700 text-white" data-testid="tendencia-tipo">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-900 border-zinc-700">
+                  <SelectItem value="mensual">Mensual</SelectItem>
+                  <SelectItem value="trimestral">Trimestral</SelectItem>
+                  <SelectItem value="anual">Anual</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
