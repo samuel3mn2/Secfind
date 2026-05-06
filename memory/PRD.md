@@ -8,6 +8,7 @@
 - **Filtro Tipo Fecha en Seguimiento**: Agregado filtro "Todas / Con fecha / Sin fecha" para mostrar todas las vulnerabilidades pendientes, solo las que tienen fecha de compromiso, o solo las que no la tienen
 - **Bug fix MongoDB**: Corregida query que usaba múltiples `$ne` incorrectamente, ahora usa `$nin` para filtrar valores nulos y vacíos
 - **Cambio de Contraseña**: Los usuarios ahora pueden cambiar su propia contraseña desde el menú de usuario, sin necesidad de acceso al módulo de Configuración
+- **Exportación con Filtros**: La exportación a Excel/CSV ahora respeta los filtros aplicados y las columnas seleccionadas por el usuario
 
 ## Problema Original
 Aplicación web para la Gestión de Vulnerabilidades de Ciberseguridad, reemplazando un flujo de trabajo basado en Excel. Permite operaciones CRUD sobre hallazgos de pentests con Dashboard visual e intuitivo para presentaciones ejecutivas.

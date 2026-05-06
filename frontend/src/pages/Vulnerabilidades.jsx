@@ -407,7 +407,30 @@ export default function Vulnerabilidades() {
 
   const handleExport = async (format) => {
     try {
-      const response = await axios.get(`${API}/export/${format}`, {
+      // Build query params with current filters
+      const params = new URLSearchParams();
+      
+      // Add search filter
+      if (search) params.append("search", search);
+      
+      // Add year filter
+      if (filterAño && filterAño !== "all") params.append("año", filterAño);
+      
+      // Add multi-select filters
+      if (filterSeveridad.length > 0) filterSeveridad.forEach(v => params.append("severidad", v));
+      if (filterEstatus.length > 0) filterEstatus.forEach(v => params.append("estatus", v));
+      if (filterInstitucion.length > 0) filterInstitucion.forEach(v => params.append("institucion", v));
+      if (filterAplicacion.length > 0) filterAplicacion.forEach(v => params.append("aplicacion", v));
+      if (filterInforme.length > 0) filterInforme.forEach(v => params.append("informe_pentest", v));
+      if (filterResponsable.length > 0) filterResponsable.forEach(v => params.append("responsable", v));
+      
+      // Add visible columns
+      const visibleColumnIds = columns.filter(col => col.visible).map(col => col.id);
+      if (visibleColumnIds.length > 0) {
+        params.append("columnas", visibleColumnIds.join(","));
+      }
+      
+      const response = await axios.get(`${API}/export/${format}?${params.toString()}`, {
         responseType: "blob",
       });
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -420,7 +443,11 @@ export default function Vulnerabilidades() {
       toast.success(`Exportado a ${format.toUpperCase()} exitosamente`);
     } catch (error) {
       console.error("Error exporting:", error);
-      toast.error("Error al exportar");
+      if (error.response?.status === 404) {
+        toast.error("No hay datos para exportar con los filtros seleccionados");
+      } else {
+        toast.error("Error al exportar");
+      }
     }
   };
 

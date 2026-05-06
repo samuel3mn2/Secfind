@@ -2211,11 +2211,50 @@ async def get_seguimiento_resumen(current_user: CurrentUser = Depends(get_curren
     }
 
 @api_router.get("/export/csv")
-async def export_csv(current_user: CurrentUser = Depends(get_current_user)):
+async def export_csv(
+    request: Request,
+    search: Optional[str] = None,
+    año: Optional[str] = None,
+    columnas: Optional[str] = None,  # Comma-separated column names
+    current_user: CurrentUser = Depends(get_current_user)
+):
     if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
         raise HTTPException(status_code=403, detail="No tiene permisos para exportar")
     
-    vulnerabilidades = await db.vulnerabilidades.find({}, {"_id": 0}).to_list(10000)
+    # Build query with filters
+    query = {}
+    
+    # Get multi-value params
+    severidades = request.query_params.getlist("severidad")
+    estatus_list = request.query_params.getlist("estatus")
+    instituciones = request.query_params.getlist("institucion")
+    aplicaciones = request.query_params.getlist("aplicacion")
+    informes = request.query_params.getlist("informe_pentest")
+    responsables = request.query_params.getlist("responsable")
+    
+    if severidades:
+        query["severidad"] = {"$in": severidades}
+    if estatus_list:
+        query["estatus"] = {"$in": estatus_list}
+    if instituciones:
+        query["institucion"] = {"$in": instituciones}
+    if aplicaciones:
+        query["aplicaciones"] = {"$in": aplicaciones}
+    if informes:
+        query["nombre_informe_pentest"] = {"$in": informes}
+    if responsables:
+        query["responsables"] = {"$in": responsables}
+    if año and año != "all":
+        query["fecha_hallazgo"] = {"$regex": f"^{año}"}
+    if search:
+        query["$or"] = [
+            {"vulnerabilidad": {"$regex": search, "$options": "i"}},
+            {"aplicaciones": {"$regex": search, "$options": "i"}},
+            {"responsables": {"$regex": search, "$options": "i"}},
+            {"institucion": {"$regex": search, "$options": "i"}}
+        ]
+    
+    vulnerabilidades = await db.vulnerabilidades.find(query, {"_id": 0}).to_list(10000)
     
     if not vulnerabilidades:
         raise HTTPException(status_code=404, detail="No hay datos para exportar")
@@ -2224,13 +2263,41 @@ async def export_csv(current_user: CurrentUser = Depends(get_current_user)):
     for vuln in vulnerabilidades:
         if isinstance(vuln.get("aplicaciones"), list):
             vuln["aplicaciones"] = " | ".join(vuln["aplicaciones"])
+        if isinstance(vuln.get("responsables"), list):
+            vuln["responsables"] = " | ".join(vuln["responsables"])
     
     df = pd.DataFrame(vulnerabilidades)
     
+    # Remove internal columns
     columns_to_remove = ['id', 'created_at', 'updated_at']
     for col in columns_to_remove:
         if col in df.columns:
             df = df.drop(columns=[col])
+    
+    # Filter columns if specified
+    if columnas:
+        selected_cols = [c.strip() for c in columnas.split(",")]
+        # Map frontend column IDs to backend field names
+        column_map = {
+            "fecha_hallazgo": "fecha_hallazgo",
+            "institucion": "institucion", 
+            "aplicaciones": "aplicaciones",
+            "vulnerabilidad": "vulnerabilidad",
+            "recomendaciones": "recomendaciones",
+            "severidad": "severidad",
+            "estatus": "estatus",
+            "responsables": "responsables",
+            "nombre_informe_pentest": "nombre_informe_pentest",
+            "fecha_compromiso": "fecha_compromiso",
+            "resultado_re_test": "resultado_re_test",
+            "riesgo_asociado": "riesgo_asociado",
+            "descripcion_riesgo": "descripcion_riesgo",
+            "proveedor": "proveedor",
+            "veces_retest": "veces_retest"
+        }
+        cols_to_keep = [column_map.get(c, c) for c in selected_cols if column_map.get(c, c) in df.columns]
+        if cols_to_keep:
+            df = df[cols_to_keep]
     
     output = io.StringIO()
     df.to_csv(output, index=False, encoding='utf-8')
@@ -2243,11 +2310,50 @@ async def export_csv(current_user: CurrentUser = Depends(get_current_user)):
     )
 
 @api_router.get("/export/excel")
-async def export_excel(current_user: CurrentUser = Depends(get_current_user)):
+async def export_excel(
+    request: Request,
+    search: Optional[str] = None,
+    año: Optional[str] = None,
+    columnas: Optional[str] = None,  # Comma-separated column names
+    current_user: CurrentUser = Depends(get_current_user)
+):
     if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
         raise HTTPException(status_code=403, detail="No tiene permisos para exportar")
     
-    vulnerabilidades = await db.vulnerabilidades.find({}, {"_id": 0}).to_list(10000)
+    # Build query with filters
+    query = {}
+    
+    # Get multi-value params
+    severidades = request.query_params.getlist("severidad")
+    estatus_list = request.query_params.getlist("estatus")
+    instituciones = request.query_params.getlist("institucion")
+    aplicaciones = request.query_params.getlist("aplicacion")
+    informes = request.query_params.getlist("informe_pentest")
+    responsables = request.query_params.getlist("responsable")
+    
+    if severidades:
+        query["severidad"] = {"$in": severidades}
+    if estatus_list:
+        query["estatus"] = {"$in": estatus_list}
+    if instituciones:
+        query["institucion"] = {"$in": instituciones}
+    if aplicaciones:
+        query["aplicaciones"] = {"$in": aplicaciones}
+    if informes:
+        query["nombre_informe_pentest"] = {"$in": informes}
+    if responsables:
+        query["responsables"] = {"$in": responsables}
+    if año and año != "all":
+        query["fecha_hallazgo"] = {"$regex": f"^{año}"}
+    if search:
+        query["$or"] = [
+            {"vulnerabilidad": {"$regex": search, "$options": "i"}},
+            {"aplicaciones": {"$regex": search, "$options": "i"}},
+            {"responsables": {"$regex": search, "$options": "i"}},
+            {"institucion": {"$regex": search, "$options": "i"}}
+        ]
+    
+    vulnerabilidades = await db.vulnerabilidades.find(query, {"_id": 0}).to_list(10000)
     
     if not vulnerabilidades:
         raise HTTPException(status_code=404, detail="No hay datos para exportar")
@@ -2256,13 +2362,41 @@ async def export_excel(current_user: CurrentUser = Depends(get_current_user)):
     for vuln in vulnerabilidades:
         if isinstance(vuln.get("aplicaciones"), list):
             vuln["aplicaciones"] = " | ".join(vuln["aplicaciones"])
+        if isinstance(vuln.get("responsables"), list):
+            vuln["responsables"] = " | ".join(vuln["responsables"])
     
     df = pd.DataFrame(vulnerabilidades)
     
+    # Remove internal columns
     columns_to_remove = ['id', 'created_at', 'updated_at']
     for col in columns_to_remove:
         if col in df.columns:
             df = df.drop(columns=[col])
+    
+    # Filter columns if specified
+    if columnas:
+        selected_cols = [c.strip() for c in columnas.split(",")]
+        # Map frontend column IDs to backend field names
+        column_map = {
+            "fecha_hallazgo": "fecha_hallazgo",
+            "institucion": "institucion", 
+            "aplicaciones": "aplicaciones",
+            "vulnerabilidad": "vulnerabilidad",
+            "recomendaciones": "recomendaciones",
+            "severidad": "severidad",
+            "estatus": "estatus",
+            "responsables": "responsables",
+            "nombre_informe_pentest": "nombre_informe_pentest",
+            "fecha_compromiso": "fecha_compromiso",
+            "resultado_re_test": "resultado_re_test",
+            "riesgo_asociado": "riesgo_asociado",
+            "descripcion_riesgo": "descripcion_riesgo",
+            "proveedor": "proveedor",
+            "veces_retest": "veces_retest"
+        }
+        cols_to_keep = [column_map.get(c, c) for c in selected_cols if column_map.get(c, c) in df.columns]
+        if cols_to_keep:
+            df = df[cols_to_keep]
     
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
