@@ -425,9 +425,8 @@ export default function Vulnerabilidades() {
       if (filterResponsable.length > 0) filterResponsable.forEach(v => params.append("responsable", v));
       
       // Add visible columns
-      const visibleColumnIds = columns.filter(col => col.visible).map(col => col.id);
-      if (visibleColumnIds.length > 0) {
-        params.append("columnas", visibleColumnIds.join(","));
+      if (visibleColumns.length > 0) {
+        params.append("columnas", visibleColumns.join(","));
       }
       
       const response = await axios.get(`${API}/export/${format}?${params.toString()}`, {
