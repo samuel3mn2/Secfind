@@ -9,6 +9,7 @@
 - **Bug fix MongoDB**: Corregida query que usaba múltiples `$ne` incorrectamente, ahora usa `$nin` para filtrar valores nulos y vacíos
 - **Cambio de Contraseña**: Los usuarios ahora pueden cambiar su propia contraseña desde el menú de usuario, sin necesidad de acceso al módulo de Configuración
 - **Exportación con Filtros**: La exportación a Excel/CSV ahora respeta los filtros aplicados y las columnas seleccionadas por el usuario
+- **Cambio de Contraseña Obligatorio**: Los nuevos usuarios deben cambiar su contraseña en el primer inicio de sesión para evitar contraseñas genéricas
 
 ## Problema Original
 Aplicación web para la Gestión de Vulnerabilidades de Ciberseguridad, reemplazando un flujo de trabajo basado en Excel. Permite operaciones CRUD sobre hallazgos de pentests con Dashboard visual e intuitivo para presentaciones ejecutivas.

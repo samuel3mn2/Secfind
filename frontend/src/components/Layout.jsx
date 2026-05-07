@@ -1,7 +1,7 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { Shield, LayoutDashboard, List, Menu, X, Settings, LogOut, User, CalendarClock, Users, History, Key } from "lucide-react";
-import { useState } from "react";
+import { Shield, LayoutDashboard, List, Menu, X, Settings, LogOut, User, CalendarClock, Users, History, Key, AlertTriangle } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import axios from "axios";
@@ -28,21 +29,30 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 export const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showForcedPasswordModal, setShowForcedPasswordModal] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
     newPassword: "",
     confirmPassword: ""
   });
   const [changingPassword, setChangingPassword] = useState(false);
-  const { user, logout, isAdmin, canView } = useAuth();
+  const { user, logout, isAdmin, canView, mustChangePassword, clearMustChangePassword } = useAuth();
   const navigate = useNavigate();
+
+  // Show forced password change modal when user must change password
+  useEffect(() => {
+    if (mustChangePassword) {
+      setShowForcedPasswordModal(true);
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    }
+  }, [mustChangePassword]);
 
   const handleLogout = () => {
     logout();
     navigate("/login");
   };
 
-  const handleChangePassword = async () => {
+  const handleChangePassword = async (isForced = false) => {
     // Validations
     if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
       toast.error("Todos los campos son requeridos");
@@ -65,7 +75,12 @@ export const Layout = () => {
       });
       toast.success("Contraseña actualizada correctamente");
       setShowPasswordModal(false);
+      setShowForcedPasswordModal(false);
       setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      // Clear the mustChangePassword flag in context
+      if (isForced) {
+        clearMustChangePassword();
+      }
     } catch (error) {
       const message = error.response?.data?.detail || "Error al cambiar la contraseña";
       toast.error(message);
@@ -334,12 +349,83 @@ export const Layout = () => {
               Cancelar
             </Button>
             <Button
-              onClick={handleChangePassword}
+              onClick={() => handleChangePassword(false)}
               disabled={changingPassword}
               className="bg-indigo-600 hover:bg-indigo-700 text-white"
               data-testid="save-password-btn"
             >
               {changingPassword ? "Guardando..." : "Guardar Cambios"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Forced Password Change Modal - Cannot be dismissed */}
+      <Dialog open={showForcedPasswordModal} onOpenChange={() => {}}>
+        <DialogContent className="bg-zinc-900 border-zinc-700 text-white max-w-md [&>button]:hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-400">
+              <AlertTriangle className="w-5 h-5" />
+              Cambio de Contraseña Requerido
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Por seguridad, debes cambiar tu contraseña antes de continuar. 
+              Esta es una medida para evitar el uso de contraseñas genéricas.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="forced-current-password" className="text-zinc-300">Contraseña Actual</Label>
+              <Input
+                id="forced-current-password"
+                type="password"
+                value={passwordForm.currentPassword}
+                onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                className="bg-zinc-800 border-zinc-700 text-white"
+                placeholder="Ingresa tu contraseña actual"
+                data-testid="forced-current-password-input"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="forced-new-password" className="text-zinc-300">Nueva Contraseña</Label>
+              <Input
+                id="forced-new-password"
+                type="password"
+                value={passwordForm.newPassword}
+                onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                className="bg-zinc-800 border-zinc-700 text-white"
+                placeholder="Ingresa tu nueva contraseña"
+                data-testid="forced-new-password-input"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="forced-confirm-password" className="text-zinc-300">Confirmar Nueva Contraseña</Label>
+              <Input
+                id="forced-confirm-password"
+                type="password"
+                value={passwordForm.confirmPassword}
+                onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                className="bg-zinc-800 border-zinc-700 text-white"
+                placeholder="Confirma tu nueva contraseña"
+                data-testid="forced-confirm-password-input"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={handleLogout}
+              className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+            >
+              Cerrar Sesión
+            </Button>
+            <Button
+              onClick={() => handleChangePassword(true)}
+              disabled={changingPassword}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              data-testid="forced-save-password-btn"
+            >
+              {changingPassword ? "Guardando..." : "Cambiar Contraseña"}
             </Button>
           </DialogFooter>
         </DialogContent>

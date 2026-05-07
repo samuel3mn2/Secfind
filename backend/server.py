@@ -63,6 +63,7 @@ class Usuario(BaseModel):
     email: Optional[str] = None
     activo: bool = True
     es_admin: bool = False
+    debe_cambiar_password: bool = True  # Force password change on first login
     permisos: UserPermissions = UserPermissions()
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -91,6 +92,7 @@ class UsuarioResponse(BaseModel):
     email: Optional[str]
     activo: bool
     es_admin: bool
+    debe_cambiar_password: bool = False
     permisos: UserPermissions
     created_at: datetime
 
@@ -423,6 +425,7 @@ async def login(credentials: LoginRequest):
             email=user.get("email"),
             activo=user["activo"],
             es_admin=user.get("es_admin", False),
+            debe_cambiar_password=user.get("debe_cambiar_password", False),
             permisos=UserPermissions(**permisos) if permisos else UserPermissions(),
             created_at=user.get("created_at", datetime.now(timezone.utc))
         )
@@ -442,6 +445,7 @@ async def get_me(current_user: CurrentUser = Depends(get_current_user)):
         email=user.get("email"),
         activo=user["activo"],
         es_admin=user.get("es_admin", False),
+        debe_cambiar_password=user.get("debe_cambiar_password", False),
         permisos=UserPermissions(**permisos) if permisos else UserPermissions(),
         created_at=user.get("created_at", datetime.now(timezone.utc))
     )
@@ -466,11 +470,11 @@ async def change_password(data: ChangePasswordRequest, current_user: CurrentUser
     if len(data.new_password) < 4:
         raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 4 caracteres")
     
-    # Update password
+    # Update password and mark as changed (no longer needs to change)
     new_hash = hash_password(data.new_password)
     await db.usuarios.update_one(
         {"id": current_user.id},
-        {"$set": {"password_hash": new_hash}}
+        {"$set": {"password_hash": new_hash, "debe_cambiar_password": False}}
     )
     
     # Log the action in audit history
@@ -504,6 +508,7 @@ async def get_usuarios(current_user: CurrentUser = Depends(get_current_user)):
             email=u.get("email"),
             activo=u.get("activo", True),
             es_admin=u.get("es_admin", False),
+            debe_cambiar_password=u.get("debe_cambiar_password", False),
             permisos=UserPermissions(**permisos) if permisos else UserPermissions(),
             created_at=u.get("created_at", datetime.now(timezone.utc))
         ))
@@ -549,6 +554,7 @@ async def create_usuario(data: UsuarioCreate, current_user: CurrentUser = Depend
         email=usuario.email,
         activo=usuario.activo,
         es_admin=usuario.es_admin,
+        debe_cambiar_password=True,
         permisos=permisos,
         created_at=usuario.created_at
     )
@@ -604,6 +610,7 @@ async def update_usuario(user_id: str, data: UsuarioUpdate, current_user: Curren
         email=updated.get("email"),
         activo=updated.get("activo", True),
         es_admin=updated.get("es_admin", False),
+        debe_cambiar_password=updated.get("debe_cambiar_password", False),
         permisos=UserPermissions(**permisos) if permisos else UserPermissions(),
         created_at=updated.get("created_at", datetime.now(timezone.utc))
     )

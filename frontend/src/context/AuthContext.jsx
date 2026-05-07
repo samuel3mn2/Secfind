@@ -17,6 +17,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [loading, setLoading] = useState(true);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
 
   useEffect(() => {
     if (token) {
@@ -31,6 +32,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await axios.get(`${API}/auth/me`);
       setUser(response.data);
+      setMustChangePassword(response.data.debe_cambiar_password || false);
     } catch (error) {
       console.error("Error fetching user:", error);
       logout();
@@ -47,6 +49,7 @@ export const AuthProvider = ({ children }) => {
     axios.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
     setToken(newToken);
     setUser(usuario);
+    setMustChangePassword(usuario.debe_cambiar_password || false);
     
     return usuario;
   };
@@ -56,6 +59,14 @@ export const AuthProvider = ({ children }) => {
     delete axios.defaults.headers.common["Authorization"];
     setToken(null);
     setUser(null);
+    setMustChangePassword(false);
+  };
+
+  const clearMustChangePassword = () => {
+    setMustChangePassword(false);
+    if (user) {
+      setUser({ ...user, debe_cambiar_password: false });
+    }
   };
 
   // Permission helpers
@@ -82,6 +93,8 @@ export const AuthProvider = ({ children }) => {
     logout,
     isAuthenticated: !!user,
     isAdmin: user?.es_admin || false,
+    mustChangePassword,
+    clearMustChangePassword,
     hasPermission,
     canView,
     canCreate,
