@@ -54,7 +54,7 @@ export default function Login() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4" autoComplete="on">
               {error && (
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -66,7 +66,9 @@ export default function Login() {
                 <Label htmlFor="username" className="text-zinc-400">Usuario</Label>
                 <Input
                   id="username"
+                  name="username"
                   type="text"
+                  autoComplete="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Ingresa tu usuario"
@@ -80,7 +82,9 @@ export default function Login() {
                 <Label htmlFor="password" className="text-zinc-400">Contraseña</Label>
                 <Input
                   id="password"
+                  name="password"
                   type="password"
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Ingresa tu contraseña"

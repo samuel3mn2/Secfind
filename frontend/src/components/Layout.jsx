@@ -302,61 +302,70 @@ export const Layout = () => {
               Cambiar Contraseña
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="current-password" className="text-zinc-300">Contraseña Actual</Label>
-              <Input
-                id="current-password"
-                type="password"
-                value={passwordForm.currentPassword}
-                onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                className="bg-zinc-800 border-zinc-700 text-white"
-                placeholder="Ingresa tu contraseña actual"
-                data-testid="current-password-input"
-              />
+          <form onSubmit={(e) => { e.preventDefault(); handleChangePassword(false); }} autoComplete="on">
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="current-password" className="text-zinc-300">Contraseña Actual</Label>
+                <Input
+                  id="current-password"
+                  name="current-password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={passwordForm.currentPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                  className="bg-zinc-800 border-zinc-700 text-white"
+                  placeholder="Ingresa tu contraseña actual"
+                  data-testid="current-password-input"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-password" className="text-zinc-300">Nueva Contraseña</Label>
+                <Input
+                  id="new-password"
+                  name="new-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                  className="bg-zinc-800 border-zinc-700 text-white"
+                  placeholder="Ingresa tu nueva contraseña"
+                  data-testid="new-password-input"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password" className="text-zinc-300">Confirmar Nueva Contraseña</Label>
+                <Input
+                  id="confirm-password"
+                  name="confirm-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                  className="bg-zinc-800 border-zinc-700 text-white"
+                  placeholder="Confirma tu nueva contraseña"
+                  data-testid="confirm-password-input"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="new-password" className="text-zinc-300">Nueva Contraseña</Label>
-              <Input
-                id="new-password"
-                type="password"
-                value={passwordForm.newPassword}
-                onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                className="bg-zinc-800 border-zinc-700 text-white"
-                placeholder="Ingresa tu nueva contraseña"
-                data-testid="new-password-input"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirm-password" className="text-zinc-300">Confirmar Nueva Contraseña</Label>
-              <Input
-                id="confirm-password"
-                type="password"
-                value={passwordForm.confirmPassword}
-                onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                className="bg-zinc-800 border-zinc-700 text-white"
-                placeholder="Confirma tu nueva contraseña"
-                data-testid="confirm-password-input"
-              />
-            </div>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowPasswordModal(false)}
-              className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => handleChangePassword(false)}
-              disabled={changingPassword}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white"
-              data-testid="save-password-btn"
-            >
-              {changingPassword ? "Guardando..." : "Guardar Cambios"}
-            </Button>
-          </DialogFooter>
+            <DialogFooter className="gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowPasswordModal(false)}
+                className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={changingPassword}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                data-testid="save-password-btn"
+              >
+                {changingPassword ? "Guardando..." : "Guardar Cambios"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -373,61 +382,70 @@ export const Layout = () => {
               Esta es una medida para evitar el uso de contraseñas genéricas.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="forced-current-password" className="text-zinc-300">Contraseña Actual</Label>
-              <Input
-                id="forced-current-password"
-                type="password"
-                value={passwordForm.currentPassword}
-                onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                className="bg-zinc-800 border-zinc-700 text-white"
-                placeholder="Ingresa tu contraseña actual"
-                data-testid="forced-current-password-input"
-              />
+          <form onSubmit={(e) => { e.preventDefault(); handleChangePassword(true); }} autoComplete="on">
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="forced-current-password" className="text-zinc-300">Contraseña Actual</Label>
+                <Input
+                  id="forced-current-password"
+                  name="current-password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={passwordForm.currentPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                  className="bg-zinc-800 border-zinc-700 text-white"
+                  placeholder="Ingresa tu contraseña actual"
+                  data-testid="forced-current-password-input"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="forced-new-password" className="text-zinc-300">Nueva Contraseña</Label>
+                <Input
+                  id="forced-new-password"
+                  name="new-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                  className="bg-zinc-800 border-zinc-700 text-white"
+                  placeholder="Ingresa tu nueva contraseña"
+                  data-testid="forced-new-password-input"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="forced-confirm-password" className="text-zinc-300">Confirmar Nueva Contraseña</Label>
+                <Input
+                  id="forced-confirm-password"
+                  name="confirm-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                  className="bg-zinc-800 border-zinc-700 text-white"
+                  placeholder="Confirma tu nueva contraseña"
+                  data-testid="forced-confirm-password-input"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="forced-new-password" className="text-zinc-300">Nueva Contraseña</Label>
-              <Input
-                id="forced-new-password"
-                type="password"
-                value={passwordForm.newPassword}
-                onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                className="bg-zinc-800 border-zinc-700 text-white"
-                placeholder="Ingresa tu nueva contraseña"
-                data-testid="forced-new-password-input"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="forced-confirm-password" className="text-zinc-300">Confirmar Nueva Contraseña</Label>
-              <Input
-                id="forced-confirm-password"
-                type="password"
-                value={passwordForm.confirmPassword}
-                onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                className="bg-zinc-800 border-zinc-700 text-white"
-                placeholder="Confirma tu nueva contraseña"
-                data-testid="forced-confirm-password-input"
-              />
-            </div>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={handleLogout}
-              className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
-            >
-              Cerrar Sesión
-            </Button>
-            <Button
-              onClick={() => handleChangePassword(true)}
-              disabled={changingPassword}
-              className="bg-amber-600 hover:bg-amber-700 text-white"
-              data-testid="forced-save-password-btn"
-            >
-              {changingPassword ? "Guardando..." : "Cambiar Contraseña"}
-            </Button>
-          </DialogFooter>
+            <DialogFooter className="gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleLogout}
+                className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+              >
+                Cerrar Sesión
+              </Button>
+              <Button
+                type="submit"
+                disabled={changingPassword}
+                className="bg-amber-600 hover:bg-amber-700 text-white"
+                data-testid="forced-save-password-btn"
+              >
+                {changingPassword ? "Guardando..." : "Cambiar Contraseña"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
