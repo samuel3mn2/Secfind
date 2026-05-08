@@ -78,6 +78,7 @@ import {
   Settings2,
 } from "lucide-react";
 import ImportarPDF from "@/pages/ImportarPDF";
+import BulkEntryModal from "@/components/BulkEntryModal";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -229,6 +230,7 @@ export default function Vulnerabilidades() {
   const [filterResponsable, setFilterResponsable] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showBulkEntryModal, setShowBulkEntryModal] = useState(false);
   const [viewingVuln, setViewingVuln] = useState(null);
   const [editingVuln, setEditingVuln] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
@@ -590,14 +592,25 @@ export default function Vulnerabilidades() {
           )}
         </div>
         {canAdd && (
-          <Button
-            onClick={() => handleOpenModal()}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/20"
-            data-testid="add-vuln-btn"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Nueva Vulnerabilidad
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setShowBulkEntryModal(true)}
+              variant="outline"
+              className="border-indigo-500/50 text-indigo-400 hover:bg-indigo-500/10"
+              data-testid="bulk-entry-btn"
+            >
+              <Layers className="w-4 h-4 mr-2" />
+              Entrada Masiva
+            </Button>
+            <Button
+              onClick={() => handleOpenModal()}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/20"
+              data-testid="add-vuln-btn"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Nueva Vulnerabilidad
+            </Button>
+          </div>
         )}
       </div>
 
@@ -1603,6 +1616,17 @@ export default function Vulnerabilidades() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Entry Modal */}
+      <BulkEntryModal
+        open={showBulkEntryModal}
+        onClose={() => setShowBulkEntryModal(false)}
+        options={options}
+        onSuccess={() => {
+          fetchVulnerabilidades();
+          fetchOptions();
+        }}
+      />
     </div>
   );
 }
