@@ -2685,7 +2685,6 @@ async def extract_vulnerabilities_from_pdf(
     
     try:
         import fitz  # PyMuPDF
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
         
         # Read PDF content
         contents = await file.read()
@@ -2704,15 +2703,8 @@ async def extract_vulnerabilities_from_pdf(
         if len(full_text) > 50000:
             full_text = full_text[:50000]
         
-        # Use LLM to extract structured data
-        llm_key = os.environ.get('EMERGENT_LLM_KEY')
-        if not llm_key:
-            raise HTTPException(status_code=500, detail="LLM key not configured")
-        
-        chat = LlmChat(
-            api_key=llm_key,
-            session_id=f"pdf-extract-{uuid.uuid4()}",
-            system_message="""Eres un experto en ciberseguridad que analiza informes de pruebas de penetración (pentest).
+        # System message for extraction
+        system_message = """Eres un experto en ciberseguridad que analiza informes de pruebas de penetración (pentest).
 Tu tarea es extraer información estructurada de informes de pentest en español.
 
 IMPORTANTE: Responde SOLO con JSON válido, sin texto adicional ni markdown.
@@ -2743,20 +2735,59 @@ Reglas IMPORTANTES:
 - "aplicacion_evaluada" es el SISTEMA o APLICACIÓN principal que se evaluó en el pentest (ej: SWIFT, SAP, Active Directory, Portal Web, etc.)
 - "activos_tecnicos" son los SERVIDORES, IPs, URLs o hosts específicos donde se encontró la vulnerabilidad. NO son aplicaciones.
 - NO confundas servidores (SERTERPRD05.cfbhd.com) con aplicaciones (SWIFT). Los servidores van en activos_tecnicos."""
-        ).with_model("openai", "gpt-4.1-mini")
+
+        user_prompt = f"Analiza el siguiente informe de pentest y extrae la información en formato JSON:\n\n{full_text}"
         
-        user_message = UserMessage(
-            text=f"Analiza el siguiente informe de pentest y extrae la información en formato JSON:\n\n{full_text}"
-        )
+        # Try to use emergentintegrations first (Emergent platform)
+        # If not available, fall back to OpenAI directly (local installation)
+        response_text = None
         
-        response = await chat.send_message(user_message)
+        try:
+            from emergentintegrations.llm.chat import LlmChat, UserMessage
+            
+            llm_key = os.environ.get('EMERGENT_LLM_KEY')
+            if not llm_key:
+                raise ImportError("EMERGENT_LLM_KEY not configured")
+            
+            chat = LlmChat(
+                api_key=llm_key,
+                session_id=f"pdf-extract-{uuid.uuid4()}",
+                system_message=system_message
+            ).with_model("openai", "gpt-4.1-mini")
+            
+            user_message = UserMessage(text=user_prompt)
+            response_text = await chat.send_message(user_message)
+            
+        except ImportError:
+            # Fall back to OpenAI directly for local installations
+            import openai
+            
+            openai_key = os.environ.get('OPENAI_API_KEY')
+            if not openai_key:
+                raise HTTPException(
+                    status_code=500, 
+                    detail="Para usar la importación de PDF con IA en instalación local, configure OPENAI_API_KEY en el archivo .env"
+                )
+            
+            client = openai.AsyncOpenAI(api_key=openai_key)
+            
+            completion = await client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": system_message},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.1
+            )
+            
+            response_text = completion.choices[0].message.content
         
         # Parse JSON response
         import json
         import re
         
         # Clean response - remove markdown code blocks if present
-        response_text = response.strip()
+        response_text = response_text.strip()
         if response_text.startswith("```"):
             response_text = re.sub(r'^```\w*\n?', '', response_text)
             response_text = re.sub(r'\n?```$', '', response_text)
