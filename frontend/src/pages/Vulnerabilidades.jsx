@@ -113,6 +113,7 @@ const StatusBadge = ({ status }) => {
 
 // Available columns configuration
 const ALL_COLUMNS = [
+  { id: "codigo", label: "Código", default: true },
   { id: "fecha_hallazgo", label: "Fecha", default: true },
   { id: "institucion", label: "Institución", default: true },
   { id: "aplicaciones", label: "Aplicaciones", default: true },
@@ -864,6 +865,7 @@ export default function Vulnerabilidades() {
                       />
                     </TableHead>
                   )}
+                  {isColumnVisible("codigo") && <TableHead className="text-zinc-400">Código</TableHead>}
                   {isColumnVisible("fecha_hallazgo") && <TableHead className="text-zinc-400">Fecha</TableHead>}
                   {isColumnVisible("institucion") && <TableHead className="text-zinc-400">Institución</TableHead>}
                   {isColumnVisible("aplicaciones") && <TableHead className="text-zinc-400">Aplicaciones</TableHead>}
@@ -901,6 +903,11 @@ export default function Vulnerabilidades() {
                             className="border-zinc-600"
                             data-testid={`select-checkbox-${vuln.id}`}
                           />
+                        </TableCell>
+                      )}
+                      {isColumnVisible("codigo") && (
+                        <TableCell className="text-zinc-300 font-mono text-xs">
+                          {vuln.codigo || "-"}
                         </TableCell>
                       )}
                       {isColumnVisible("fecha_hallazgo") && (
@@ -1167,6 +1174,18 @@ export default function Vulnerabilidades() {
           <ScrollArea className="max-h-[60vh] pr-4">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-zinc-400">Código</Label>
+                  <Input
+                    type="text"
+                    value={formData.codigo || ""}
+                    onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
+                    className="bg-black/20 border-zinc-700 text-white"
+                    placeholder="Ej: VULN-001"
+                    data-testid="input-codigo"
+                  />
+                </div>
+
                 <div className="space-y-2">
                   <Label className="text-zinc-400">Fecha Hallazgo</Label>
                   <Input

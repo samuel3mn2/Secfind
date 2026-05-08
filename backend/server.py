@@ -114,6 +114,7 @@ class CurrentUser(BaseModel):
 # ============ VULNERABILITY MODELS ============
 
 class VulnerabilidadBase(BaseModel):
+    codigo: Optional[str] = None  # Código único de la vulnerabilidad
     fecha_hallazgo: Optional[str] = None
     institucion: Optional[str] = None
     aplicaciones: Optional[List[str]] = None  # Changed to list
@@ -2286,6 +2287,7 @@ async def export_csv(
         selected_cols = [c.strip() for c in columnas.split(",")]
         # Map frontend column IDs to backend field names
         column_map = {
+            "codigo": "codigo",
             "fecha_hallazgo": "fecha_hallazgo",
             "institucion": "institucion", 
             "aplicaciones": "aplicaciones",
@@ -2385,6 +2387,7 @@ async def export_excel(
         selected_cols = [c.strip() for c in columnas.split(",")]
         # Map frontend column IDs to backend field names
         column_map = {
+            "codigo": "codigo",
             "fecha_hallazgo": "fecha_hallazgo",
             "institucion": "institucion", 
             "aplicaciones": "aplicaciones",
@@ -2473,6 +2476,8 @@ async def import_excel(file: UploadFile = File(...), current_user: CurrentUser =
     df = pd.read_excel(io.BytesIO(contents))
     
     column_mapping = {
+        'Código': 'codigo',
+        'Codigo': 'codigo',
         'Fecha Hallazgo': 'fecha_hallazgo',
         'Institución': 'institucion',
         'Aplicación': 'aplicacion',
