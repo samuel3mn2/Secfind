@@ -254,7 +254,7 @@ export default function BulkEntryModal({ open, onClose, options, onSuccess }) {
             <Copy className="w-8 h-8 mx-auto mb-2 text-indigo-400" />
             <p className="text-zinc-300">Haz clic aquí y presiona <kbd className="px-2 py-1 bg-zinc-800 rounded">Ctrl+V</kbd></p>
             <p className="text-xs text-zinc-500 mt-2">
-              Formato esperado: Código | Fecha | Institución | Aplicaciones | Vulnerabilidad | Severidad | Estatus | Responsable | Fecha Compromiso | Informe | Proveedor
+              Formato esperado: Código | Fecha | Institución | Aplicaciones | Vulnerabilidad | Severidad | Estatus | Responsable | Fecha Compromiso | Informe | Proveedor | Recomendaciones
             </p>
           </div>
         )}
@@ -274,6 +274,7 @@ export default function BulkEntryModal({ open, onClose, options, onSuccess }) {
                 <TableHead className="text-zinc-400 w-28">Estatus</TableHead>
                 <TableHead className="text-zinc-400 w-32">Responsable</TableHead>
                 <TableHead className="text-zinc-400 w-32">Informe</TableHead>
+                <TableHead className="text-zinc-400 min-w-[150px]">Recomendaciones</TableHead>
                 <TableHead className="text-zinc-400 w-12"></TableHead>
               </TableRow>
             </TableHeader>
@@ -386,6 +387,14 @@ export default function BulkEntryModal({ open, onClose, options, onSuccess }) {
                         ))}
                       </SelectContent>
                     </Select>
+                  </TableCell>
+                  <TableCell className="p-1">
+                    <Input
+                      value={row.recomendaciones}
+                      onChange={(e) => updateRow(row.id, 'recomendaciones', e.target.value)}
+                      className="h-8 text-xs bg-zinc-800 border-zinc-700 text-white"
+                      placeholder="Recomendaciones"
+                    />
                   </TableCell>
                   <TableCell className="p-1">
                     <Button
