@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, Users, AppWindow, Truck, FileText, Bell, UserCircle } from "lucide-react";
+import { Building2, Users, AppWindow, Truck, FileText, Bell, UserCircle, FolderOpen } from "lucide-react";
 import Instituciones from "@/pages/Instituciones";
 import Usuarios from "@/pages/Usuarios";
 import Aplicaciones from "@/pages/Aplicaciones";
@@ -9,6 +9,7 @@ import Proveedores from "@/pages/Proveedores";
 import InformesPentest from "@/pages/InformesPentest";
 import Notificaciones from "@/pages/Notificaciones";
 import Responsables from "@/pages/Responsables";
+import GruposInformes from "@/pages/GruposInformes";
 
 export default function Configuracion() {
   const { isAdmin, canView } = useAuth();
@@ -64,6 +65,14 @@ export default function Configuracion() {
             Informes Pentest
           </TabsTrigger>
           <TabsTrigger 
+            value="grupos-informes" 
+            className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white"
+            data-testid="tab-grupos-informes"
+          >
+            <FolderOpen className="w-4 h-4 mr-2" />
+            Grupos Informes
+          </TabsTrigger>
+          <TabsTrigger 
             value="responsables" 
             className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white"
             data-testid="tab-responsables"
@@ -107,6 +116,10 @@ export default function Configuracion() {
 
         <TabsContent value="informes" className="mt-6">
           <InformesPentest />
+        </TabsContent>
+
+        <TabsContent value="grupos-informes" className="mt-6">
+          <GruposInformes />
         </TabsContent>
 
         <TabsContent value="responsables" className="mt-6">

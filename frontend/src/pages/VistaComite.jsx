@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -30,6 +31,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Users,
   FileText,
   Filter,
@@ -43,6 +50,8 @@ import {
   Clock,
   Image,
   Search,
+  FolderOpen,
+  Layers,
 } from "lucide-react";
 import html2canvas from "html2canvas";
 
@@ -88,6 +97,13 @@ export default function VistaComite() {
   const [exporting, setExporting] = useState(false);
   const tableRef = useRef(null);
   
+  // Grouping mode
+  const [agruparPorGrupo, setAgruparPorGrupo] = useState(false);
+  const [grupos, setGrupos] = useState([]);
+  const [selectedGrupos, setSelectedGrupos] = useState([]);
+  const [gruposPopoverOpen, setGruposPopoverOpen] = useState(false);
+  const [grupoSearch, setGrupoSearch] = useState("");
+  
   // Filters
   const [selectedInformes, setSelectedInformes] = useState([]);
   const [selectedSeveridades, setSelectedSeveridades] = useState(["Critica", "Alta", "Media", "Baja"]);
@@ -103,6 +119,12 @@ export default function VistaComite() {
     }
   }, [informesPopoverOpen]);
 
+  useEffect(() => {
+    if (!gruposPopoverOpen) {
+      setGrupoSearch("");
+    }
+  }, [gruposPopoverOpen]);
+
   // Filter informes by search - use useMemo for better performance
   const filteredInformes = React.useMemo(() => {
     if (!informeSearch.trim()) return options?.informes_pentest || [];
@@ -112,16 +134,33 @@ export default function VistaComite() {
     );
   }, [options?.informes_pentest, informeSearch]);
 
+  // Filter grupos by search
+  const filteredGrupos = React.useMemo(() => {
+    if (!grupoSearch.trim()) return grupos;
+    const searchLower = grupoSearch.toLowerCase().trim();
+    return grupos.filter(g => g.nombre.toLowerCase().includes(searchLower));
+  }, [grupos, grupoSearch]);
+
   const fetchOptions = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await axios.get(`${API}/dropdown-options`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setOptions(response.data);
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      const [optionsRes, gruposRes] = await Promise.all([
+        axios.get(`${API}/dropdown-options`, { headers }),
+        axios.get(`${API}/config/grupos-informes`, { headers }),
+      ]);
+      
+      setOptions(optionsRes.data);
+      setGrupos(gruposRes.data);
+      
       // Initially select all informes
-      if (response.data.informes_pentest) {
-        setSelectedInformes(response.data.informes_pentest);
+      if (optionsRes.data.informes_pentest) {
+        setSelectedInformes(optionsRes.data.informes_pentest);
+      }
+      // Initially select all grupos
+      if (gruposRes.data.length > 0) {
+        setSelectedGrupos(gruposRes.data.map(g => g.id));
       }
     } catch (error) {
       console.error("Error fetching options:", error);
@@ -129,20 +168,37 @@ export default function VistaComite() {
   };
 
   const fetchData = useCallback(async () => {
-    if (selectedInformes.length === 0) {
-      setData([]);
-      setLoading(false);
-      return;
+    // Check if we have selections based on mode
+    if (agruparPorGrupo) {
+      if (selectedGrupos.length === 0) {
+        setData([]);
+        setLoading(false);
+        return;
+      }
+    } else {
+      if (selectedInformes.length === 0) {
+        setData([]);
+        setLoading(false);
+        return;
+      }
     }
 
     try {
       const token = localStorage.getItem("token");
+      const params = {
+        severidades: selectedSeveridades.join(","),
+        agrupar_por: agruparPorGrupo ? "grupo" : "informe",
+      };
+      
+      if (agruparPorGrupo) {
+        params.grupos = selectedGrupos.join(",");
+      } else {
+        params.informes = selectedInformes.join(",");
+      }
+      
       const response = await axios.get(`${API}/vista-comite`, {
         headers: { Authorization: `Bearer ${token}` },
-        params: {
-          informes: selectedInformes.join(","),
-          severidades: selectedSeveridades.join(",")
-        }
+        params
       });
       setData(response.data);
     } catch (error) {
@@ -151,7 +207,7 @@ export default function VistaComite() {
     } finally {
       setLoading(false);
     }
-  }, [selectedInformes, selectedSeveridades]);
+  }, [selectedInformes, selectedGrupos, selectedSeveridades, agruparPorGrupo]);
 
   useEffect(() => {
     fetchOptions();
@@ -179,6 +235,29 @@ export default function VistaComite() {
 
   const handleClearInformes = () => {
     setSelectedInformes([]);
+  };
+
+  // Grupo handlers
+  const handleGrupoToggle = (grupoId) => {
+    setSelectedGrupos(prev =>
+      prev.includes(grupoId)
+        ? prev.filter(g => g !== grupoId)
+        : [...prev, grupoId]
+    );
+  };
+
+  const handleSelectAllGrupos = () => {
+    setSelectedGrupos(grupos.map(g => g.id));
+  };
+
+  const handleClearGrupos = () => {
+    setSelectedGrupos([]);
+  };
+
+  // Toggle grouping mode
+  const handleToggleGroupMode = (checked) => {
+    setAgruparPorGrupo(checked);
+    setLoading(true);
   };
 
   const handleSeveridadToggle = (severidad) => {
@@ -478,75 +557,189 @@ export default function VistaComite() {
               <span className="text-sm text-zinc-400">Filtros:</span>
             </div>
 
-            {/* Informes Filter */}
-            <Popover open={informesPopoverOpen} onOpenChange={setInformesPopoverOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 min-w-[200px] justify-between"
-                  data-testid="filter-informes"
-                >
-                  <span className="truncate">
-                    {selectedInformes.length === 0 
-                      ? "Seleccionar informes..." 
-                      : selectedInformes.length === options?.informes_pentest?.length
-                        ? "Todos los informes"
-                        : `${selectedInformes.length} informes`}
-                  </span>
-                  <ChevronDown className="w-4 h-4 ml-2" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[400px] bg-zinc-900 border-zinc-700 p-0" align="start">
-                <div className="p-3 border-b border-zinc-700 space-y-2">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                    <Input
-                      placeholder="Buscar informe..."
-                      value={informeSearch}
-                      onChange={(e) => setInformeSearch(e.target.value)}
-                      className="pl-9 bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleSelectAllInformes}
-                      className="text-xs text-zinc-400 hover:text-white"
-                    >
-                      <Check className="w-3 h-3 mr-1" /> Todos
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleClearInformes}
-                      className="text-xs text-zinc-400 hover:text-white"
-                    >
-                      <X className="w-3 h-3 mr-1" /> Ninguno
-                    </Button>
-                  </div>
-                </div>
-                <ScrollArea className="h-[300px]">
-                  <div className="p-2 space-y-1">
-                    {filteredInformes.map((informe) => (
-                      <div
-                        key={informe}
-                        className="flex items-center space-x-2 p-2 rounded hover:bg-zinc-800 cursor-pointer"
-                        onClick={() => handleInformeToggle(informe)}
+            {/* Grouping Mode Toggle */}
+            {grupos.length > 0 && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800/50 rounded-lg border border-zinc-700">
+                      <Layers className="w-4 h-4 text-zinc-400" />
+                      <span className="text-sm text-zinc-400">Agrupar:</span>
+                      <Switch
+                        checked={agruparPorGrupo}
+                        onCheckedChange={handleToggleGroupMode}
+                        data-testid="toggle-agrupar"
+                      />
+                      <span className={`text-sm ${agruparPorGrupo ? 'text-indigo-400' : 'text-zinc-500'}`}>
+                        {agruparPorGrupo ? 'Por Grupo' : 'Individual'}
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent className="bg-zinc-800 border-zinc-700">
+                    <p className="text-sm">
+                      {agruparPorGrupo 
+                        ? "Mostrando informes consolidados por grupo" 
+                        : "Mostrando cada informe individualmente"}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+
+            {/* Grupos Filter (when grouping mode is on) */}
+            {agruparPorGrupo && grupos.length > 0 && (
+              <Popover open={gruposPopoverOpen} onOpenChange={setGruposPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="border-indigo-700 text-indigo-300 hover:bg-indigo-900/30 min-w-[200px] justify-between"
+                    data-testid="filter-grupos"
+                  >
+                    <FolderOpen className="w-4 h-4 mr-2" />
+                    <span className="truncate">
+                      {selectedGrupos.length === 0
+                        ? "Seleccionar grupos..."
+                        : selectedGrupos.length === grupos.length
+                          ? "Todos los grupos"
+                          : `${selectedGrupos.length} grupos`}
+                    </span>
+                    <ChevronDown className="w-4 h-4 ml-2" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] bg-zinc-900 border-zinc-700 p-0" align="start">
+                  <div className="p-3 border-b border-zinc-700 space-y-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                      <Input
+                        placeholder="Buscar grupo..."
+                        value={grupoSearch}
+                        onChange={(e) => setGrupoSearch(e.target.value)}
+                        className="pl-9 bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleSelectAllGrupos}
+                        className="text-xs text-zinc-400 hover:text-white"
                       >
-                        <Checkbox
-                          checked={selectedInformes.includes(informe)}
-                          onCheckedChange={() => handleInformeToggle(informe)}
-                        />
-                        <Label className="text-sm text-zinc-300 cursor-pointer break-words whitespace-normal">
-                          {informe}
-                        </Label>
-                      </div>
-                    ))}
+                        <Check className="w-3 h-3 mr-1" /> Todos
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleClearGrupos}
+                        className="text-xs text-zinc-400 hover:text-white"
+                      >
+                        <X className="w-3 h-3 mr-1" /> Ninguno
+                      </Button>
+                    </div>
                   </div>
-                </ScrollArea>
-              </PopoverContent>
-            </Popover>
+                  <ScrollArea className="h-[250px]">
+                    <div className="p-2 space-y-1">
+                      {filteredGrupos.map((grupo) => (
+                        <div
+                          key={grupo.id}
+                          className="flex items-center space-x-2 p-2 rounded hover:bg-zinc-800 cursor-pointer"
+                          onClick={() => handleGrupoToggle(grupo.id)}
+                        >
+                          <Checkbox
+                            checked={selectedGrupos.includes(grupo.id)}
+                            onCheckedChange={() => handleGrupoToggle(grupo.id)}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <Label className="text-sm text-zinc-300 cursor-pointer font-medium">
+                              {grupo.nombre}
+                            </Label>
+                            <p className="text-xs text-zinc-500">
+                              {grupo.informes?.length || 0} informes
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                      {filteredGrupos.length === 0 && (
+                        <p className="text-center text-zinc-500 py-4 text-sm">
+                          {grupoSearch ? "No se encontraron grupos" : "No hay grupos creados"}
+                        </p>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
+            )}
+
+            {/* Informes Filter (when not grouping) */}
+            {!agruparPorGrupo && (
+              <Popover open={informesPopoverOpen} onOpenChange={setInformesPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 min-w-[200px] justify-between"
+                    data-testid="filter-informes"
+                  >
+                    <span className="truncate">
+                      {selectedInformes.length === 0 
+                        ? "Seleccionar informes..." 
+                        : selectedInformes.length === options?.informes_pentest?.length
+                          ? "Todos los informes"
+                          : `${selectedInformes.length} informes`}
+                    </span>
+                    <ChevronDown className="w-4 h-4 ml-2" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] bg-zinc-900 border-zinc-700 p-0" align="start">
+                  <div className="p-3 border-b border-zinc-700 space-y-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                      <Input
+                        placeholder="Buscar informe..."
+                        value={informeSearch}
+                        onChange={(e) => setInformeSearch(e.target.value)}
+                        className="pl-9 bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleSelectAllInformes}
+                        className="text-xs text-zinc-400 hover:text-white"
+                      >
+                        <Check className="w-3 h-3 mr-1" /> Todos
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleClearInformes}
+                        className="text-xs text-zinc-400 hover:text-white"
+                      >
+                        <X className="w-3 h-3 mr-1" /> Ninguno
+                      </Button>
+                    </div>
+                  </div>
+                  <ScrollArea className="h-[300px]">
+                    <div className="p-2 space-y-1">
+                      {filteredInformes.map((informe) => (
+                        <div
+                          key={informe}
+                          className="flex items-center space-x-2 p-2 rounded hover:bg-zinc-800 cursor-pointer"
+                          onClick={() => handleInformeToggle(informe)}
+                        >
+                          <Checkbox
+                            checked={selectedInformes.includes(informe)}
+                            onCheckedChange={() => handleInformeToggle(informe)}
+                          />
+                          <Label className="text-sm text-zinc-300 cursor-pointer break-words whitespace-normal">
+                            {informe}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
+            )}
 
             {/* Severidad Filter */}
             <div className="flex items-center gap-2">
@@ -631,7 +824,29 @@ export default function VistaComite() {
                       data-testid={`comite-row-${idx}`}
                     >
                       <TableCell className="text-white font-medium whitespace-normal break-words">
-                        {row.informe}
+                        <div className="flex items-start gap-2">
+                          {row.es_grupo && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <FolderOpen className="w-4 h-4 text-indigo-400 mt-0.5 flex-shrink-0" />
+                                </TooltipTrigger>
+                                <TooltipContent className="bg-zinc-800 border-zinc-700 max-w-sm">
+                                  <p className="font-medium text-indigo-400 mb-1">Grupo con {row.informes_incluidos?.length || 0} informes:</p>
+                                  <ul className="text-xs text-zinc-300 space-y-0.5">
+                                    {row.informes_incluidos?.slice(0, 5).map((inf, i) => (
+                                      <li key={i}>• {inf}</li>
+                                    ))}
+                                    {(row.informes_incluidos?.length || 0) > 5 && (
+                                      <li className="text-zinc-500">... y {row.informes_incluidos.length - 5} más</li>
+                                    )}
+                                  </ul>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                          <span>{row.informe}</span>
+                        </div>
                       </TableCell>
                       {selectedSeveridades.includes("Critica") && (
                         <TableCell className="text-center">

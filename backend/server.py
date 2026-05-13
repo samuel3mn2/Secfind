@@ -407,7 +407,7 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> Curre
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=401, detail="No autorizado")
 
 async def get_optional_user(authorization: Optional[str] = Header(None)) -> Optional[CurrentUser]:
@@ -2055,7 +2055,7 @@ async def get_vista_comite(
     # Aggregate by informe or grupo
     from collections import defaultdict
     
-    data_aggregation = defaultdict(lambda: {
+    informe_data = defaultdict(lambda: {
         "criticas_pendientes": 0, "criticas_total": 0,
         "altas_pendientes": 0, "altas_total": 0,
         "medias_pendientes": 0, "medias_total": 0,
@@ -2063,7 +2063,7 @@ async def get_vista_comite(
         "total_pendientes": 0, "total_hallazgos": 0,
         "responsables": set(),
         "fecha_mas_antigua": None,
-        "informes_incluidos": set()  # NEW: track which reports are in this group
+        "informes_incluidos": set()
     })
     
     for v in vulns:
@@ -2073,15 +2073,25 @@ async def get_vista_comite(
         responsable = v.get("responsable")
         fecha_hallazgo = v.get("fecha_hallazgo")
         
-        if responsable:
-            informe_data[informe]["responsables"].add(responsable)
+        # Determine the aggregation key based on mode
+        if agrupar_por == "grupo":
+            # Map informe to its group name, or use informe itself if not in any group
+            key = informe_to_grupo.get(informe, informe)
+        else:
+            key = informe
         
-        # Track oldest date for this informe
+        # Track which informes are included in this key
+        informe_data[key]["informes_incluidos"].add(informe)
+        
+        if responsable:
+            informe_data[key]["responsables"].add(responsable)
+        
+        # Track oldest date
         if fecha_hallazgo:
             try:
-                current_oldest = informe_data[informe]["fecha_mas_antigua"]
+                current_oldest = informe_data[key]["fecha_mas_antigua"]
                 if current_oldest is None or fecha_hallazgo < current_oldest:
-                    informe_data[informe]["fecha_mas_antigua"] = fecha_hallazgo
+                    informe_data[key]["fecha_mas_antigua"] = fecha_hallazgo
             except:
                 pass
         
@@ -2090,51 +2100,52 @@ async def get_vista_comite(
         
         # Map severidad to field name
         if severidad == "Critica":
-            informe_data[informe]["criticas_total"] += 1
+            informe_data[key]["criticas_total"] += 1
             if is_pending:
-                informe_data[informe]["criticas_pendientes"] += 1
+                informe_data[key]["criticas_pendientes"] += 1
         elif severidad == "Alta":
-            informe_data[informe]["altas_total"] += 1
+            informe_data[key]["altas_total"] += 1
             if is_pending:
-                informe_data[informe]["altas_pendientes"] += 1
+                informe_data[key]["altas_pendientes"] += 1
         elif severidad == "Media":
-            informe_data[informe]["medias_total"] += 1
+            informe_data[key]["medias_total"] += 1
             if is_pending:
-                informe_data[informe]["medias_pendientes"] += 1
+                informe_data[key]["medias_pendientes"] += 1
         elif severidad == "Baja":
-            informe_data[informe]["bajas_total"] += 1
+            informe_data[key]["bajas_total"] += 1
             if is_pending:
-                informe_data[informe]["bajas_pendientes"] += 1
+                informe_data[key]["bajas_pendientes"] += 1
         
         # Totals (only count if severidad is in the selected list)
         if severidad in ["Critica", "Alta", "Media", "Baja"]:
-            informe_data[informe]["total_hallazgos"] += 1
+            informe_data[key]["total_hallazgos"] += 1
             if is_pending:
-                informe_data[informe]["total_pendientes"] += 1
+                informe_data[key]["total_pendientes"] += 1
     
     # Build response
     result = []
     today = datetime.now(timezone.utc).date()
     
-    for informe in sorted(informe_data.keys()):
-        data = informe_data[informe]
+    for key in sorted(informe_data.keys()):
+        data = informe_data[key]
         responsables_list = sorted(data["responsables"])
+        informes_incluidos = sorted(data["informes_incluidos"])
         
         # Calculate tiempo activo in months
         tiempo_activo_meses = None
         if data["fecha_mas_antigua"]:
             try:
                 fecha_str = data["fecha_mas_antigua"]
-                # Parse date string (format: YYYY-MM-DD)
                 fecha_date = datetime.strptime(fecha_str[:10], "%Y-%m-%d").date()
-                # Calculate months difference
                 months_diff = (today.year - fecha_date.year) * 12 + (today.month - fecha_date.month)
                 tiempo_activo_meses = max(0, months_diff)
             except:
                 tiempo_activo_meses = None
         
         result.append({
-            "informe": informe,
+            "informe": key,
+            "es_grupo": agrupar_por == "grupo" and key in grupo_to_informes,
+            "informes_incluidos": informes_incluidos if agrupar_por == "grupo" else [],
             "criticas_pendientes": data["criticas_pendientes"],
             "criticas_total": data["criticas_total"],
             "altas_pendientes": data["altas_pendientes"],
