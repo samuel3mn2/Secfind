@@ -151,6 +151,7 @@ export default function VistaComite() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailData, setDetailData] = useState(null);
   const [detailVulnerabilities, setDetailVulnerabilities] = useState([]);
+  const [detailStatusFilter, setDetailStatusFilter] = useState("all"); // all, pendientes, cerradas
   
   // Saved Views
   const [vistasGuardadas, setVistasGuardadas] = useState([]);
@@ -386,7 +387,22 @@ export default function VistaComite() {
     setDetailModalOpen(false);
     setDetailData(null);
     setDetailVulnerabilities([]);
+    setDetailStatusFilter("all");
   };
+
+  // Filter vulnerabilities by status in detail modal
+  const filteredDetailVulnerabilities = React.useMemo(() => {
+    if (detailStatusFilter === "all") return detailVulnerabilities;
+    
+    const closedStatuses = ["Cerrado", "Corregido", "Aceptado", "Mitigado"];
+    
+    if (detailStatusFilter === "pendientes") {
+      return detailVulnerabilities.filter(v => !closedStatuses.includes(v.estatus));
+    } else if (detailStatusFilter === "cerradas") {
+      return detailVulnerabilities.filter(v => closedStatuses.includes(v.estatus));
+    }
+    return detailVulnerabilities;
+  }, [detailVulnerabilities, detailStatusFilter]);
 
   // Saved Views Functions
   const handleSaveView = async () => {
@@ -1305,15 +1321,57 @@ export default function VistaComite() {
             </div>
           )}
 
+          {/* Status Filter */}
+          <div className="flex items-center gap-2 py-2">
+            <span className="text-sm text-zinc-400">Filtrar por estatus:</span>
+            <div className="flex gap-1">
+              <Button
+                size="sm"
+                variant={detailStatusFilter === "all" ? "default" : "outline"}
+                onClick={() => setDetailStatusFilter("all")}
+                className={detailStatusFilter === "all" 
+                  ? "bg-indigo-600 hover:bg-indigo-700 h-7 text-xs" 
+                  : "border-zinc-700 text-zinc-400 hover:text-white h-7 text-xs"}
+                data-testid="filter-all"
+              >
+                Todas
+              </Button>
+              <Button
+                size="sm"
+                variant={detailStatusFilter === "pendientes" ? "default" : "outline"}
+                onClick={() => setDetailStatusFilter("pendientes")}
+                className={detailStatusFilter === "pendientes" 
+                  ? "bg-red-600 hover:bg-red-700 h-7 text-xs" 
+                  : "border-zinc-700 text-zinc-400 hover:text-white h-7 text-xs"}
+                data-testid="filter-pendientes"
+              >
+                Pendientes
+              </Button>
+              <Button
+                size="sm"
+                variant={detailStatusFilter === "cerradas" ? "default" : "outline"}
+                onClick={() => setDetailStatusFilter("cerradas")}
+                className={detailStatusFilter === "cerradas" 
+                  ? "bg-green-600 hover:bg-green-700 h-7 text-xs" 
+                  : "border-zinc-700 text-zinc-400 hover:text-white h-7 text-xs"}
+                data-testid="filter-cerradas"
+              >
+                Cerradas
+              </Button>
+            </div>
+          </div>
+
           {/* Vulnerabilities table */}
           <ScrollArea className="flex-1 overflow-auto">
             {detailLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
               </div>
-            ) : detailVulnerabilities.length === 0 ? (
+            ) : filteredDetailVulnerabilities.length === 0 ? (
               <div className="text-center py-12 text-zinc-500">
-                No se encontraron vulnerabilidades
+                {detailVulnerabilities.length === 0 
+                  ? "No se encontraron vulnerabilidades"
+                  : `No hay vulnerabilidades ${detailStatusFilter === "pendientes" ? "pendientes" : "cerradas"}`}
               </div>
             ) : (
               <Table>
@@ -1325,12 +1383,12 @@ export default function VistaComite() {
                     <TableHead className="text-zinc-400 w-[100px]">Estatus</TableHead>
                     <TableHead className="text-zinc-400">Responsable</TableHead>
                     {detailData?.es_grupo && (
-                      <TableHead className="text-zinc-400">Informe</TableHead>
+                      <TableHead className="text-zinc-400 min-w-[200px]">Informe</TableHead>
                     )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {detailVulnerabilities.map((vuln, idx) => (
+                  {filteredDetailVulnerabilities.map((vuln, idx) => (
                     <TableRow key={vuln.id || idx} className="border-zinc-800 hover:bg-zinc-800/50">
                       <TableCell className="text-zinc-400 font-mono text-xs">
                         {vuln.codigo || "-"}
@@ -1370,8 +1428,17 @@ export default function VistaComite() {
                         {vuln.responsable || "-"}
                       </TableCell>
                       {detailData?.es_grupo && (
-                        <TableCell className="text-zinc-400 text-xs max-w-[150px] truncate" title={vuln.nombre_informe_pentest}>
-                          {vuln.nombre_informe_pentest || "-"}
+                        <TableCell className="text-zinc-400 text-sm">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="cursor-help">{vuln.nombre_informe_pentest || "-"}</span>
+                              </TooltipTrigger>
+                              <TooltipContent className="bg-zinc-800 border-zinc-700 max-w-md">
+                                <p>{vuln.nombre_informe_pentest}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </TableCell>
                       )}
                     </TableRow>
@@ -1384,7 +1451,12 @@ export default function VistaComite() {
           {/* Footer */}
           <div className="flex items-center justify-between pt-4 border-t border-zinc-800">
             <span className="text-sm text-zinc-500">
-              {detailVulnerabilities.length} vulnerabilidades
+              {filteredDetailVulnerabilities.length} de {detailVulnerabilities.length} vulnerabilidades
+              {detailStatusFilter !== "all" && (
+                <span className="text-indigo-400 ml-1">
+                  ({detailStatusFilter === "pendientes" ? "solo pendientes" : "solo cerradas"})
+                </span>
+              )}
             </span>
             <Button
               variant="outline"

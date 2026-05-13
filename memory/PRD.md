@@ -274,6 +274,7 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 ### P2 (Media Prioridad)
 - [ ] Historial de cambios en catálogos de configuración (instituciones, aplicaciones, etc.)
 - [ ] Refactorización de server.py en routers modulares (deuda técnica)
+- [ ] Compartir vistas guardadas entre usuarios (marcar como públicas)
 
 ### P3 (Baja Prioridad)
 - [ ] Dashboard comparativo por períodos
