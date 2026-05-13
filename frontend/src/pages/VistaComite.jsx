@@ -11,6 +11,12 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -52,6 +58,9 @@ import {
   Search,
   FolderOpen,
   Layers,
+  Eye,
+  ExternalLink,
+  Loader2,
 } from "lucide-react";
 import html2canvas from "html2canvas";
 
@@ -104,11 +113,23 @@ export default function VistaComite() {
   const [gruposPopoverOpen, setGruposPopoverOpen] = useState(false);
   const [grupoSearch, setGrupoSearch] = useState("");
   
+  // Informes sin grupo (para modo mixto)
+  const [informesSinGrupo, setInformesSinGrupo] = useState([]);
+  const [selectedInformesSinGrupo, setSelectedInformesSinGrupo] = useState([]);
+  const [informesSinGrupoPopoverOpen, setInformesSinGrupoPopoverOpen] = useState(false);
+  const [informeSinGrupoSearch, setInformeSinGrupoSearch] = useState("");
+  
   // Filters
   const [selectedInformes, setSelectedInformes] = useState([]);
   const [selectedSeveridades, setSelectedSeveridades] = useState(["Critica", "Alta", "Media", "Baja"]);
   const [informesPopoverOpen, setInformesPopoverOpen] = useState(false);
   const [informeSearch, setInformeSearch] = useState("");
+  
+  // Detail Modal
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailData, setDetailData] = useState(null);
+  const [detailVulnerabilities, setDetailVulnerabilities] = useState([]);
 
   const canViewModule = isAdmin || canView("vulnerabilidades");
 
@@ -124,6 +145,12 @@ export default function VistaComite() {
       setGrupoSearch("");
     }
   }, [gruposPopoverOpen]);
+
+  useEffect(() => {
+    if (!informesSinGrupoPopoverOpen) {
+      setInformeSinGrupoSearch("");
+    }
+  }, [informesSinGrupoPopoverOpen]);
 
   // Filter informes by search - use useMemo for better performance
   const filteredInformes = React.useMemo(() => {
@@ -141,18 +168,27 @@ export default function VistaComite() {
     return grupos.filter(g => g.nombre.toLowerCase().includes(searchLower));
   }, [grupos, grupoSearch]);
 
+  // Filter informes sin grupo by search
+  const filteredInformesSinGrupo = React.useMemo(() => {
+    if (!informeSinGrupoSearch.trim()) return informesSinGrupo;
+    const searchLower = informeSinGrupoSearch.toLowerCase().trim();
+    return informesSinGrupo.filter(i => i.toLowerCase().includes(searchLower));
+  }, [informesSinGrupo, informeSinGrupoSearch]);
+
   const fetchOptions = async () => {
     try {
       const token = localStorage.getItem("token");
       const headers = { Authorization: `Bearer ${token}` };
       
-      const [optionsRes, gruposRes] = await Promise.all([
+      const [optionsRes, gruposRes, sinGrupoRes] = await Promise.all([
         axios.get(`${API}/dropdown-options`, { headers }),
         axios.get(`${API}/config/grupos-informes`, { headers }),
+        axios.get(`${API}/config/informes-sin-grupo`, { headers }),
       ]);
       
       setOptions(optionsRes.data);
       setGrupos(gruposRes.data);
+      setInformesSinGrupo(sinGrupoRes.data);
       
       // Initially select all informes
       if (optionsRes.data.informes_pentest) {
@@ -170,7 +206,8 @@ export default function VistaComite() {
   const fetchData = useCallback(async () => {
     // Check if we have selections based on mode
     if (agruparPorGrupo) {
-      if (selectedGrupos.length === 0) {
+      // In group mode, need at least grupos OR informes sin grupo selected
+      if (selectedGrupos.length === 0 && selectedInformesSinGrupo.length === 0) {
         setData([]);
         setLoading(false);
         return;
@@ -192,6 +229,10 @@ export default function VistaComite() {
       
       if (agruparPorGrupo) {
         params.grupos = selectedGrupos.join(",");
+        // Also include individual reports without group
+        if (selectedInformesSinGrupo.length > 0) {
+          params.informes_adicionales = selectedInformesSinGrupo.join(",");
+        }
       } else {
         params.informes = selectedInformes.join(",");
       }
@@ -207,7 +248,7 @@ export default function VistaComite() {
     } finally {
       setLoading(false);
     }
-  }, [selectedInformes, selectedGrupos, selectedSeveridades, agruparPorGrupo]);
+  }, [selectedInformes, selectedGrupos, selectedInformesSinGrupo, selectedSeveridades, agruparPorGrupo]);
 
   useEffect(() => {
     fetchOptions();
@@ -254,10 +295,66 @@ export default function VistaComite() {
     setSelectedGrupos([]);
   };
 
+  // Informes sin grupo handlers
+  const handleInformeSinGrupoToggle = (informe) => {
+    setSelectedInformesSinGrupo(prev =>
+      prev.includes(informe)
+        ? prev.filter(i => i !== informe)
+        : [...prev, informe]
+    );
+  };
+
+  const handleSelectAllInformesSinGrupo = () => {
+    setSelectedInformesSinGrupo([...informesSinGrupo]);
+  };
+
+  const handleClearInformesSinGrupo = () => {
+    setSelectedInformesSinGrupo([]);
+  };
+
   // Toggle grouping mode
   const handleToggleGroupMode = (checked) => {
     setAgruparPorGrupo(checked);
+    setSelectedInformesSinGrupo([]); // Reset informes sin grupo selection
     setLoading(true);
+  };
+
+  // Open detail modal
+  const handleOpenDetail = async (row) => {
+    setDetailData(row);
+    setDetailModalOpen(true);
+    setDetailLoading(true);
+    
+    try {
+      const token = localStorage.getItem("token");
+      // Get vulnerabilities for this row
+      const informesToFetch = row.es_grupo && row.informes_incluidos?.length > 0
+        ? row.informes_incluidos
+        : [row.informe];
+      
+      // Build URL with multiple informe_pentest params
+      const params = new URLSearchParams();
+      informesToFetch.forEach(inf => params.append("informe_pentest", inf));
+      params.append("limit", "500");
+      
+      const response = await axios.get(`${API}/vulnerabilidades?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      setDetailVulnerabilities(response.data.items || response.data || []);
+    } catch (error) {
+      console.error("Error fetching vulnerabilities:", error);
+      toast.error("Error al cargar vulnerabilidades");
+      setDetailVulnerabilities([]);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const closeDetailModal = () => {
+    setDetailModalOpen(false);
+    setDetailData(null);
+    setDetailVulnerabilities([]);
   };
 
   const handleSeveridadToggle = (severidad) => {
@@ -669,6 +766,85 @@ export default function VistaComite() {
               </Popover>
             )}
 
+            {/* Informes sin grupo (in group mode - to add individual reports) */}
+            {agruparPorGrupo && informesSinGrupo.length > 0 && (
+              <Popover open={informesSinGrupoPopoverOpen} onOpenChange={setInformesSinGrupoPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="border-yellow-700 text-yellow-300 hover:bg-yellow-900/30 min-w-[180px] justify-between"
+                    data-testid="filter-informes-sin-grupo"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    <span className="truncate">
+                      {selectedInformesSinGrupo.length === 0
+                        ? "Agregar informes..."
+                        : `+${selectedInformesSinGrupo.length} informes`}
+                    </span>
+                    <ChevronDown className="w-4 h-4 ml-2" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] bg-zinc-900 border-zinc-700 p-0" align="start">
+                  <div className="p-3 border-b border-zinc-700 space-y-2">
+                    <p className="text-xs text-yellow-400 mb-2">
+                      Añade informes individuales (sin grupo) a la vista
+                    </p>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                      <Input
+                        placeholder="Buscar informe..."
+                        value={informeSinGrupoSearch}
+                        onChange={(e) => setInformeSinGrupoSearch(e.target.value)}
+                        className="pl-9 bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleSelectAllInformesSinGrupo}
+                        className="text-xs text-zinc-400 hover:text-white"
+                      >
+                        <Check className="w-3 h-3 mr-1" /> Todos
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleClearInformesSinGrupo}
+                        className="text-xs text-zinc-400 hover:text-white"
+                      >
+                        <X className="w-3 h-3 mr-1" /> Ninguno
+                      </Button>
+                    </div>
+                  </div>
+                  <ScrollArea className="h-[250px]">
+                    <div className="p-2 space-y-1">
+                      {filteredInformesSinGrupo.map((informe) => (
+                        <div
+                          key={informe}
+                          className="flex items-center space-x-2 p-2 rounded hover:bg-zinc-800 cursor-pointer"
+                          onClick={() => handleInformeSinGrupoToggle(informe)}
+                        >
+                          <Checkbox
+                            checked={selectedInformesSinGrupo.includes(informe)}
+                            onCheckedChange={() => handleInformeSinGrupoToggle(informe)}
+                          />
+                          <Label className="text-sm text-zinc-300 cursor-pointer break-words whitespace-normal">
+                            {informe}
+                          </Label>
+                        </div>
+                      ))}
+                      {filteredInformesSinGrupo.length === 0 && (
+                        <p className="text-center text-zinc-500 py-4 text-sm">
+                          {informeSinGrupoSearch ? "No se encontraron informes" : "No hay informes sin grupo"}
+                        </p>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
+            )}
+
             {/* Informes Filter (when not grouping) */}
             {!agruparPorGrupo && (
               <Popover open={informesPopoverOpen} onOpenChange={setInformesPopoverOpen}>
@@ -820,15 +996,16 @@ export default function VistaComite() {
                   {data.map((row, idx) => (
                     <TableRow
                       key={idx}
-                      className="border-zinc-800 hover:bg-zinc-800/50"
+                      className="border-zinc-800 hover:bg-zinc-800/50 cursor-pointer group"
                       data-testid={`comite-row-${idx}`}
+                      onClick={() => handleOpenDetail(row)}
                     >
                       <TableCell className="text-white font-medium whitespace-normal break-words">
                         <div className="flex items-start gap-2">
                           {row.es_grupo && (
                             <TooltipProvider>
                               <Tooltip>
-                                <TooltipTrigger>
+                                <TooltipTrigger onClick={(e) => e.stopPropagation()}>
                                   <FolderOpen className="w-4 h-4 text-indigo-400 mt-0.5 flex-shrink-0" />
                                 </TooltipTrigger>
                                 <TooltipContent className="bg-zinc-800 border-zinc-700 max-w-sm">
@@ -845,7 +1022,8 @@ export default function VistaComite() {
                               </Tooltip>
                             </TooltipProvider>
                           )}
-                          <span>{row.informe}</span>
+                          <span className="group-hover:text-indigo-400 transition-colors">{row.informe}</span>
+                          <Eye className="w-3 h-3 text-zinc-600 group-hover:text-indigo-400 transition-colors opacity-0 group-hover:opacity-100 ml-1 flex-shrink-0" />
                         </div>
                       </TableCell>
                       {selectedSeveridades.includes("Critica") && (
@@ -931,6 +1109,135 @@ export default function VistaComite() {
           )}
         </CardContent>
       </Card>
+
+      {/* Detail Modal */}
+      <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
+        <DialogContent className="bg-zinc-900 border-zinc-800 max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              {detailData?.es_grupo ? (
+                <FolderOpen className="w-5 h-5 text-indigo-400" />
+              ) : (
+                <FileText className="w-5 h-5 text-indigo-400" />
+              )}
+              {detailData?.informe}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {/* Summary badges */}
+          {detailData && (
+            <div className="flex flex-wrap gap-2 py-2 border-b border-zinc-800">
+              <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
+                Críticas: {detailData.criticas_pendientes}/{detailData.criticas_total}
+              </Badge>
+              <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30">
+                Altas: {detailData.altas_pendientes}/{detailData.altas_total}
+              </Badge>
+              <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
+                Medias: {detailData.medias_pendientes}/{detailData.medias_total}
+              </Badge>
+              <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                Bajas: {detailData.bajas_pendientes}/{detailData.bajas_total}
+              </Badge>
+              {detailData.es_grupo && detailData.informes_incluidos?.length > 0 && (
+                <Badge variant="outline" className="bg-indigo-500/10 text-indigo-400 border-indigo-500/30">
+                  {detailData.informes_incluidos.length} informes incluidos
+                </Badge>
+              )}
+            </div>
+          )}
+
+          {/* Vulnerabilities table */}
+          <ScrollArea className="flex-1 overflow-auto">
+            {detailLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+              </div>
+            ) : detailVulnerabilities.length === 0 ? (
+              <div className="text-center py-12 text-zinc-500">
+                No se encontraron vulnerabilidades
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-zinc-700 hover:bg-transparent">
+                    <TableHead className="text-zinc-400 w-[80px]">Código</TableHead>
+                    <TableHead className="text-zinc-400">Vulnerabilidad</TableHead>
+                    <TableHead className="text-zinc-400 w-[90px]">Severidad</TableHead>
+                    <TableHead className="text-zinc-400 w-[100px]">Estatus</TableHead>
+                    <TableHead className="text-zinc-400">Responsable</TableHead>
+                    {detailData?.es_grupo && (
+                      <TableHead className="text-zinc-400">Informe</TableHead>
+                    )}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {detailVulnerabilities.map((vuln, idx) => (
+                    <TableRow key={vuln.id || idx} className="border-zinc-800 hover:bg-zinc-800/50">
+                      <TableCell className="text-zinc-400 font-mono text-xs">
+                        {vuln.codigo || "-"}
+                      </TableCell>
+                      <TableCell className="text-white max-w-[300px]">
+                        <p className="truncate" title={vuln.vulnerabilidad}>
+                          {vuln.vulnerabilidad || "-"}
+                        </p>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={
+                            vuln.severidad === "Critica" ? "bg-red-500/20 text-red-400 border-red-500/30" :
+                            vuln.severidad === "Alta" ? "bg-orange-500/20 text-orange-400 border-orange-500/30" :
+                            vuln.severidad === "Media" ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" :
+                            "bg-green-500/20 text-green-400 border-green-500/30"
+                          }
+                        >
+                          {vuln.severidad || "-"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={
+                            vuln.estatus === "Cerrado" || vuln.estatus === "Corregido" ? "bg-green-500/20 text-green-400 border-green-500/30" :
+                            vuln.estatus === "Pendiente" ? "bg-red-500/20 text-red-400 border-red-500/30" :
+                            vuln.estatus === "En Proceso" ? "bg-blue-500/20 text-blue-400 border-blue-500/30" :
+                            "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
+                          }
+                        >
+                          {vuln.estatus || "-"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-zinc-300 text-sm">
+                        {vuln.responsable || "-"}
+                      </TableCell>
+                      {detailData?.es_grupo && (
+                        <TableCell className="text-zinc-400 text-xs max-w-[150px] truncate" title={vuln.nombre_informe_pentest}>
+                          {vuln.nombre_informe_pentest || "-"}
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </ScrollArea>
+          
+          {/* Footer */}
+          <div className="flex items-center justify-between pt-4 border-t border-zinc-800">
+            <span className="text-sm text-zinc-500">
+              {detailVulnerabilities.length} vulnerabilidades
+            </span>
+            <Button
+              variant="outline"
+              onClick={closeDetailModal}
+              className="border-zinc-700 text-zinc-300"
+            >
+              Cerrar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

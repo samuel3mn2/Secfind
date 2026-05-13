@@ -1993,8 +1993,9 @@ async def get_dashboard_tendencias(
 @api_router.get("/vista-comite")
 async def get_vista_comite(
     informes: str = "",
-    grupos: str = "",  # NEW: comma-separated group IDs
-    agrupar_por: str = "informe",  # NEW: "informe" or "grupo"
+    grupos: str = "",  # comma-separated group IDs
+    informes_adicionales: str = "",  # NEW: individual reports to add (without group) in group mode
+    agrupar_por: str = "informe",  # "informe" or "grupo"
     severidades: str = "Critica,Alta,Media,Baja",
     current_user: CurrentUser = Depends(get_current_user)
 ):
@@ -2004,7 +2005,10 @@ async def get_vista_comite(
     
     agrupar_por: 
       - "informe": agrupa por informe individual (comportamiento original)
-      - "grupo": agrupa por grupo de informes
+      - "grupo": agrupa por grupo de informes (grupos consolidados + informes adicionales individuales)
+    
+    informes_adicionales: cuando agrupar_por=grupo, permite añadir informes individuales
+                          que no pertenecen a ningún grupo (aparecen como filas separadas)
     """
     if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
         raise HTTPException(status_code=403, detail="No tiene permisos para ver este módulo")
@@ -2012,21 +2016,27 @@ async def get_vista_comite(
     # Parse filters
     informes_list = [i.strip() for i in informes.split(",") if i.strip()] if informes else []
     grupos_list = [g.strip() for g in grupos.split(",") if g.strip()] if grupos else []
+    informes_adicionales_list = [i.strip() for i in informes_adicionales.split(",") if i.strip()] if informes_adicionales else []
     severidades_list = [s.strip() for s in severidades.split(",") if s.strip()] if severidades else []
     
     # If grouping by "grupo", expand grupo IDs to their report names
-    grupo_to_informes = {}  # Maps grupo_id/nombre -> list of informes
+    grupo_to_informes = {}  # Maps grupo_nombre -> list of informes
     
-    if agrupar_por == "grupo" and grupos_list:
-        # Fetch groups and their reports
-        grupos_docs = await db.grupos_informes.find(
-            {"$or": [{"id": {"$in": grupos_list}}, {"nombre": {"$in": grupos_list}}]},
-            {"_id": 0}
-        ).to_list(1000)
+    if agrupar_por == "grupo":
+        if grupos_list:
+            # Fetch groups and their reports
+            grupos_docs = await db.grupos_informes.find(
+                {"$or": [{"id": {"$in": grupos_list}}, {"nombre": {"$in": grupos_list}}]},
+                {"_id": 0}
+            ).to_list(1000)
+            
+            for g in grupos_docs:
+                grupo_to_informes[g["nombre"]] = g.get("informes", [])
+                informes_list.extend(g.get("informes", []))
         
-        for g in grupos_docs:
-            grupo_to_informes[g["nombre"]] = g.get("informes", [])
-            informes_list.extend(g.get("informes", []))
+        # Add informes_adicionales (they will appear as individual rows)
+        if informes_adicionales_list:
+            informes_list.extend(informes_adicionales_list)
         
         informes_list = list(set(informes_list))  # Remove duplicates
     
