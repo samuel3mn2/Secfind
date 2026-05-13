@@ -3,6 +3,8 @@
 ## Última Actualización: 2025-12-13
 
 ### Cambios Recientes
+- **Modal de Detalle en Vista Comité**: Al hacer clic en cualquier fila de la tabla, se abre un modal con todas las vulnerabilidades del informe/grupo, incluyendo código, severidad, estatus y responsable.
+- **Vista Mixta (Grupos + Informes Individuales)**: En modo "Por Grupo", se puede agregar informes individuales (sin grupo) a la tabla para crear vistas personalizadas según las necesidades de los directivos.
 - **Grupos de Informes en Vista Comité**: Nueva funcionalidad para agrupar múltiples informes de pentest bajo un nombre de grupo. Permite consolidar la vista ejecutiva y alternar entre modo Individual y Por Grupo.
 - **Parser PDF sin IA**: Nuevo parser basado en reglas para informes de Pentraze Cybersecurity. No requiere API key ni costos adicionales
 - **Entrada Masiva**: Formulario tipo spreadsheet para agregar múltiples vulnerabilidades a la vez con opción de pegar desde Excel
@@ -102,6 +104,15 @@ REACT_APP_BACKEND_URL=http://localhost:8001
   - [x] Ícono de carpeta para identificar grupos en la tabla
   - [x] Tooltip con lista de informes incluidos en cada grupo
   - [x] Consolidación de métricas por grupo
+- [x] **Modal de Detalle** (NUEVO - Dic 2025):
+  - [x] Click en cualquier fila abre modal con vulnerabilidades
+  - [x] Muestra código, vulnerabilidad, severidad, estatus, responsable
+  - [x] Para grupos: columna adicional con nombre del informe
+  - [x] Badges con conteos por severidad
+- [x] **Vista Mixta** (NUEVO - Dic 2025):
+  - [x] Botón "Agregar informes..." para añadir informes individuales
+  - [x] Combina grupos + informes sin grupo en la misma tabla
+  - [x] Ícono diferenciador (carpeta para grupos, nada para individuales)
 
 ### Grupos de Informes (NUEVO - Dic 2025)
 - [x] Nueva pestaña "Grupos Informes" en Configuración
