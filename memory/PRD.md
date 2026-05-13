@@ -1,8 +1,9 @@
 # SecFind - Sistema de Gestión de Vulnerabilidades
 
-## Última Actualización: 2025-12-01
+## Última Actualización: 2025-12-13
 
 ### Cambios Recientes
+- **Grupos de Informes en Vista Comité**: Nueva funcionalidad para agrupar múltiples informes de pentest bajo un nombre de grupo. Permite consolidar la vista ejecutiva y alternar entre modo Individual y Por Grupo.
 - **Parser PDF sin IA**: Nuevo parser basado en reglas para informes de Pentraze Cybersecurity. No requiere API key ni costos adicionales
 - **Entrada Masiva**: Formulario tipo spreadsheet para agregar múltiples vulnerabilidades a la vez con opción de pegar desde Excel
 - **Campo Código**: Agregado campo "Código" a vulnerabilidades para identificación única
@@ -95,6 +96,20 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - [x] Fila TOTALES con suma de todas las filas
 - [x] Exportar CSV (incluye Tiempo Activo)
 - [x] **Exportar Imagen PNG fondo BLANCO** (para presentaciones PowerPoint)
+- [x] **Grupos de Informes** (NUEVO - Dic 2025):
+  - [x] Toggle para alternar entre vista "Individual" y "Por Grupo"
+  - [x] Filtro de grupos cuando está en modo agrupado
+  - [x] Ícono de carpeta para identificar grupos en la tabla
+  - [x] Tooltip con lista de informes incluidos en cada grupo
+  - [x] Consolidación de métricas por grupo
+
+### Grupos de Informes (NUEVO - Dic 2025)
+- [x] Nueva pestaña "Grupos Informes" en Configuración
+- [x] CRUD completo de grupos (crear, leer, actualizar, eliminar)
+- [x] Asignar múltiples informes a un grupo
+- [x] Validación: un informe solo puede pertenecer a un grupo
+- [x] Vista de informes sin asignar
+- [x] KPIs: Total grupos, Informes agrupados, Informes sin grupo
 
 ### Gestión de Vulnerabilidades
 - [x] Tabla CRUD con búsqueda (texto visible)
@@ -226,12 +241,37 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 
 ## Backlog
 
+### P0 (Alta Prioridad)
+- [ ] Detección de duplicados en importación y creación manual
+
+### P1 (Media-Alta Prioridad)
+- [ ] Integración con herramientas de scanning (Nessus, Qualys, etc.)
+
 ### P2 (Media Prioridad)
-- [ ] Detección de duplicados en importación
 - [ ] Historial de cambios en catálogos de configuración (instituciones, aplicaciones, etc.)
+- [ ] Refactorización de server.py en routers modulares (deuda técnica)
 
 ### P3 (Baja Prioridad)
 - [ ] Dashboard comparativo por períodos
-- [ ] Integración con herramientas de scanning
 - [ ] Ejecución automática programada de notificaciones (cron job)
 
+## Notas Técnicas
+
+### Colección MongoDB: grupos_informes
+```json
+{
+  "id": "uuid",
+  "nombre": "Nombre del grupo",
+  "descripcion": "Descripción opcional",
+  "informes": ["Informe 1", "Informe 2"],
+  "created_at": "ISO datetime"
+}
+```
+
+### Endpoints Nuevos (Dic 2025)
+- `GET /api/config/grupos-informes` - Lista grupos
+- `POST /api/config/grupos-informes` - Crear grupo
+- `PUT /api/config/grupos-informes/{id}` - Actualizar grupo
+- `DELETE /api/config/grupos-informes/{id}` - Eliminar grupo
+- `GET /api/config/informes-sin-grupo` - Informes no asignados
+- `GET /api/vista-comite?agrupar_por=grupo&grupos=id1,id2` - Vista agrupada
