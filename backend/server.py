@@ -143,6 +143,25 @@ class Vulnerabilidad(VulnerabilidadBase):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+# Report Groups Model
+class GrupoInformesBase(BaseModel):
+    nombre: str
+    descripcion: Optional[str] = None
+    informes: List[str] = []  # List of report names that belong to this group
+
+class GrupoInformesCreate(GrupoInformesBase):
+    pass
+
+class GrupoInformesUpdate(BaseModel):
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
+    informes: Optional[List[str]] = None
+
+class GrupoInformes(GrupoInformesBase):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 # ============ CONFIGURATION MODELS ============
 
 class Institucion(BaseModel):
@@ -928,6 +947,106 @@ async def delete_responsable(responsable_id: str, current_user: CurrentUser = De
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Responsable no encontrado")
     return {"message": "Responsable eliminado exitosamente"}
+
+# ============ REPORT GROUPS ENDPOINTS ============
+
+@api_router.get("/config/grupos-informes")
+async def get_grupos_informes(current_user: CurrentUser = Depends(get_current_user)):
+    """Get all report groups"""
+    if not current_user.es_admin and not current_user.permisos.configuracion.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos para ver grupos de informes")
+    
+    grupos = await db.grupos_informes.find({}, {"_id": 0}).to_list(1000)
+    return grupos
+
+@api_router.post("/config/grupos-informes")
+async def create_grupo_informes(data: GrupoInformesCreate, current_user: CurrentUser = Depends(get_current_user)):
+    """Create a new report group"""
+    if not current_user.es_admin and not current_user.permisos.configuracion.crear:
+        raise HTTPException(status_code=403, detail="No tiene permisos para crear grupos")
+    
+    # Check if name already exists
+    existing = await db.grupos_informes.find_one({"nombre": {"$regex": f"^{data.nombre}$", "$options": "i"}})
+    if existing:
+        raise HTTPException(status_code=400, detail="Ya existe un grupo con ese nombre")
+    
+    # Check that reports are not already in another group
+    if data.informes:
+        for informe in data.informes:
+            other_group = await db.grupos_informes.find_one({"informes": informe})
+            if other_group:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"El informe '{informe}' ya pertenece al grupo '{other_group['nombre']}'"
+                )
+    
+    grupo = GrupoInformes(**data.model_dump())
+    doc = grupo.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.grupos_informes.insert_one(doc)
+    
+    return {"id": grupo.id, "nombre": grupo.nombre, "informes": grupo.informes, "descripcion": grupo.descripcion}
+
+@api_router.put("/config/grupos-informes/{grupo_id}")
+async def update_grupo_informes(grupo_id: str, data: GrupoInformesUpdate, current_user: CurrentUser = Depends(get_current_user)):
+    """Update a report group"""
+    if not current_user.es_admin and not current_user.permisos.configuracion.editar:
+        raise HTTPException(status_code=403, detail="No tiene permisos para editar grupos")
+    
+    existing = await db.grupos_informes.find_one({"id": grupo_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Grupo no encontrado")
+    
+    update_data = data.model_dump(exclude_unset=True)
+    
+    # If updating reports, check they're not in another group
+    if "informes" in update_data:
+        for informe in update_data["informes"]:
+            other_group = await db.grupos_informes.find_one({
+                "informes": informe,
+                "id": {"$ne": grupo_id}
+            })
+            if other_group:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"El informe '{informe}' ya pertenece al grupo '{other_group['nombre']}'"
+                )
+    
+    await db.grupos_informes.update_one({"id": grupo_id}, {"$set": update_data})
+    
+    updated = await db.grupos_informes.find_one({"id": grupo_id}, {"_id": 0})
+    return updated
+
+@api_router.delete("/config/grupos-informes/{grupo_id}")
+async def delete_grupo_informes(grupo_id: str, current_user: CurrentUser = Depends(get_current_user)):
+    """Delete a report group"""
+    if not current_user.es_admin and not current_user.permisos.configuracion.eliminar:
+        raise HTTPException(status_code=403, detail="No tiene permisos para eliminar grupos")
+    
+    result = await db.grupos_informes.delete_one({"id": grupo_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Grupo no encontrado")
+    return {"message": "Grupo eliminado exitosamente"}
+
+@api_router.get("/config/informes-sin-grupo")
+async def get_informes_sin_grupo(current_user: CurrentUser = Depends(get_current_user)):
+    """Get reports that are not assigned to any group"""
+    if not current_user.es_admin and not current_user.permisos.configuracion.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos")
+    
+    # Get all reports
+    informes = await db.informes_pentest.find({}, {"_id": 0, "nombre": 1}).to_list(1000)
+    all_report_names = [i["nombre"] for i in informes]
+    
+    # Get all reports that are in groups
+    grupos = await db.grupos_informes.find({}, {"_id": 0, "informes": 1}).to_list(1000)
+    reports_in_groups = set()
+    for g in grupos:
+        reports_in_groups.update(g.get("informes", []))
+    
+    # Return reports not in any group
+    informes_sin_grupo = [r for r in all_report_names if r not in reports_in_groups]
+    return informes_sin_grupo
 
 # ============ NOTIFICATION CONFIGURATION ENDPOINTS ============
 
@@ -1874,19 +1993,42 @@ async def get_dashboard_tendencias(
 @api_router.get("/vista-comite")
 async def get_vista_comite(
     informes: str = "",
+    grupos: str = "",  # NEW: comma-separated group IDs
+    agrupar_por: str = "informe",  # NEW: "informe" or "grupo"
     severidades: str = "Critica,Alta,Media,Baja",
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """
     Agregación de vulnerabilidades por informe de pentest para vista de comité.
     Retorna pendientes/total por severidad, responsables, y porcentaje de pendientes.
+    
+    agrupar_por: 
+      - "informe": agrupa por informe individual (comportamiento original)
+      - "grupo": agrupa por grupo de informes
     """
     if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
         raise HTTPException(status_code=403, detail="No tiene permisos para ver este módulo")
     
     # Parse filters
     informes_list = [i.strip() for i in informes.split(",") if i.strip()] if informes else []
+    grupos_list = [g.strip() for g in grupos.split(",") if g.strip()] if grupos else []
     severidades_list = [s.strip() for s in severidades.split(",") if s.strip()] if severidades else []
+    
+    # If grouping by "grupo", expand grupo IDs to their report names
+    grupo_to_informes = {}  # Maps grupo_id/nombre -> list of informes
+    
+    if agrupar_por == "grupo" and grupos_list:
+        # Fetch groups and their reports
+        grupos_docs = await db.grupos_informes.find(
+            {"$or": [{"id": {"$in": grupos_list}}, {"nombre": {"$in": grupos_list}}]},
+            {"_id": 0}
+        ).to_list(1000)
+        
+        for g in grupos_docs:
+            grupo_to_informes[g["nombre"]] = g.get("informes", [])
+            informes_list.extend(g.get("informes", []))
+        
+        informes_list = list(set(informes_list))  # Remove duplicates
     
     if not informes_list:
         return []
@@ -1903,17 +2045,25 @@ async def get_vista_comite(
         {"_id": 0, "nombre_informe_pentest": 1, "severidad": 1, "estatus": 1, "responsable": 1, "fecha_hallazgo": 1}
     ).to_list(50000)
     
-    # Aggregate by informe
+    # Create reverse mapping: informe -> grupo_nombre
+    informe_to_grupo = {}
+    if agrupar_por == "grupo":
+        for grupo_nombre, grupo_informes in grupo_to_informes.items():
+            for inf in grupo_informes:
+                informe_to_grupo[inf] = grupo_nombre
+    
+    # Aggregate by informe or grupo
     from collections import defaultdict
     
-    informe_data = defaultdict(lambda: {
+    data_aggregation = defaultdict(lambda: {
         "criticas_pendientes": 0, "criticas_total": 0,
         "altas_pendientes": 0, "altas_total": 0,
         "medias_pendientes": 0, "medias_total": 0,
         "bajas_pendientes": 0, "bajas_total": 0,
         "total_pendientes": 0, "total_hallazgos": 0,
         "responsables": set(),
-        "fecha_mas_antigua": None
+        "fecha_mas_antigua": None,
+        "informes_incluidos": set()  # NEW: track which reports are in this group
     })
     
     for v in vulns:
