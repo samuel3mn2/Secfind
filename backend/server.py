@@ -2850,6 +2850,54 @@ Reglas IMPORTANTES:
         logging.error(f"PDF extraction error: {e}")
         raise HTTPException(status_code=500, detail=f"Error al procesar el PDF: {str(e)}")
 
+
+
+@api_router.post("/import/pdf/extract-rules")
+async def extract_vulnerabilities_from_pdf_rules(
+    file: UploadFile = File(...),
+    parser_type: str = "pentraze",
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Extract vulnerabilities from a PDF using rule-based parser (no AI required).
+    Currently supports: pentraze (Pentraze Cybersecurity reports)
+    """
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.crear:
+        raise HTTPException(status_code=403, detail="No tiene permisos para importar")
+    
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="El archivo debe ser PDF")
+    
+    try:
+        contents = await file.read()
+        
+        if parser_type == "pentraze":
+            from pdf_parsers.pentraze_parser import parse_pentraze_pdf
+            result = parse_pentraze_pdf(contents)
+        else:
+            raise HTTPException(status_code=400, detail=f"Parser '{parser_type}' no soportado. Disponibles: pentraze")
+        
+        if not result.get('vulnerabilities'):
+            raise HTTPException(
+                status_code=400, 
+                detail="No se encontraron vulnerabilidades en el PDF. Verifique que el formato sea compatible."
+            )
+        
+        return {
+            "success": True,
+            "parser_used": result.get('parser', parser_type),
+            "metadata": result.get('metadata', {}),
+            "vulnerabilities": result.get('vulnerabilities', []),
+            "total": result.get('total', 0),
+            "message": f"Se extrajeron {result.get('total', 0)} vulnerabilidades usando parser '{parser_type}'"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"PDF rules extraction error: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al procesar el PDF: {str(e)}")
+
 @api_router.post("/import/pdf/add-vulnerability")
 async def add_vulnerability_from_pdf(
     data: VulnerabilidadParaAgregar,

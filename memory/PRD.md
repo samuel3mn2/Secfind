@@ -3,13 +3,12 @@
 ## Última Actualización: 2025-12-01
 
 ### Cambios Recientes
-- **Campo Código**: Agregado campo "Código" a vulnerabilidades para identificación única. Disponible en tabla, formulario, importación y exportación
+- **Parser PDF sin IA**: Nuevo parser basado en reglas para informes de Pentraze Cybersecurity. No requiere API key ni costos adicionales
+- **Entrada Masiva**: Formulario tipo spreadsheet para agregar múltiples vulnerabilidades a la vez con opción de pegar desde Excel
+- **Campo Código**: Agregado campo "Código" a vulnerabilidades para identificación única
 - **Instalación Local**: Creado `requirements-local.txt` y documentación para instalar sin emergentintegrations
 - **Cambio de Contraseña Obligatorio**: Los nuevos usuarios deben cambiar su contraseña en el primer inicio de sesión
 - **Exportación con Filtros**: La exportación a Excel/CSV respeta los filtros aplicados y columnas seleccionadas
-- **Autocompletado de Contraseñas**: Formularios de login y cambio de contraseña ahora soportan guardado en navegador
-- **Filtro Tipo Fecha en Seguimiento**: Filtro "Todas / Con fecha / Sin fecha" en Seguimiento de Riesgos
-- **Filtro Anual en Dashboard**: Opción "Anual" y filtro por año específico en gráfica de tendencias
 
 ## Problema Original
 Aplicación web para la Gestión de Vulnerabilidades de Ciberseguridad, reemplazando un flujo de trabajo basado en Excel. Permite operaciones CRUD sobre hallazgos de pentests con Dashboard visual e intuitivo para presentaciones ejecutivas.

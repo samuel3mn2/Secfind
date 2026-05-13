@@ -75,6 +75,8 @@ export default function ImportarPDF({ onClose, onSuccess }) {
   const [addedVulns, setAddedVulns] = useState([]);
   const [options, setOptions] = useState(null);
   const [showConfirmAdd, setShowConfirmAdd] = useState(false);
+  const [extractionMethod, setExtractionMethod] = useState("rules"); // "ai" or "rules"
+  const [parserType, setParserType] = useState("pentraze");
 
   const canImport = isAdmin || canCreate("vulnerabilidades");
 
@@ -104,33 +106,95 @@ export default function ImportarPDF({ onClose, onSuccess }) {
     formData.append('file', file);
 
     try {
-      // Get token from localStorage
       const token = localStorage.getItem("token");
-      const response = await axios.post(`${API}/import/pdf/extract`, formData, {
-        headers: { 
-          'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${token}`
+      let response;
+      
+      if (extractionMethod === "rules") {
+        // Use rule-based parser (no AI required)
+        formData.append('parser_type', parserType);
+        response = await axios.post(`${API}/import/pdf/extract-rules`, formData, {
+          headers: { 
+            'Content-Type': 'multipart/form-data',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        // Transform response to match AI format
+        const rulesData = response.data;
+        setExtractedData({
+          nombre_informe: rulesData.metadata?.nombre_informe || "",
+          fecha_informe: rulesData.metadata?.fecha_informe || "",
+          institucion: rulesData.metadata?.institucion || "",
+          proveedor: rulesData.metadata?.proveedor || "",
+          aplicacion_evaluada: "",
+          vulnerabilidades: rulesData.vulnerabilities?.map(v => ({
+            titulo: v.vulnerabilidad,
+            severidad: v.severidad,
+            activos_tecnicos: v.aplicaciones || [],
+            descripcion: v.descripcion_riesgo || "",
+            impacto: v.riesgo_asociado || "",
+            recomendaciones: v.recomendaciones || "",
+            codigo: v.codigo || "",
+          })) || [],
+          // For rules parser, items come pre-formatted
+          aplicaciones_nuevas: [],
+          informes_nuevos: rulesData.metadata?.nombre_informe ? [rulesData.metadata.nombre_informe] : [],
+          proveedores_nuevos: rulesData.metadata?.proveedor ? [rulesData.metadata.proveedor] : [],
+          instituciones_nuevas: [],
+        });
+        
+        await fetchOptions();
+        setStep(3);
+        
+        // Prepare first vulnerability
+        if (rulesData.vulnerabilities?.length > 0) {
+          const vuln = rulesData.vulnerabilities[0];
+          setEditingVuln({
+            codigo: vuln.codigo || "",
+            fecha_hallazgo: rulesData.metadata?.fecha_informe || new Date().toISOString().split('T')[0],
+            institucion: rulesData.metadata?.institucion || "",
+            aplicaciones: vuln.aplicaciones || [],
+            vulnerabilidad: vuln.vulnerabilidad || "",
+            recomendaciones: vuln.recomendaciones || "",
+            severidad: vuln.severidad || "Media",
+            estatus: "Pendiente",
+            nombre_informe_pentest: rulesData.metadata?.nombre_informe || "",
+            proveedor: rulesData.metadata?.proveedor || "",
+            descripcion_riesgo: vuln.descripcion_riesgo || "",
+            riesgo_asociado: vuln.riesgo_asociado || "",
+          });
         }
-      });
-      
-      setExtractedData(response.data);
-      await fetchOptions();
-      
-      // Check if there are new catalog items
-      const hasNewItems = 
-        response.data.aplicaciones_nuevas?.length > 0 ||
-        response.data.informes_nuevos?.length > 0 ||
-        response.data.proveedores_nuevos?.length > 0 ||
-        response.data.instituciones_nuevas?.length > 0;
-      
-      if (hasNewItems) {
-        setStep(2); // Go to catalog review
+        
+        toast.success(`Se extrajeron ${rulesData.total || 0} vulnerabilidades usando parser de reglas`);
+        
       } else {
-        setStep(3); // Go directly to vulnerability review
-        prepareFirstVuln(response.data);
+        // Use AI-based extraction
+        response = await axios.post(`${API}/import/pdf/extract`, formData, {
+          headers: { 
+            'Content-Type': 'multipart/form-data',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        setExtractedData(response.data);
+        await fetchOptions();
+        
+        // Check if there are new catalog items
+        const hasNewItems = 
+          response.data.aplicaciones_nuevas?.length > 0 ||
+          response.data.informes_nuevos?.length > 0 ||
+          response.data.proveedores_nuevos?.length > 0 ||
+          response.data.instituciones_nuevas?.length > 0;
+        
+        if (hasNewItems) {
+          setStep(2); // Go to catalog review
+        } else {
+          setStep(3); // Go directly to vulnerability review
+          prepareFirstVuln(response.data);
+        }
+        
+        toast.success(`Se extrajeron ${response.data.vulnerabilidades?.length || 0} vulnerabilidades del PDF`);
       }
-      
-      toast.success(`Se extrajeron ${response.data.vulnerabilidades?.length || 0} vulnerabilidades del PDF`);
     } catch (error) {
       console.error("Error extracting:", error);
       toast.error(error.response?.data?.detail || "Error al procesar el PDF");
@@ -351,6 +415,54 @@ export default function ImportarPDF({ onClose, onSuccess }) {
           </p>
         </div>
 
+        {/* Extraction Method Selection */}
+        <div className="bg-zinc-800/50 rounded-lg p-4 space-y-3">
+          <Label className="text-zinc-300 text-sm font-medium">Método de Extracción</Label>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setExtractionMethod("rules")}
+              className={`p-3 rounded-lg border text-left transition-all ${
+                extractionMethod === "rules" 
+                  ? "border-green-500 bg-green-500/10 text-green-400" 
+                  : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-600"
+              }`}
+            >
+              <div className="font-medium mb-1">📋 Parser de Reglas</div>
+              <div className="text-xs opacity-75">Sin API Key • Gratis • Formato Pentraze</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setExtractionMethod("ai")}
+              className={`p-3 rounded-lg border text-left transition-all ${
+                extractionMethod === "ai" 
+                  ? "border-indigo-500 bg-indigo-500/10 text-indigo-400" 
+                  : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-600"
+              }`}
+            >
+              <div className="font-medium mb-1">🤖 Inteligencia Artificial</div>
+              <div className="text-xs opacity-75">Requiere API Key • Cualquier formato</div>
+            </button>
+          </div>
+          
+          {extractionMethod === "rules" && (
+            <div className="pt-2">
+              <Label className="text-zinc-400 text-xs">Tipo de Informe</Label>
+              <Select value={parserType} onValueChange={setParserType}>
+                <SelectTrigger className="mt-1 bg-zinc-900 border-zinc-700 text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-900 border-zinc-700">
+                  <SelectItem value="pentraze">Pentraze Cybersecurity</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-zinc-500 mt-1">
+                Compatible con informes de Pentraze Cybersecurity
+              </p>
+            </div>
+          )}
+        </div>
+
         <div 
           className="border-2 border-dashed border-zinc-700 rounded-xl p-8 text-center hover:border-indigo-500/50 transition-colors cursor-pointer"
           onClick={() => fileInputRef.current?.click()}
@@ -366,7 +478,9 @@ export default function ImportarPDF({ onClose, onSuccess }) {
           {loading ? (
             <div className="space-y-3">
               <Loader2 className="w-10 h-10 text-indigo-500 mx-auto animate-spin" />
-              <p className="text-zinc-400">Procesando PDF con IA...</p>
+              <p className="text-zinc-400">
+                {extractionMethod === "rules" ? "Procesando PDF con reglas..." : "Procesando PDF con IA..."}
+              </p>
               <p className="text-xs text-zinc-500">Esto puede tomar unos segundos</p>
             </div>
           ) : (
