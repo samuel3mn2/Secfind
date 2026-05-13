@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, Users, AppWindow, Truck, FileText, Bell, UserCircle, FolderOpen } from "lucide-react";
+import { Building2, Users, AppWindow, Truck, FileText, Bell, UserCircle, FolderOpen, History } from "lucide-react";
 import Instituciones from "@/pages/Instituciones";
 import Usuarios from "@/pages/Usuarios";
 import Aplicaciones from "@/pages/Aplicaciones";
@@ -10,6 +10,7 @@ import InformesPentest from "@/pages/InformesPentest";
 import Notificaciones from "@/pages/Notificaciones";
 import Responsables from "@/pages/Responsables";
 import GruposInformes from "@/pages/GruposInformes";
+import Auditoria from "@/pages/Auditoria";
 
 export default function Configuracion() {
   const { isAdmin, canView } = useAuth();
@@ -100,6 +101,16 @@ export default function Configuracion() {
               Notificaciones
             </TabsTrigger>
           )}
+          {isAdmin && (
+            <TabsTrigger 
+              value="auditoria" 
+              className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white"
+              data-testid="tab-auditoria"
+            >
+              <History className="w-4 h-4 mr-2" />
+              Auditoría
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="instituciones" className="mt-6">
@@ -135,6 +146,12 @@ export default function Configuracion() {
         {canViewUsers && (
           <TabsContent value="notificaciones" className="mt-6">
             <Notificaciones />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="auditoria" className="mt-6">
+            <Auditoria />
           </TabsContent>
         )}
       </Tabs>

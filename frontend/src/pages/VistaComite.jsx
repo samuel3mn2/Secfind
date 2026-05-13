@@ -43,6 +43,23 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Users,
   FileText,
   Filter,
@@ -61,6 +78,10 @@ import {
   Eye,
   ExternalLink,
   Loader2,
+  Save,
+  BookmarkCheck,
+  Trash2,
+  MoreHorizontal,
 } from "lucide-react";
 import html2canvas from "html2canvas";
 
@@ -130,6 +151,14 @@ export default function VistaComite() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailData, setDetailData] = useState(null);
   const [detailVulnerabilities, setDetailVulnerabilities] = useState([]);
+  
+  // Saved Views
+  const [vistasGuardadas, setVistasGuardadas] = useState([]);
+  const [saveViewModalOpen, setSaveViewModalOpen] = useState(false);
+  const [newViewName, setNewViewName] = useState("");
+  const [newViewDescription, setNewViewDescription] = useState("");
+  const [savingView, setSavingView] = useState(false);
+  const [deleteViewConfirm, setDeleteViewConfirm] = useState(null);
 
   const canViewModule = isAdmin || canView("vulnerabilidades");
 
@@ -180,15 +209,17 @@ export default function VistaComite() {
       const token = localStorage.getItem("token");
       const headers = { Authorization: `Bearer ${token}` };
       
-      const [optionsRes, gruposRes, sinGrupoRes] = await Promise.all([
+      const [optionsRes, gruposRes, sinGrupoRes, vistasRes] = await Promise.all([
         axios.get(`${API}/dropdown-options`, { headers }),
         axios.get(`${API}/config/grupos-informes`, { headers }),
         axios.get(`${API}/config/informes-sin-grupo`, { headers }),
+        axios.get(`${API}/vistas-guardadas`, { headers }),
       ]);
       
       setOptions(optionsRes.data);
       setGrupos(gruposRes.data);
       setInformesSinGrupo(sinGrupoRes.data);
+      setVistasGuardadas(vistasRes.data);
       
       // Initially select all informes
       if (optionsRes.data.informes_pentest) {
@@ -355,6 +386,75 @@ export default function VistaComite() {
     setDetailModalOpen(false);
     setDetailData(null);
     setDetailVulnerabilities([]);
+  };
+
+  // Saved Views Functions
+  const handleSaveView = async () => {
+    if (!newViewName.trim()) {
+      toast.error("El nombre de la vista es requerido");
+      return;
+    }
+    
+    setSavingView(true);
+    try {
+      const token = localStorage.getItem("token");
+      const viewData = {
+        nombre: newViewName.trim(),
+        descripcion: newViewDescription.trim() || null,
+        agrupar_por_grupo: agruparPorGrupo,
+        grupos_ids: selectedGrupos,
+        informes_adicionales: selectedInformesSinGrupo,
+        informes_individuales: selectedInformes,
+        severidades: selectedSeveridades,
+      };
+      
+      const response = await axios.post(`${API}/vistas-guardadas`, viewData, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      setVistasGuardadas(prev => [...prev, response.data].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+      toast.success("Vista guardada exitosamente");
+      setSaveViewModalOpen(false);
+      setNewViewName("");
+      setNewViewDescription("");
+    } catch (error) {
+      console.error("Error saving view:", error);
+      toast.error(error.response?.data?.detail || "Error al guardar la vista");
+    } finally {
+      setSavingView(false);
+    }
+  };
+
+  const handleLoadView = (vista) => {
+    // Apply the saved view configuration
+    setAgruparPorGrupo(vista.agrupar_por_grupo);
+    setSelectedSeveridades(vista.severidades || ["Critica", "Alta", "Media", "Baja"]);
+    
+    if (vista.agrupar_por_grupo) {
+      setSelectedGrupos(vista.grupos_ids || []);
+      setSelectedInformesSinGrupo(vista.informes_adicionales || []);
+    } else {
+      setSelectedInformes(vista.informes_individuales || []);
+    }
+    
+    setLoading(true);
+    toast.success(`Vista "${vista.nombre}" cargada`);
+  };
+
+  const handleDeleteView = async (vista) => {
+    try {
+      const token = localStorage.getItem("token");
+      await axios.delete(`${API}/vistas-guardadas/${vista.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      setVistasGuardadas(prev => prev.filter(v => v.id !== vista.id));
+      setDeleteViewConfirm(null);
+      toast.success("Vista eliminada");
+    } catch (error) {
+      console.error("Error deleting view:", error);
+      toast.error("Error al eliminar la vista");
+    }
   };
 
   const handleSeveridadToggle = (severidad) => {
@@ -543,7 +643,65 @@ export default function VistaComite() {
             Resumen ejecutivo de vulnerabilidades por informe de pentest
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {/* Saved Views Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="border-green-700 text-green-300 hover:bg-green-900/30"
+                data-testid="saved-views-btn"
+              >
+                <BookmarkCheck className="w-4 h-4 mr-2" />
+                Vistas
+                {vistasGuardadas.length > 0 && (
+                  <span className="ml-1 text-xs bg-green-500/30 px-1.5 py-0.5 rounded">
+                    {vistasGuardadas.length}
+                  </span>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-64 bg-zinc-900 border-zinc-700">
+              <DropdownMenuItem
+                onClick={() => setSaveViewModalOpen(true)}
+                className="text-green-400 focus:text-green-300 focus:bg-green-500/10 cursor-pointer"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Guardar vista actual
+              </DropdownMenuItem>
+              {vistasGuardadas.length > 0 && (
+                <>
+                  <DropdownMenuSeparator className="bg-zinc-700" />
+                  {vistasGuardadas.map((vista) => (
+                    <div key={vista.id} className="flex items-center group">
+                      <DropdownMenuItem
+                        onClick={() => handleLoadView(vista)}
+                        className="flex-1 text-zinc-300 focus:text-white focus:bg-white/10 cursor-pointer pr-2"
+                      >
+                        <BookmarkCheck className="w-4 h-4 mr-2 text-indigo-400" />
+                        <span className="truncate">{vista.nombre}</span>
+                      </DropdownMenuItem>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteViewConfirm(vista);
+                        }}
+                        className="p-1.5 text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </>
+              )}
+              {vistasGuardadas.length === 0 && (
+                <div className="px-2 py-3 text-center text-xs text-zinc-500">
+                  No hay vistas guardadas
+                </div>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          
           <Button
             variant="outline"
             onClick={handleRefresh}
@@ -1238,6 +1396,107 @@ export default function VistaComite() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Save View Modal */}
+      <Dialog open={saveViewModalOpen} onOpenChange={setSaveViewModalOpen}>
+        <DialogContent className="bg-zinc-900 border-zinc-800 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Save className="w-5 h-5 text-green-400" />
+              Guardar Vista Actual
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-zinc-300">Nombre de la vista *</Label>
+              <Input
+                value={newViewName}
+                onChange={(e) => setNewViewName(e.target.value)}
+                placeholder="Ej: Comité Q4 2024"
+                className="bg-zinc-800 border-zinc-700 text-white"
+                data-testid="input-view-name"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label className="text-zinc-300">Descripción (opcional)</Label>
+              <Input
+                value={newViewDescription}
+                onChange={(e) => setNewViewDescription(e.target.value)}
+                placeholder="Descripción de la vista..."
+                className="bg-zinc-800 border-zinc-700 text-white"
+              />
+            </div>
+            
+            <div className="text-xs text-zinc-500 bg-zinc-800/50 p-3 rounded-lg space-y-1">
+              <p className="font-medium text-zinc-400">Se guardará:</p>
+              <p>• Modo: {agruparPorGrupo ? "Por Grupo" : "Individual"}</p>
+              {agruparPorGrupo ? (
+                <>
+                  <p>• {selectedGrupos.length} grupos seleccionados</p>
+                  <p>• {selectedInformesSinGrupo.length} informes adicionales</p>
+                </>
+              ) : (
+                <p>• {selectedInformes.length} informes seleccionados</p>
+              )}
+              <p>• Severidades: {selectedSeveridades.join(", ")}</p>
+            </div>
+          </div>
+          
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSaveViewModalOpen(false);
+                setNewViewName("");
+                setNewViewDescription("");
+              }}
+              className="border-zinc-700 text-zinc-300"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveView}
+              disabled={savingView || !newViewName.trim()}
+              className="bg-green-600 hover:bg-green-700"
+              data-testid="btn-save-view"
+            >
+              {savingView ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4 mr-2" />
+              )}
+              Guardar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete View Confirmation */}
+      <AlertDialog open={!!deleteViewConfirm} onOpenChange={() => setDeleteViewConfirm(null)}>
+        <AlertDialogContent className="bg-zinc-900 border-zinc-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">
+              ¿Eliminar vista guardada?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-zinc-400">
+              Esto eliminará permanentemente la vista "{deleteViewConfirm?.nombre}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-zinc-800 text-white border-zinc-700 hover:bg-zinc-700">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => handleDeleteView(deleteViewConfirm)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

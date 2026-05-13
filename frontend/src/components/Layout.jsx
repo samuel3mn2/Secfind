@@ -1,6 +1,6 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { Shield, LayoutDashboard, List, Menu, X, Settings, LogOut, User, CalendarClock, Users, History, Key, AlertTriangle } from "lucide-react";
+import { Shield, LayoutDashboard, List, Menu, X, Settings, LogOut, User, CalendarClock, Users, Key, AlertTriangle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -118,12 +118,6 @@ export const Layout = () => {
       icon: Users, 
       label: "Vista Comité",
       show: isAdmin || canView("vulnerabilidades")
-    },
-    { 
-      to: "/auditoria", 
-      icon: History, 
-      label: "Auditoría",
-      show: isAdmin
     },
     { 
       to: "/configuracion", 

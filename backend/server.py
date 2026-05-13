@@ -162,6 +162,34 @@ class GrupoInformes(GrupoInformesBase):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+# Saved Views Model (for Vista Comité)
+class VistaGuardadaBase(BaseModel):
+    nombre: str
+    descripcion: Optional[str] = None
+    agrupar_por_grupo: bool = False
+    grupos_ids: List[str] = []  # IDs of selected grupos
+    informes_adicionales: List[str] = []  # Names of individual informes
+    informes_individuales: List[str] = []  # For individual mode
+    severidades: List[str] = ["Critica", "Alta", "Media", "Baja"]
+
+class VistaGuardadaCreate(VistaGuardadaBase):
+    pass
+
+class VistaGuardadaUpdate(BaseModel):
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
+    agrupar_por_grupo: Optional[bool] = None
+    grupos_ids: Optional[List[str]] = None
+    informes_adicionales: Optional[List[str]] = None
+    informes_individuales: Optional[List[str]] = None
+    severidades: Optional[List[str]] = None
+
+class VistaGuardada(VistaGuardadaBase):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    created_by: str  # User ID who created the view
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 # ============ CONFIGURATION MODELS ============
 
 class Institucion(BaseModel):
@@ -1047,6 +1075,84 @@ async def get_informes_sin_grupo(current_user: CurrentUser = Depends(get_current
     # Return reports not in any group
     informes_sin_grupo = [r for r in all_report_names if r not in reports_in_groups]
     return informes_sin_grupo
+
+# ============ SAVED VIEWS ENDPOINTS ============
+
+@api_router.get("/vistas-guardadas")
+async def get_vistas_guardadas(current_user: CurrentUser = Depends(get_current_user)):
+    """Get all saved views for Vista Comité"""
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos")
+    
+    vistas = await db.vistas_guardadas.find({}, {"_id": 0}).sort("nombre", 1).to_list(100)
+    return vistas
+
+@api_router.post("/vistas-guardadas")
+async def create_vista_guardada(data: VistaGuardadaCreate, current_user: CurrentUser = Depends(get_current_user)):
+    """Create a new saved view"""
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos")
+    
+    # Check if name already exists
+    existing = await db.vistas_guardadas.find_one({"nombre": {"$regex": f"^{data.nombre}$", "$options": "i"}})
+    if existing:
+        raise HTTPException(status_code=400, detail="Ya existe una vista con ese nombre")
+    
+    vista = VistaGuardada(
+        **data.model_dump(),
+        created_by=current_user.id
+    )
+    doc = vista.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.vistas_guardadas.insert_one(doc)
+    
+    return {
+        "id": vista.id,
+        "nombre": vista.nombre,
+        "descripcion": vista.descripcion,
+        "agrupar_por_grupo": vista.agrupar_por_grupo,
+        "grupos_ids": vista.grupos_ids,
+        "informes_adicionales": vista.informes_adicionales,
+        "informes_individuales": vista.informes_individuales,
+        "severidades": vista.severidades
+    }
+
+@api_router.put("/vistas-guardadas/{vista_id}")
+async def update_vista_guardada(vista_id: str, data: VistaGuardadaUpdate, current_user: CurrentUser = Depends(get_current_user)):
+    """Update a saved view"""
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos")
+    
+    existing = await db.vistas_guardadas.find_one({"id": vista_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Vista no encontrada")
+    
+    update_data = data.model_dump(exclude_unset=True)
+    
+    # Check name uniqueness if updating name
+    if "nombre" in update_data:
+        other = await db.vistas_guardadas.find_one({
+            "nombre": {"$regex": f"^{update_data['nombre']}$", "$options": "i"},
+            "id": {"$ne": vista_id}
+        })
+        if other:
+            raise HTTPException(status_code=400, detail="Ya existe otra vista con ese nombre")
+    
+    await db.vistas_guardadas.update_one({"id": vista_id}, {"$set": update_data})
+    
+    updated = await db.vistas_guardadas.find_one({"id": vista_id}, {"_id": 0})
+    return updated
+
+@api_router.delete("/vistas-guardadas/{vista_id}")
+async def delete_vista_guardada(vista_id: str, current_user: CurrentUser = Depends(get_current_user)):
+    """Delete a saved view"""
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos")
+    
+    result = await db.vistas_guardadas.delete_one({"id": vista_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Vista no encontrada")
+    return {"message": "Vista eliminada exitosamente"}
 
 # ============ NOTIFICATION CONFIGURATION ENDPOINTS ============
 

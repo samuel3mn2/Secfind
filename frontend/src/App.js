@@ -7,7 +7,6 @@ import Vulnerabilidades from "@/pages/Vulnerabilidades";
 import Configuracion from "@/pages/Configuracion";
 import SeguimientoRiesgos from "@/pages/SeguimientoRiesgos";
 import VistaComite from "@/pages/VistaComite";
-import Auditoria from "@/pages/Auditoria";
 import Login from "@/pages/Login";
 import Layout from "@/components/Layout";
 
@@ -72,7 +71,6 @@ function AppRoutes() {
         <Route path="vulnerabilidades" element={<Vulnerabilidades />} />
         <Route path="seguimiento-riesgos" element={<SeguimientoRiesgos />} />
         <Route path="vista-comite" element={<VistaComite />} />
-        <Route path="auditoria" element={<Auditoria />} />
         <Route path="configuracion" element={<Configuracion />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
