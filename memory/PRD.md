@@ -3,15 +3,14 @@
 ## Última Actualización: 2025-12-13
 
 ### Cambios Recientes
+- **Vistas Guardadas en Vista Comité**: Nueva funcionalidad para guardar configuraciones personalizadas de filtros (grupos, informes, severidades) y cargarlas rápidamente en futuras reuniones de comité.
+- **Auditoría como submódulo de Configuración**: El historial de auditoría se movió del sidebar al módulo de Configuración como una pestaña adicional (solo visible para administradores).
 - **Modal de Detalle en Vista Comité**: Al hacer clic en cualquier fila de la tabla, se abre un modal con todas las vulnerabilidades del informe/grupo, incluyendo código, severidad, estatus y responsable.
 - **Vista Mixta (Grupos + Informes Individuales)**: En modo "Por Grupo", se puede agregar informes individuales (sin grupo) a la tabla para crear vistas personalizadas según las necesidades de los directivos.
 - **Grupos de Informes en Vista Comité**: Nueva funcionalidad para agrupar múltiples informes de pentest bajo un nombre de grupo. Permite consolidar la vista ejecutiva y alternar entre modo Individual y Por Grupo.
 - **Parser PDF sin IA**: Nuevo parser basado en reglas para informes de Pentraze Cybersecurity. No requiere API key ni costos adicionales
 - **Entrada Masiva**: Formulario tipo spreadsheet para agregar múltiples vulnerabilidades a la vez con opción de pegar desde Excel
 - **Campo Código**: Agregado campo "Código" a vulnerabilidades para identificación única
-- **Instalación Local**: Creado `requirements-local.txt` y documentación para instalar sin emergentintegrations
-- **Cambio de Contraseña Obligatorio**: Los nuevos usuarios deben cambiar su contraseña en el primer inicio de sesión
-- **Exportación con Filtros**: La exportación a Excel/CSV respeta los filtros aplicados y columnas seleccionadas
 
 ## Problema Original
 Aplicación web para la Gestión de Vulnerabilidades de Ciberseguridad, reemplazando un flujo de trabajo basado en Excel. Permite operaciones CRUD sobre hallazgos de pentests con Dashboard visual e intuitivo para presentaciones ejecutivas.
@@ -114,6 +113,14 @@ REACT_APP_BACKEND_URL=http://localhost:8001
   - [x] Combina grupos + informes sin grupo en la misma tabla
   - [x] Ícono diferenciador (carpeta para grupos, nada para individuales)
 
+- [x] **Vistas Guardadas** (NUEVO - Dic 2025):
+  - [x] Botón "Vistas" en header con contador de vistas guardadas
+  - [x] Dropdown con lista de vistas y opción "Guardar vista actual"
+  - [x] Modal de guardar: nombre, descripción, resumen de configuración
+  - [x] Cargar vista aplica todos los filtros automáticamente
+  - [x] Eliminar vista con confirmación
+  - [x] Toast de feedback para cada operación
+
 ### Grupos de Informes (NUEVO - Dic 2025)
 - [x] Nueva pestaña "Grupos Informes" en Configuración
 - [x] CRUD completo de grupos (crear, leer, actualizar, eliminar)
@@ -164,6 +171,12 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - [x] CRUD Proveedores (con actualización en cascada)
 - [x] CRUD Informes Pentest (con actualización en cascada)
 - [x] CRUD Usuarios con permisos
+- [x] CRUD Grupos de Informes
+- [x] **Auditoría del Sistema** (movido desde sidebar - Dic 2025)
+  - [x] Historial de todos los cambios del sistema
+  - [x] Filtros por entidad, acción, usuario, fechas
+  - [x] Paginación con 15 registros por página
+  - [x] Modal de detalle de cambios
 - [x] **Actualización en cascada**: Al cambiar nombre de institución, aplicación, proveedor o informe, se actualizan todas las vulnerabilidades relacionadas
 
 ### Sistema de Autenticación
@@ -286,3 +299,24 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - `DELETE /api/config/grupos-informes/{id}` - Eliminar grupo
 - `GET /api/config/informes-sin-grupo` - Informes no asignados
 - `GET /api/vista-comite?agrupar_por=grupo&grupos=id1,id2` - Vista agrupada
+- `GET /api/vista-comite?informes_adicionales=informe1,informe2` - Vista mixta
+- `GET /api/vistas-guardadas` - Lista vistas guardadas
+- `POST /api/vistas-guardadas` - Crear vista guardada
+- `PUT /api/vistas-guardadas/{id}` - Actualizar vista guardada
+- `DELETE /api/vistas-guardadas/{id}` - Eliminar vista guardada
+
+### Colección MongoDB: vistas_guardadas
+```json
+{
+  "id": "uuid",
+  "nombre": "Nombre de la vista",
+  "descripcion": "Descripción opcional",
+  "agrupar_por_grupo": true/false,
+  "grupos_ids": ["id1", "id2"],
+  "informes_adicionales": ["Informe X"],
+  "informes_individuales": ["Informe Y"],
+  "severidades": ["Critica", "Alta", "Media", "Baja"],
+  "created_by": "user_id",
+  "created_at": "ISO datetime"
+}
+```
