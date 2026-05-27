@@ -954,8 +954,9 @@ export default function HallazgosAuditoria() {
             <ul className="text-zinc-400 text-sm list-disc list-inside space-y-1">
               <li><strong>Código</strong> (obligatorio): Ej: AUD-2025-001</li>
               <li><strong>Brecha</strong> (obligatorio): Descripción del hallazgo</li>
-              <li><strong>Control</strong> (opcional): Código del control asociado</li>
-              <li><strong>Riesgo</strong> (opcional): Código del riesgo del catálogo</li>
+              <li><strong>Dominio</strong> (opcional): Nombre del dominio</li>
+              <li><strong>Control</strong> (opcional): Nombre del control asociado</li>
+              <li><strong>Riesgo</strong> (opcional): Nombre corto del riesgo del catálogo</li>
               <li><strong>Probabilidad</strong>: 1-5 (default: 3)</li>
               <li><strong>Impacto</strong>: 1-5 (default: 3)</li>
               <li><strong>Estado</strong>: Abierto, En Proceso, Listo para Revisión, Cerrado</li>

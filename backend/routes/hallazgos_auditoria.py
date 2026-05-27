@@ -138,12 +138,13 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
         """Generate and return an Excel template for import"""
         from fastapi.responses import StreamingResponse
         
-        # Create template DataFrame
+        # Create template DataFrame with user-friendly names
         template_data = {
             'Código': ['AUD-2025-001', 'AUD-2025-002'],
             'Brecha': ['Descripción del hallazgo de auditoría...', 'Otro hallazgo...'],
-            'Control': ['CTRL-EP-01', ''],  # Código del control (opcional)
-            'Riesgo': ['R-001', ''],  # Código del riesgo del catálogo (opcional)
+            'Dominio': ['Seguridad Endpoints', ''],  # Nombre del dominio (opcional, para filtrar controles)
+            'Control': ['Antivirus actualizado', ''],  # Nombre del control (opcional)
+            'Riesgo': ['Acceso no autorizado', ''],  # Nombre corto del riesgo del catálogo (opcional)
             'Probabilidad': [3, 4],  # 1-5
             'Impacto': [4, 3],  # 1-5
             'Estado': ['Abierto', 'En Proceso'],  # Abierto, En Proceso, Listo para Revisión, Cerrado
@@ -342,7 +343,7 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
     ):
         """
         Import hallazgos from Excel file.
-        Expected columns: Código, Brecha, Control (código), Riesgo (código), Probabilidad, Impacto, Estado, Observaciones
+        Expected columns: Código, Brecha, Dominio, Control (nombre), Riesgo (nombre corto), Probabilidad, Impacto, Estado, Observaciones
         """
         if not current_user.es_admin and not current_user.permisos.vulnerabilidades.crear:
             raise HTTPException(status_code=403, detail="No tiene permisos para importar hallazgos")
@@ -364,12 +365,13 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
             'Brecha': 'brecha',
             'Hallazgo': 'brecha',
             'Descripción': 'brecha',
-            'Control': 'codigo_control',
-            'Código Control': 'codigo_control',
-            'Control Asociado': 'codigo_control',
-            'Riesgo': 'codigo_riesgo',
-            'Código Riesgo': 'codigo_riesgo',
-            'Riesgo Asociado': 'codigo_riesgo',
+            'Dominio': 'nombre_dominio',
+            'Control': 'nombre_control',
+            'Nombre Control': 'nombre_control',
+            'Control Asociado': 'nombre_control',
+            'Riesgo': 'nombre_riesgo',
+            'Nombre Riesgo': 'nombre_riesgo',
+            'Riesgo Asociado': 'nombre_riesgo',
             'Probabilidad': 'probabilidad',
             'Impacto': 'impacto',
             'Estado': 'estado',
@@ -388,12 +390,24 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
                 detail=f"Columnas requeridas faltantes: {', '.join(missing_cols)}. Se esperan: Código, Brecha"
             )
         
-        # Pre-load control and riesgo mappings
+        # Pre-load dominio, control and riesgo mappings by name (case-insensitive)
+        dominios = await db.config_dominios.find({}, {"_id": 0}).to_list(500)
+        dominio_map = {d.get("nombre_dominio", "").lower(): d["id"] for d in dominios if d.get("nombre_dominio")}
+        
         controles = await db.config_controles.find({}, {"_id": 0}).to_list(1000)
-        control_map = {c.get("codigo_control", "").upper(): c["id"] for c in controles if c.get("codigo_control")}
+        # Map by nombre_control (case-insensitive)
+        control_map = {c.get("nombre_control", "").lower(): c["id"] for c in controles if c.get("nombre_control")}
+        # Also map controls by dominio for validation
+        control_by_dominio = {}
+        for c in controles:
+            dom_id = c.get("dominio_id")
+            if dom_id not in control_by_dominio:
+                control_by_dominio[dom_id] = {}
+            control_by_dominio[dom_id][c.get("nombre_control", "").lower()] = c["id"]
         
         riesgos = await db.catalogo_riesgos.find({}, {"_id": 0}).to_list(1000)
-        riesgo_map = {r.get("codigo_riesgo", "").upper(): r["id"] for r in riesgos if r.get("codigo_riesgo")}
+        # Map by nombre_corto (case-insensitive)
+        riesgo_map = {r.get("nombre_corto", "").lower(): r["id"] for r in riesgos if r.get("nombre_corto")}
         
         valid_estados = ["Abierto", "En Proceso", "Listo para Revisión", "Cerrado"]
         
@@ -426,19 +440,32 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
                     errors.append(f"Fila {idx}: Código '{cleaned_record['codigo']}' ya existe")
                     continue
                 
-                # Resolve control_id from codigo_control
-                control_id = None
-                if cleaned_record.get('codigo_control'):
-                    control_id = control_map.get(cleaned_record['codigo_control'].upper())
-                    if not control_id:
-                        errors.append(f"Fila {idx}: Control '{cleaned_record['codigo_control']}' no encontrado")
+                # Resolve dominio_id from nombre_dominio (for context/validation)
+                dominio_id = None
+                if cleaned_record.get('nombre_dominio'):
+                    dominio_id = dominio_map.get(cleaned_record['nombre_dominio'].lower())
+                    if not dominio_id:
+                        errors.append(f"Fila {idx}: Dominio '{cleaned_record['nombre_dominio']}' no encontrado")
                 
-                # Resolve riesgo_id from codigo_riesgo
+                # Resolve control_id from nombre_control
+                control_id = None
+                if cleaned_record.get('nombre_control'):
+                    nombre_control_lower = cleaned_record['nombre_control'].lower()
+                    # If dominio is specified, search within that dominio first
+                    if dominio_id and dominio_id in control_by_dominio:
+                        control_id = control_by_dominio[dominio_id].get(nombre_control_lower)
+                    # If not found or no dominio specified, search globally
+                    if not control_id:
+                        control_id = control_map.get(nombre_control_lower)
+                    if not control_id:
+                        errors.append(f"Fila {idx}: Control '{cleaned_record['nombre_control']}' no encontrado")
+                
+                # Resolve riesgo_id from nombre_riesgo (nombre_corto)
                 riesgo_id = None
-                if cleaned_record.get('codigo_riesgo'):
-                    riesgo_id = riesgo_map.get(cleaned_record['codigo_riesgo'].upper())
+                if cleaned_record.get('nombre_riesgo'):
+                    riesgo_id = riesgo_map.get(cleaned_record['nombre_riesgo'].lower())
                     if not riesgo_id:
-                        errors.append(f"Fila {idx}: Riesgo '{cleaned_record['codigo_riesgo']}' no encontrado")
+                        errors.append(f"Fila {idx}: Riesgo '{cleaned_record['nombre_riesgo']}' no encontrado")
                 
                 # Validate and set probabilidad and impacto
                 probabilidad = cleaned_record.get('probabilidad', 3)
