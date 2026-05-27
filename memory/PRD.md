@@ -267,6 +267,18 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 
 ### P0 (Alta Prioridad)
 - [ ] Detección de duplicados en importación y creación manual
+- [x] **Arquitectura GRC Backend** (EN PROGRESO - Dic 2025):
+  - [x] Modularización de server.py con factory routers
+  - [x] Colecciones: config_dominios, config_controles, catalogo_riesgos, hallazgos_auditoria
+  - [x] CRUD endpoints para todos los módulos GRC
+  - [x] Seed data: 6 dominios + 4 controles de Seguridad EndPoints
+  - [x] Migración: riesgo_asociado -> riesgo_id en vulnerabilidades
+  - [ ] Frontend: UI de Dominios y Controles en Configuración
+  - [ ] Frontend: Módulo Catálogo de Riesgos
+  - [ ] Frontend: Módulo Hallazgos de Auditoría
+  - [ ] Frontend: Selector cascada Dominio -> Control
+  - [ ] Frontend: Modal de búsqueda de Riesgos
+  - [ ] Frontend: Actualizar Vulnerabilidades con campos GRC
 
 ### P1 (Media-Alta Prioridad)
 - [ ] Integración con herramientas de scanning (Nessus, Qualys, etc.)

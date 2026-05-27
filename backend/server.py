@@ -17,6 +17,12 @@ import jwt
 from pdf_reports import generate_executive_report, generate_institution_report, generate_vista_comite_report
 from email_service import EmailService, generate_alert_email, generate_weekly_summary_email
 
+# GRC Module Routes (Modular Architecture)
+from routes.dominios import create_dominios_router
+from routes.controles import create_controles_router
+from routes.catalogo_riesgos import create_catalogo_riesgos_router
+from routes.hallazgos_auditoria import create_hallazgos_router
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
@@ -3623,7 +3629,24 @@ async def get_reporte_vista_comite(
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
-# Include the router in the main app
+# Initialize and register GRC module routers
+def setup_grc_routers():
+    """Setup GRC routers with database connection and dependencies"""
+    # Create routers using factory functions
+    dominios_router = create_dominios_router(db, get_current_user)
+    controles_router = create_controles_router(db, get_current_user)
+    catalogo_riesgos_router = create_catalogo_riesgos_router(db, get_current_user)
+    hallazgos_router = create_hallazgos_router(db, get_current_user)
+    
+    # Register routers with api_router
+    api_router.include_router(dominios_router)
+    api_router.include_router(controles_router)
+    api_router.include_router(catalogo_riesgos_router)
+    api_router.include_router(hallazgos_router)
+
+setup_grc_routers()
+
+# Include the router in the main app (AFTER adding GRC routers)
 app.include_router(api_router)
 
 app.add_middleware(
@@ -3649,6 +3672,68 @@ async def startup_event():
     await init_informes_pentest()
     await migrate_aplicaciones()
     await init_admin_user()
+    await init_grc_data()  # Initialize GRC seed data
+
+async def init_grc_data():
+    """Initialize GRC seed data (dominios and controles) if not exists"""
+    import uuid as uuid_mod
+    
+    # Check if dominios exist
+    existing_dominios = await db.config_dominios.count_documents({})
+    if existing_dominios == 0:
+        # Seed dominios
+        DOMINIOS = [
+            {"nombre_dominio": "Gestión de Identidades", "codigo_referencia": "DOM-ID"},
+            {"nombre_dominio": "Seguridad EndPoints", "codigo_referencia": "DOM-EP"},
+            {"nombre_dominio": "Seguridad de Red y Perímetro", "codigo_referencia": "DOM-NET"},
+            {"nombre_dominio": "Seguridad de Aplicaciones", "codigo_referencia": "DOM-APP"},
+            {"nombre_dominio": "Seguridad de Datos", "codigo_referencia": "DOM-DAT"},
+            {"nombre_dominio": "Gestión de Monitoreo & Respuesta", "codigo_referencia": "DOM-MON"},
+        ]
+        
+        dominio_docs = []
+        for d in DOMINIOS:
+            dominio_docs.append({
+                "id": str(uuid_mod.uuid4()),
+                "nombre_dominio": d["nombre_dominio"],
+                "codigo_referencia": d["codigo_referencia"],
+                "created_at": datetime.now(timezone.utc).isoformat()
+            })
+        
+        await db.config_dominios.insert_many(dominio_docs)
+        logger.info(f"Created {len(dominio_docs)} initial dominios")
+        
+        # Seed controles for Seguridad EndPoints
+        dominio_ep = await db.config_dominios.find_one({"nombre_dominio": "Seguridad EndPoints"}, {"_id": 0})
+        if dominio_ep:
+            CONTROLES = [
+                {"codigo_control": "CTRL-EP-01", "nombre_control": "Protección del endpoint (EDR/EPP + postura)"},
+                {"codigo_control": "CTRL-EP-02", "nombre_control": "Gestión de vulnerabilidades y parches (endpoints)"},
+                {"codigo_control": "CTRL-EP-03", "nombre_control": "Configuración segura (Baseline/Hardening)"},
+                {"codigo_control": "CTRL-EP-04", "nombre_control": "Protección de datos (Cifrado)"},
+            ]
+            
+            control_docs = []
+            for c in CONTROLES:
+                control_docs.append({
+                    "id": str(uuid_mod.uuid4()),
+                    "dominio_id": dominio_ep["id"],
+                    "codigo_control": c["codigo_control"],
+                    "nombre_control": c["nombre_control"],
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                })
+            
+            await db.config_controles.insert_many(control_docs)
+            logger.info(f"Created {len(control_docs)} initial controles for 'Seguridad EndPoints'")
+    
+    # Migration: Rename riesgo_asociado -> riesgo_id
+    count_old = await db.vulnerabilidades.count_documents({"riesgo_asociado": {"$exists": True}})
+    if count_old > 0:
+        result = await db.vulnerabilidades.update_many(
+            {"riesgo_asociado": {"$exists": True}},
+            {"$rename": {"riesgo_asociado": "riesgo_id"}}
+        )
+        logger.info(f"Migrated {result.modified_count} vulnerabilidades: riesgo_asociado -> riesgo_id")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
