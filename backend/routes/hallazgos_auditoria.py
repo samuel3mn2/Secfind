@@ -140,15 +140,15 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
         
         # Create template DataFrame with user-friendly names
         template_data = {
-            'Código': ['AUD-2025-001', 'AUD-2025-002'],
-            'Brecha': ['Descripción del hallazgo de auditoría...', 'Otro hallazgo...'],
-            'Dominio': ['Seguridad Endpoints', ''],  # Nombre del dominio (opcional, para filtrar controles)
-            'Control': ['Antivirus actualizado', ''],  # Nombre del control (opcional)
-            'Riesgo': ['Acceso no autorizado', ''],  # Nombre corto del riesgo del catálogo (opcional)
-            'Probabilidad': [3, 4],  # 1-5
-            'Impacto': [4, 3],  # 1-5
-            'Estado': ['Abierto', 'En Proceso'],  # Abierto, En Proceso, Listo para Revisión, Cerrado
-            'Observaciones': ['Notas adicionales...', '']
+            'Código': ['AUD-2025-001', 'AUD-2025-002', 'AUD-2025-003'],
+            'Brecha': ['Descripción del hallazgo...', 'Otro hallazgo...', 'Tercer hallazgo...'],
+            'Dominio': ['Seguridad Endpoints', '', 'Gestión de Identidades'],
+            'Control': ['Antivirus actualizado', '', 'Autenticación MFA'],
+            'Riesgo': ['Acceso no autorizado', '', 'Fraude de identidad'],
+            'Probabilidad': ['Alta', 'Medio', 'Muy Alta'],  # Muy Baja, Baja, Medio, Alta, Muy Alta
+            'Impacto': ['Alto', 'Medio', 'Muy Alto'],  # Muy Bajo, Bajo, Medio, Alto, Muy Alto
+            'Estado': ['Abierto', 'En Proceso', 'Abierto'],
+            'Observaciones': ['Notas...', '', 'Urgente']
         }
         df = pd.DataFrame(template_data)
         
@@ -411,6 +411,35 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
         
         valid_estados = ["Abierto", "En Proceso", "Listo para Revisión", "Cerrado"]
         
+        # Mapping for text-based probabilidad/impacto values
+        prob_imp_text_map = {
+            # Probabilidad
+            "muy baja": 1, "muy bajo": 1,
+            "baja": 2, "bajo": 2,
+            "media": 3, "medio": 3,
+            "alta": 4, "alto": 4,
+            "muy alta": 5, "muy alto": 5,
+            # Also accept numbers as strings
+            "1": 1, "2": 2, "3": 3, "4": 4, "5": 5,
+        }
+        
+        def parse_prob_imp(value, default=3):
+            """Convert text or number to 1-5 scale"""
+            if value is None:
+                return default
+            if isinstance(value, (int, float)):
+                return max(1, min(5, int(value)))
+            if isinstance(value, str):
+                val_lower = value.strip().lower()
+                if val_lower in prob_imp_text_map:
+                    return prob_imp_text_map[val_lower]
+                # Try to parse as int
+                try:
+                    return max(1, min(5, int(value)))
+                except:
+                    return default
+            return default
+        
         records = df.to_dict('records')
         inserted_count = 0
         skipped_count = 0
@@ -467,22 +496,9 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
                     if not riesgo_id:
                         errors.append(f"Fila {idx}: Riesgo '{cleaned_record['nombre_riesgo']}' no encontrado")
                 
-                # Validate and set probabilidad and impacto
-                probabilidad = cleaned_record.get('probabilidad', 3)
-                if isinstance(probabilidad, str):
-                    try:
-                        probabilidad = int(probabilidad)
-                    except:
-                        probabilidad = 3
-                probabilidad = max(1, min(5, probabilidad))  # Clamp to 1-5
-                
-                impacto = cleaned_record.get('impacto', 3)
-                if isinstance(impacto, str):
-                    try:
-                        impacto = int(impacto)
-                    except:
-                        impacto = 3
-                impacto = max(1, min(5, impacto))  # Clamp to 1-5
+                # Parse probabilidad and impacto (supports text like "Medio", "Alto" or numbers 1-5)
+                probabilidad = parse_prob_imp(cleaned_record.get('probabilidad'), default=3)
+                impacto = parse_prob_imp(cleaned_record.get('impacto'), default=3)
                 
                 # Validate estado
                 estado = cleaned_record.get('estado', 'Abierto')

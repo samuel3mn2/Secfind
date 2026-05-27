@@ -957,8 +957,8 @@ export default function HallazgosAuditoria() {
               <li><strong>Dominio</strong> (opcional): Nombre del dominio</li>
               <li><strong>Control</strong> (opcional): Nombre del control asociado</li>
               <li><strong>Riesgo</strong> (opcional): Nombre corto del riesgo del catálogo</li>
-              <li><strong>Probabilidad</strong>: 1-5 (default: 3)</li>
-              <li><strong>Impacto</strong>: 1-5 (default: 3)</li>
+              <li><strong>Probabilidad</strong>: Muy Baja, Baja, Medio, Alta, Muy Alta</li>
+              <li><strong>Impacto</strong>: Muy Bajo, Bajo, Medio, Alto, Muy Alto</li>
               <li><strong>Estado</strong>: Abierto, En Proceso, Listo para Revisión, Cerrado</li>
               <li><strong>Observaciones</strong> (opcional)</li>
             </ul>
