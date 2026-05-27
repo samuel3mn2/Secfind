@@ -1,8 +1,16 @@
 # SecFind - Sistema de Gestión de Vulnerabilidades
 
-## Última Actualización: 2025-12-13
+## Última Actualización: 2025-12-27
 
 ### Cambios Recientes
+- **Fase Frontend GRC Completada (Dic 2025)**: Implementación completa de UI para módulos GRC:
+  - Dominios y Controles integrados como tabs en Configuración
+  - Catálogo de Riesgos como página independiente (/catalogo-riesgos)
+  - Hallazgos de Auditoría como página independiente (/hallazgos-auditoria)
+  - Cálculo reactivo de Riesgo Inherente (Probabilidad × Impacto)
+  - Dropdown cascada Dominio → Control en formulario de Hallazgos
+  - Modal de búsqueda de riesgos del catálogo
+- **Arquitectura Backend Modular GRC (Dic 2025)**: Nueva arquitectura con Router Factories en `/app/backend/routes/` para Dominios, Controles, Catálogo de Riesgos y Hallazgos de Auditoría.
 - **Vistas Guardadas en Vista Comité**: Nueva funcionalidad para guardar configuraciones personalizadas de filtros (grupos, informes, severidades) y cargarlas rápidamente en futuras reuniones de comité.
 - **Auditoría como submódulo de Configuración**: El historial de auditoría se movió del sidebar al módulo de Configuración como una pestaña adicional (solo visible para administradores).
 - **Modal de Detalle en Vista Comité**: Al hacer clic en cualquier fila de la tabla, se abre un modal con todas las vulnerabilidades del informe/grupo, incluyendo código, severidad, estatus y responsable.
@@ -165,6 +173,40 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - [x] Cálculo automático de días restantes
 - [x] Filtros por severidad, institución e **informe pentest**
 
+### Módulo GRC - Governance, Risk, Compliance (NUEVO - Dic 2025)
+
+#### Dominios de Seguridad (Tab en Configuración)
+- [x] CRUD completo de dominios (nombre, código de referencia)
+- [x] Seed data: 6 dominios base (Gestión Identidades, Endpoints, Red/Perímetro, Aplicaciones, Datos, Monitoreo)
+- [x] Validación de unicidad por nombre
+- [x] Protección: no se puede eliminar si tiene controles asociados
+
+#### Controles de Seguridad (Tab en Configuración)
+- [x] CRUD completo de controles (código, nombre, dominio_id)
+- [x] Asociación obligatoria a un dominio
+- [x] Filtro por dominio en la lista
+- [x] Seed data: 4 controles de ejemplo para Endpoints
+- [x] Protección: no se puede eliminar si tiene vulnerabilidades o hallazgos asociados
+
+#### Catálogo de Riesgos (Página independiente /catalogo-riesgos)
+- [x] CRUD completo de riesgos (código, nombre corto, descripción completa)
+- [x] Búsqueda por código, nombre o descripción
+- [x] Paginación de resultados
+- [x] Solo administradores pueden crear/editar/eliminar
+- [x] Protección: no se puede eliminar si tiene vulnerabilidades o hallazgos asociados
+
+#### Hallazgos de Auditoría (Página independiente /hallazgos-auditoria)
+- [x] CRUD completo de hallazgos de auditoría
+- [x] Campos: código (auto-generado AUD-YYYY-XXX), brecha, control asociado, riesgo asociado
+- [x] **Cálculo reactivo de Riesgo Inherente**: Probabilidad (1-5) × Impacto (1-5) = Riesgo Inherente
+- [x] Dropdown cascada: Dominio → Control
+- [x] Modal de búsqueda de riesgos del catálogo
+- [x] Estados: Abierto, En Proceso, Listo para Revisión, Cerrado
+- [x] Filtros por estado y búsqueda
+- [x] Dashboard con KPIs: Total, Abiertos, En Proceso, Revisión, Alto Riesgo (≥15)
+- [x] Colores por nivel de riesgo (verde < 4, amarillo < 8, naranja < 15, rojo ≥ 15)
+- [x] Paginación de resultados
+
 ### Módulo de Configuración
 - [x] CRUD Instituciones (con actualización en cascada)
 - [x] CRUD Aplicaciones (con actualización en cascada)
@@ -189,8 +231,9 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - `/vulnerabilidades` - Gestión de Vulnerabilidades
 - `/seguimiento-riesgos` - Seguimiento de Riesgos
 - `/vista-comite` - Vista Comité
-- `/auditoria` - Auditoría del Sistema (solo admin)
-- `/configuracion` - Configuración del Sistema
+- `/catalogo-riesgos` - Catálogo de Riesgos (GRC)
+- `/hallazgos-auditoria` - Hallazgos de Auditoría (GRC)
+- `/configuracion` - Configuración del Sistema (incluye tabs: Dominios, Controles, Auditoría)
 - `/login` - Inicio de Sesión
 
 ## Documentación
@@ -267,18 +310,20 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 
 ### P0 (Alta Prioridad)
 - [ ] Detección de duplicados en importación y creación manual
-- [x] **Arquitectura GRC Backend** (EN PROGRESO - Dic 2025):
+- [ ] Actualizar Formulario de Vulnerabilidades con campos GRC (control_id, dropdown cascada Dominio→Control, búsqueda de riesgos)
+- [x] **Arquitectura GRC Backend** (COMPLETADO - Dic 2025):
   - [x] Modularización de server.py con factory routers
   - [x] Colecciones: config_dominios, config_controles, catalogo_riesgos, hallazgos_auditoria
   - [x] CRUD endpoints para todos los módulos GRC
   - [x] Seed data: 6 dominios + 4 controles de Seguridad EndPoints
   - [x] Migración: riesgo_asociado -> riesgo_id en vulnerabilidades
-  - [ ] Frontend: UI de Dominios y Controles en Configuración
-  - [ ] Frontend: Módulo Catálogo de Riesgos
-  - [ ] Frontend: Módulo Hallazgos de Auditoría
-  - [ ] Frontend: Selector cascada Dominio -> Control
-  - [ ] Frontend: Modal de búsqueda de Riesgos
-  - [ ] Frontend: Actualizar Vulnerabilidades con campos GRC
+- [x] **Fase Frontend GRC** (COMPLETADO - Dic 2025):
+  - [x] Frontend: UI de Dominios y Controles en Configuración (como tabs)
+  - [x] Frontend: Módulo Catálogo de Riesgos (página independiente)
+  - [x] Frontend: Módulo Hallazgos de Auditoría (página independiente)
+  - [x] Frontend: Selector cascada Dominio → Control en Hallazgos
+  - [x] Frontend: Modal de búsqueda de Riesgos en Hallazgos
+  - [x] Frontend: Cálculo reactivo de Riesgo Inherente (Probabilidad × Impacto)
 
 ### P1 (Media-Alta Prioridad)
 - [ ] Integración con herramientas de scanning (Nessus, Qualys, etc.)
@@ -317,6 +362,40 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - `POST /api/vistas-guardadas` - Crear vista guardada
 - `PUT /api/vistas-guardadas/{id}` - Actualizar vista guardada
 - `DELETE /api/vistas-guardadas/{id}` - Eliminar vista guardada
+
+### Endpoints GRC (Dic 2025)
+```
+# Dominios
+GET    /api/config/dominios         - Lista dominios
+POST   /api/config/dominios         - Crear dominio
+GET    /api/config/dominios/{id}    - Obtener dominio
+PUT    /api/config/dominios/{id}    - Actualizar dominio
+DELETE /api/config/dominios/{id}    - Eliminar dominio
+
+# Controles
+GET    /api/config/controles        - Lista controles (filtro: ?dominio_id=xxx)
+POST   /api/config/controles        - Crear control
+GET    /api/config/controles/{id}   - Obtener control
+PUT    /api/config/controles/{id}   - Actualizar control
+DELETE /api/config/controles/{id}   - Eliminar control
+
+# Catálogo de Riesgos
+GET    /api/catalogo-riesgos        - Lista paginada (filtros: ?search=xxx&skip=0&limit=50)
+GET    /api/catalogo-riesgos/all    - Todos los riesgos (para selectores)
+POST   /api/catalogo-riesgos        - Crear riesgo (solo admin)
+GET    /api/catalogo-riesgos/{id}   - Obtener riesgo
+PUT    /api/catalogo-riesgos/{id}   - Actualizar riesgo (solo admin)
+DELETE /api/catalogo-riesgos/{id}   - Eliminar riesgo (solo admin)
+
+# Hallazgos de Auditoría
+GET    /api/hallazgos-auditoria           - Lista paginada (filtros: ?estado=xxx&control_id=xxx&search=xxx)
+GET    /api/hallazgos-auditoria/stats     - Estadísticas (total, por_estado, alto_riesgo_pendientes)
+GET    /api/hallazgos-auditoria/next-codigo - Próximo código AUD-YYYY-XXX
+POST   /api/hallazgos-auditoria           - Crear hallazgo (calcula riesgo_inherente automático)
+GET    /api/hallazgos-auditoria/{id}      - Obtener hallazgo con datos enriquecidos
+PUT    /api/hallazgos-auditoria/{id}      - Actualizar hallazgo (recalcula riesgo_inherente)
+DELETE /api/hallazgos-auditoria/{id}      - Eliminar hallazgo
+```
 
 ### Colección MongoDB: vistas_guardadas
 ```json
