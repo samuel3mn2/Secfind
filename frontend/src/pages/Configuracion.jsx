@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, Users, AppWindow, Truck, FileText, Bell, UserCircle, FolderOpen, History } from "lucide-react";
+import { Building2, Users, AppWindow, Truck, FileText, Bell, UserCircle, FolderOpen, History, Layers, Shield } from "lucide-react";
 import Instituciones from "@/pages/Instituciones";
 import Usuarios from "@/pages/Usuarios";
 import Aplicaciones from "@/pages/Aplicaciones";
@@ -11,6 +11,8 @@ import Notificaciones from "@/pages/Notificaciones";
 import Responsables from "@/pages/Responsables";
 import GruposInformes from "@/pages/GruposInformes";
 import Auditoria from "@/pages/Auditoria";
+import Dominios from "@/pages/Dominios";
+import Controles from "@/pages/Controles";
 
 export default function Configuracion() {
   const { isAdmin, canView } = useAuth();
@@ -111,6 +113,26 @@ export default function Configuracion() {
               Auditoría
             </TabsTrigger>
           )}
+          {isAdmin && (
+            <TabsTrigger 
+              value="dominios" 
+              className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white"
+              data-testid="tab-dominios"
+            >
+              <Layers className="w-4 h-4 mr-2" />
+              Dominios
+            </TabsTrigger>
+          )}
+          {isAdmin && (
+            <TabsTrigger 
+              value="controles" 
+              className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white"
+              data-testid="tab-controles"
+            >
+              <Shield className="w-4 h-4 mr-2" />
+              Controles
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="instituciones" className="mt-6">
@@ -152,6 +174,18 @@ export default function Configuracion() {
         {isAdmin && (
           <TabsContent value="auditoria" className="mt-6">
             <Auditoria />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="dominios" className="mt-6">
+            <Dominios />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="controles" className="mt-6">
+            <Controles />
           </TabsContent>
         )}
       </Tabs>
