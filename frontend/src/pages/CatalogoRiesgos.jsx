@@ -311,7 +311,7 @@ export default function CatalogoRiesgos() {
               <TableHeader>
                 <TableRow className="border-zinc-800 hover:bg-transparent">
                   <TableHead className="text-zinc-400 w-[120px]">Código</TableHead>
-                  <TableHead className="text-zinc-400">Nombre Corto</TableHead>
+                  <TableHead className="text-zinc-400">Riesgo</TableHead>
                   <TableHead className="text-zinc-400 hidden md:table-cell">Descripción</TableHead>
                   {isAdmin && (
                     <TableHead className="text-zinc-400 text-right">Acciones</TableHead>
@@ -418,7 +418,7 @@ export default function CatalogoRiesgos() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-zinc-300">Nombre Corto *</Label>
+              <Label className="text-zinc-300">Riesgo *</Label>
               <Input
                 value={formData.nombre_corto}
                 onChange={(e) =>
@@ -505,7 +505,7 @@ export default function CatalogoRiesgos() {
 
           <div className="space-y-4">
             <p className="text-zinc-400 text-sm">
-              Sube un archivo Excel (.xlsx) con las columnas: <strong>Código</strong>, <strong>Nombre Corto</strong>, <strong>Descripción Completa</strong>
+              Sube un archivo Excel (.xlsx) con las columnas: <strong>Código</strong>, <strong>Riesgo</strong>, <strong>Descripción Completa</strong>
             </p>
 
             <div className="space-y-2">

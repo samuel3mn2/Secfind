@@ -59,7 +59,7 @@ def create_catalogo_riesgos_router(db, get_current_user: Callable) -> APIRouter:
         # Create template DataFrame
         template_data = {
             'Código': ['R-001', 'R-002'],
-            'Nombre Corto': ['Nombre del riesgo', 'Otro riesgo'],
+            'Riesgo': ['Acceso no autorizado', 'Fuga de datos'],
             'Descripción Completa': ['Descripción detallada del riesgo...', 'Otra descripción...']
         }
         df = pd.DataFrame(template_data)
@@ -220,7 +220,7 @@ def create_catalogo_riesgos_router(db, get_current_user: Callable) -> APIRouter:
     ):
         """
         Import riesgos from Excel file.
-        Expected columns: Código, Nombre Corto, Descripción Completa
+        Expected columns: Código, Riesgo, Descripción Completa
         """
         if not current_user.es_admin:
             raise HTTPException(status_code=403, detail="Solo administradores pueden importar riesgos")
@@ -240,6 +240,7 @@ def create_catalogo_riesgos_router(db, get_current_user: Callable) -> APIRouter:
             'Codigo': 'codigo_riesgo',
             'Código Riesgo': 'codigo_riesgo',
             'codigo_riesgo': 'codigo_riesgo',
+            'Riesgo': 'nombre_corto',
             'Nombre Corto': 'nombre_corto',
             'Nombre': 'nombre_corto',
             'nombre_corto': 'nombre_corto',
@@ -256,7 +257,7 @@ def create_catalogo_riesgos_router(db, get_current_user: Callable) -> APIRouter:
         if missing_cols:
             raise HTTPException(
                 status_code=400, 
-                detail=f"Columnas requeridas faltantes: {', '.join(missing_cols)}. Se esperan: Código, Nombre Corto"
+                detail=f"Columnas requeridas faltantes: {', '.join(missing_cols)}. Se esperan: Código, Riesgo"
             )
         
         records = df.to_dict('records')

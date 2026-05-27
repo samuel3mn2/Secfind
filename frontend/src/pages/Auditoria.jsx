@@ -183,7 +183,7 @@ export default function Auditoria() {
       dominio_id: "Dominio",
       // Catálogo de Riesgos
       codigo_riesgo: "Código de Riesgo",
-      nombre_corto: "Nombre Corto",
+      nombre_corto: "Riesgo",
       descripcion_completa: "Descripción Completa",
       // Hallazgos de Auditoría
       codigo: "Código",
