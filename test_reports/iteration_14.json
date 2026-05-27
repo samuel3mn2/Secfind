@@ -1,0 +1,60 @@
+{
+  "summary": "Completed testing of Vulnerabilidades GRC Integration (Iteration 14). Fixed missing control_id and riesgo_id fields in VulnerabilidadBase model. All 9 backend tests passed. Frontend UI shows GRC section with Dominio→Control cascading dropdowns and Risk catalog search modal working correctly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Vulnerabilidades search", "issues": ["Search by 'codigo' field not supported - only searches in vulnerabilidad, aplicaciones, responsable, nombre_informe_pentest"]}
+    ]
+  },
+  "passed_tests": [
+    "Backend: GET /api/config/dominios returns all 6 dominios",
+    "Backend: GET /api/config/controles returns all controles with enriched dominio name",
+    "Backend: GET /api/config/controles?dominio_id=X filters correctly (4 controls for Seguridad EndPoints)",
+    "Backend: GET /api/catalogo-riesgos/all returns all riesgos (R-0001 Fraude de identidad masivo)",
+    "Backend: POST /api/vulnerabilidades with control_id saves and returns control_id",
+    "Backend: POST /api/vulnerabilidades with riesgo_id saves and returns riesgo_id",
+    "Backend: POST /api/vulnerabilidades with both control_id and riesgo_id works",
+    "Backend: PUT /api/vulnerabilidades/{id} updates control_id correctly",
+    "Backend: PUT /api/vulnerabilidades/{id} updates riesgo_id correctly",
+    "UI: Nueva Vulnerabilidad form shows 'Vinculación GRC' section",
+    "UI: Dominio dropdown lists all 6 dominios",
+    "UI: Control dropdown cascades based on selected Dominio (shows 4 CTRL-EP controls for Seguridad EndPoints)",
+    "UI: 'Riesgo del Catálogo' field opens search modal on click",
+    "UI: Risk search modal shows R-0001 Fraude de identidad masivo",
+    "UI: Selecting risk updates field with 'R-0001 - Fraude de identidad masivo'",
+    "UI: Saving vulnerability with control_id and riesgo_id works (success toast shown)"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_vuln_grc_integration.py",
+    "/app/test_reports/pytest/pytest_vuln_grc.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/server.py (added control_id and riesgo_id to VulnerabilidadBase model)",
+    "/app/backend/tests/test_vuln_grc_integration.py (new test file)"
+  ],
+  "success_rate": {
+    "backend": "100% (9/9 tests passed)",
+    "frontend": "100% (All GRC UI features working correctly)"
+  },
+  "test_credentials": {
+    "user": "admin",
+    "password": "admin123"
+  },
+  "seed_data_creation": "Test vulnerabilities created and cleaned up during testing. Existing seed data: 6 Dominios, 4 Controles (all for Seguridad EndPoints), 1 Riesgo in catalog (R-0001).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 14 tested Vulnerabilidades GRC integration. Key fix: Added control_id and riesgo_id fields to VulnerabilidadBase model in server.py (lines 122-141). The frontend form at /app/frontend/src/pages/Vulnerabilidades.jsx already had the GRC section implemented with: 1) Dominio dropdown (lines 1407-1432) that filters controls, 2) Control Asociado dropdown (lines 1434-1453) that shows filtered controls, 3) Riesgo del Catálogo field (lines 1456-1491) with search modal. The view modal shows GRC section when control_id or riesgo_id exists (lines 1182-1216). Edit form loads existing control_id and riesgo_id values correctly (lines 399-410).",
+  "bug_fix_applied": {
+    "issue": "VulnerabilidadBase model missing control_id and riesgo_id fields",
+    "file": "/app/backend/server.py",
+    "fix": "Added 'control_id: Optional[str] = None' and 'riesgo_id: Optional[str] = None' to VulnerabilidadBase class",
+    "verification": "All 9 backend tests pass, UI creates/updates vulnerabilities with GRC fields correctly"
+  }
+}

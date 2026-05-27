@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import axios from "axios";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
@@ -76,6 +76,8 @@ import {
   Layers,
   Columns,
   Settings2,
+  AlertTriangle,
+  Shield,
 } from "lucide-react";
 import ImportarPDF from "@/pages/ImportarPDF";
 import BulkEntryModal from "@/components/BulkEntryModal";
@@ -250,6 +252,14 @@ export default function Vulnerabilidades() {
   const [visibleColumns, setVisibleColumns] = useState(loadSavedColumns);
   const [showColumnSelector, setShowColumnSelector] = useState(false);
 
+  // GRC Data state
+  const [dominios, setDominios] = useState([]);
+  const [controles, setControles] = useState([]);
+  const [catalogoRiesgos, setCatalogoRiesgos] = useState([]);
+  const [selectedDominioId, setSelectedDominioId] = useState("");
+  const [showRiskSearchModal, setShowRiskSearchModal] = useState(false);
+  const [riskSearchTerm, setRiskSearchTerm] = useState("");
+
   // Toggle column visibility
   const toggleColumn = (columnId) => {
     setVisibleColumns(prev => {
@@ -279,7 +289,8 @@ export default function Vulnerabilidades() {
     vulnerabilidad: "",
     recomendaciones: "",
     severidad: "",
-    riesgo_asociado: "",
+    control_id: "",
+    riesgo_id: "",
     descripcion_riesgo: "",
     responsable: "",
     fecha_compromiso: "",
@@ -294,6 +305,29 @@ export default function Vulnerabilidades() {
   const canRemove = isAdmin || canDelete("vulnerabilidades");
   const canAdd = isAdmin || canCreate("vulnerabilidades");
 
+  // Filter controles based on selected dominio
+  const filteredControles = useMemo(() => {
+    if (!selectedDominioId) return controles;
+    return controles.filter(c => c.dominio_id === selectedDominioId);
+  }, [controles, selectedDominioId]);
+
+  // Filter riesgos for search modal
+  const filteredRiesgos = useMemo(() => {
+    if (!riskSearchTerm) return catalogoRiesgos;
+    const term = riskSearchTerm.toLowerCase();
+    return catalogoRiesgos.filter(r =>
+      r.codigo_riesgo?.toLowerCase().includes(term) ||
+      r.nombre_corto?.toLowerCase().includes(term) ||
+      r.descripcion_completa?.toLowerCase().includes(term)
+    );
+  }, [catalogoRiesgos, riskSearchTerm]);
+
+  // Get selected riesgo name
+  const selectedRiesgoName = useMemo(() => {
+    const r = catalogoRiesgos.find(r => r.id === formData.riesgo_id);
+    return r ? `${r.codigo_riesgo} - ${r.nombre_corto}` : "";
+  }, [catalogoRiesgos, formData.riesgo_id]);
+
   const fetchOptions = async () => {
     try {
       const response = await axios.get(`${API}/dropdown-options`);
@@ -302,6 +336,25 @@ export default function Vulnerabilidades() {
       console.error("Error fetching options:", error);
     }
   };
+
+  const fetchGRCData = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+
+      const [dominiosRes, controlesRes, riesgosRes] = await Promise.all([
+        axios.get(`${API}/config/dominios`, { headers }),
+        axios.get(`${API}/config/controles`, { headers }),
+        axios.get(`${API}/catalogo-riesgos/all`, { headers }),
+      ]);
+
+      setDominios(dominiosRes.data);
+      setControles(controlesRes.data);
+      setCatalogoRiesgos(riesgosRes.data);
+    } catch (error) {
+      console.error("Error fetching GRC data:", error);
+    }
+  }, []);
 
   const fetchVulnerabilidades = useCallback(async () => {
     try {
@@ -328,7 +381,8 @@ export default function Vulnerabilidades() {
 
   useEffect(() => {
     fetchOptions();
-  }, []);
+    fetchGRCData();
+  }, [fetchGRCData]);
 
   useEffect(() => {
     const debounce = setTimeout(() => {
@@ -345,12 +399,18 @@ export default function Vulnerabilidades() {
   const handleOpenModal = (vuln = null) => {
     if (vuln) {
       setEditingVuln(vuln);
+      // Find dominio_id from control if exists
+      const control = controles.find(c => c.id === vuln.control_id);
+      setSelectedDominioId(control?.dominio_id || "");
       setFormData({ 
         ...vuln,
-        aplicaciones: vuln.aplicaciones || []
+        aplicaciones: vuln.aplicaciones || [],
+        control_id: vuln.control_id || "",
+        riesgo_id: vuln.riesgo_id || "",
       });
     } else {
       setEditingVuln(null);
+      setSelectedDominioId("");
       setFormData({
         fecha_hallazgo: "",
         institucion: "",
@@ -358,7 +418,8 @@ export default function Vulnerabilidades() {
         vulnerabilidad: "",
         recomendaciones: "",
         severidad: "",
-        riesgo_asociado: "",
+        control_id: "",
+        riesgo_id: "",
         descripcion_riesgo: "",
         responsable: "",
         fecha_compromiso: "",
@@ -374,6 +435,7 @@ export default function Vulnerabilidades() {
 
   const handleCloseModal = () => {
     setShowModal(false);
+    setSelectedDominioId("");
     setEditingVuln(null);
   };
 
@@ -1114,11 +1176,44 @@ export default function Vulnerabilidades() {
                     <p className="text-xs text-zinc-500 uppercase tracking-wide">Proveedor</p>
                     <p className="text-white">{viewingVuln.proveedor || "-"}</p>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Riesgo Asociado</p>
-                    <p className="text-white">{viewingVuln.riesgo_asociado || "-"}</p>
-                  </div>
                 </div>
+
+                {/* GRC Section */}
+                {(viewingVuln.control_id || viewingVuln.riesgo_id) && (
+                  <div className="p-3 bg-cyan-500/5 rounded-lg border border-cyan-500/20">
+                    <p className="text-xs text-cyan-500 uppercase tracking-wide mb-2 flex items-center gap-1">
+                      <Shield className="w-3 h-3" />
+                      Vinculación GRC
+                    </p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <p className="text-xs text-zinc-500">Control Asociado</p>
+                        <p className="text-white">
+                          {(() => {
+                            const control = controles.find(c => c.id === viewingVuln.control_id);
+                            return control ? `${control.codigo_control || ""} ${control.nombre_control}` : "-";
+                          })()}
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-zinc-500">Riesgo del Catálogo</p>
+                        <p className="text-white">
+                          {(() => {
+                            const riesgo = catalogoRiesgos.find(r => r.id === viewingVuln.riesgo_id);
+                            return riesgo ? (
+                              <span className="flex items-center gap-2">
+                                <Badge variant="outline" className="bg-orange-500/10 text-orange-400 border-orange-500/30 text-xs">
+                                  {riesgo.codigo_riesgo}
+                                </Badge>
+                                {riesgo.nombre_corto}
+                              </span>
+                            ) : "-";
+                          })()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Full Width Fields */}
                 <div className="space-y-1">
@@ -1309,14 +1404,90 @@ export default function Vulnerabilidades() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="text-zinc-400">Riesgo Asociado</Label>
-                  <Input
-                    value={formData.riesgo_asociado || ""}
-                    onChange={(e) => setFormData({ ...formData, riesgo_asociado: e.target.value })}
-                    className="bg-black/20 border-zinc-700 text-white"
-                    data-testid="input-riesgo-asociado"
-                  />
+                {/* GRC Section - Dominio → Control Cascading */}
+                <div className="space-y-2 md:col-span-2">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Shield className="w-4 h-4 text-cyan-500" />
+                    <span className="text-sm font-medium text-cyan-500">Vinculación GRC</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 p-3 bg-cyan-500/5 rounded-lg border border-cyan-500/20">
+                    <div className="space-y-2">
+                      <Label className="text-zinc-400">Dominio</Label>
+                      <Select
+                        value={selectedDominioId || "_none"}
+                        onValueChange={(v) => {
+                          setSelectedDominioId(v === "_none" ? "" : v);
+                          setFormData({ ...formData, control_id: "" });
+                        }}
+                      >
+                        <SelectTrigger className="bg-black/20 border-zinc-700 text-white">
+                          <SelectValue placeholder="Filtrar por dominio..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-900 border-zinc-700">
+                          <SelectItem value="_none" className="text-zinc-400">Todos los dominios</SelectItem>
+                          {dominios.map((d) => (
+                            <SelectItem key={d.id} value={d.id}>{d.nombre_dominio}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-zinc-400">Control Asociado</Label>
+                      <Select
+                        value={formData.control_id || "_none"}
+                        onValueChange={(v) => setFormData({ ...formData, control_id: v === "_none" ? "" : v })}
+                      >
+                        <SelectTrigger className="bg-black/20 border-zinc-700 text-white" data-testid="input-control">
+                          <SelectValue placeholder="Seleccionar control..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-900 border-zinc-700 max-h-[200px]">
+                          <SelectItem value="_none" className="text-zinc-400">Sin control</SelectItem>
+                          {filteredControles.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.codigo_control ? `${c.codigo_control} - ` : ""}{c.nombre_control}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Riesgo del Catálogo */}
+                <div className="space-y-2 md:col-span-2">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-orange-500" />
+                    <Label className="text-zinc-400">Riesgo del Catálogo</Label>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={selectedRiesgoName}
+                      readOnly
+                      placeholder="Buscar y seleccionar riesgo del catálogo..."
+                      className="bg-black/20 border-zinc-700 text-white flex-1 cursor-pointer"
+                      onClick={() => setShowRiskSearchModal(true)}
+                      data-testid="input-riesgo-catalogo"
+                    />
+                    {formData.riesgo_id && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setFormData({ ...formData, riesgo_id: "" })}
+                        className="text-zinc-400 hover:text-white shrink-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowRiskSearchModal(true)}
+                      className="border-zinc-700 text-zinc-300 shrink-0"
+                    >
+                      <Search className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -1627,6 +1798,67 @@ export default function Vulnerabilidades() {
           fetchOptions();
         }}
       />
+
+      {/* Risk Search Modal */}
+      <Dialog open={showRiskSearchModal} onOpenChange={setShowRiskSearchModal}>
+        <DialogContent className="bg-zinc-900 border-zinc-800 max-w-lg max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-orange-500" />
+              Buscar Riesgo en Catálogo
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <Input
+                value={riskSearchTerm}
+                onChange={(e) => setRiskSearchTerm(e.target.value)}
+                placeholder="Buscar por código o nombre..."
+                className="pl-10 bg-zinc-800 border-zinc-700 text-white"
+                autoFocus
+                data-testid="risk-search-input"
+              />
+            </div>
+
+            <ScrollArea className="max-h-[300px]">
+              <div className="space-y-1">
+                {filteredRiesgos.length === 0 ? (
+                  <p className="text-zinc-500 text-center py-4">
+                    {catalogoRiesgos.length === 0 
+                      ? "No hay riesgos en el catálogo. Crea uno en Catálogo de Riesgos."
+                      : "No se encontraron riesgos"}
+                  </p>
+                ) : (
+                  filteredRiesgos.map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={() => {
+                        setFormData({ ...formData, riesgo_id: r.id });
+                        setShowRiskSearchModal(false);
+                        setRiskSearchTerm("");
+                      }}
+                      className="w-full text-left p-3 rounded-lg hover:bg-zinc-800 transition-colors border border-transparent hover:border-orange-500/30"
+                      data-testid={`risk-option-${r.id}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="bg-orange-500/10 text-orange-400 border-orange-500/30 font-mono text-xs">
+                          {r.codigo_riesgo}
+                        </Badge>
+                        <span className="text-white font-medium">{r.nombre_corto}</span>
+                      </div>
+                      {r.descripcion_completa && (
+                        <p className="text-xs text-zinc-500 mt-1 line-clamp-2">{r.descripcion_completa}</p>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

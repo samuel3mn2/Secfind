@@ -127,7 +127,7 @@ class VulnerabilidadBase(BaseModel):
     vulnerabilidad: Optional[str] = None
     recomendaciones: Optional[str] = None
     severidad: Optional[str] = None
-    riesgo_asociado: Optional[str] = None
+    riesgo_asociado: Optional[str] = None  # Legacy field - kept for backward compatibility
     descripcion_riesgo: Optional[str] = None
     responsable: Optional[str] = None
     fecha_compromiso: Optional[str] = None
@@ -136,6 +136,9 @@ class VulnerabilidadBase(BaseModel):
     veces_en_retest: Optional[int] = 0
     nombre_informe_pentest: Optional[str] = None
     proveedor: Optional[str] = None
+    # GRC Integration fields
+    control_id: Optional[str] = None  # Reference to config_controles
+    riesgo_id: Optional[str] = None  # Reference to catalogo_riesgos
 
 class VulnerabilidadCreate(VulnerabilidadBase):
     pass
