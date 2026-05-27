@@ -2,9 +2,12 @@
 Routes for Catálogo de Riesgos (Global Risk Catalog)
 Implementado como función factory para inyección de dependencias
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from typing import List, Optional, Callable
 from datetime import datetime, timezone
+import uuid
+import io
+import pandas as pd
 
 from models.grc_models import RiesgoCatalogo, RiesgoCatalogoCreate, RiesgoCatalogoUpdate
 
@@ -48,6 +51,31 @@ def create_catalogo_riesgos_router(db, get_current_user: Callable) -> APIRouter:
         riesgos = await db.catalogo_riesgos.find({}, {"_id": 0}).sort("codigo_riesgo", 1).to_list(1000)
         return riesgos
 
+    @router.get("/plantilla/descargar")
+    async def download_template(current_user = Depends(get_current_user)):
+        """Generate and return an Excel template for import"""
+        from fastapi.responses import StreamingResponse
+        
+        # Create template DataFrame
+        template_data = {
+            'Código': ['R-001', 'R-002'],
+            'Nombre Corto': ['Nombre del riesgo', 'Otro riesgo'],
+            'Descripción Completa': ['Descripción detallada del riesgo...', 'Otra descripción...']
+        }
+        df = pd.DataFrame(template_data)
+        
+        # Write to BytesIO
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Catálogo de Riesgos')
+        output.seek(0)
+        
+        return StreamingResponse(
+            output,
+            media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            headers={'Content-Disposition': 'attachment; filename=plantilla_catalogo_riesgos.xlsx'}
+        )
+
     @router.get("/{riesgo_id}")
     async def get_riesgo(riesgo_id: str, current_user = Depends(get_current_user)):
         """Get a single riesgo by ID"""
@@ -75,14 +103,18 @@ def create_catalogo_riesgos_router(db, get_current_user: Callable) -> APIRouter:
         
         await db.catalogo_riesgos.insert_one(doc)
         
-        # Audit log
-        await db.auditoria.insert_one({
+        # Audit log - using standard historial structure
+        await db.historial_cambios.insert_one({
+            "id": str(uuid.uuid4()),
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "usuario": current_user.username,
+            "usuario_id": current_user.id,
+            "usuario_nombre": current_user.username,
             "accion": "crear",
-            "entidad": "riesgo_catalogo",
+            "entidad": "catalogo_riesgo",
             "entidad_id": riesgo.id,
-            "detalles": {"codigo": riesgo.codigo_riesgo, "nombre": riesgo.nombre_corto}
+            "entidad_nombre": f"{riesgo.codigo_riesgo} - {riesgo.nombre_corto}",
+            "descripcion": f"Riesgo creado en catálogo: {riesgo.codigo_riesgo} - {riesgo.nombre_corto}",
+            "cambios": []
         })
         
         return {
@@ -113,16 +145,31 @@ def create_catalogo_riesgos_router(db, get_current_user: Callable) -> APIRouter:
             if other:
                 raise HTTPException(status_code=400, detail="Ya existe otro riesgo con ese código")
         
+        # Calculate changes for audit
+        cambios = []
+        for campo, valor_nuevo in update_data.items():
+            valor_anterior = existing.get(campo)
+            if valor_anterior != valor_nuevo:
+                cambios.append({
+                    "campo": campo,
+                    "valor_anterior": valor_anterior,
+                    "valor_nuevo": valor_nuevo
+                })
+        
         await db.catalogo_riesgos.update_one({"id": riesgo_id}, {"$set": update_data})
         
         # Audit log
-        await db.auditoria.insert_one({
+        await db.historial_cambios.insert_one({
+            "id": str(uuid.uuid4()),
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "usuario": current_user.username,
-            "accion": "editar",
-            "entidad": "riesgo_catalogo",
+            "usuario_id": current_user.id,
+            "usuario_nombre": current_user.username,
+            "accion": "actualizar",
+            "entidad": "catalogo_riesgo",
             "entidad_id": riesgo_id,
-            "detalles": {"cambios": update_data, "anterior": existing}
+            "entidad_nombre": f"{existing.get('codigo_riesgo')} - {existing.get('nombre_corto')}",
+            "descripcion": f"Riesgo actualizado: {existing.get('codigo_riesgo')} - {existing.get('nombre_corto')}",
+            "cambios": cambios
         })
         
         updated = await db.catalogo_riesgos.find_one({"id": riesgo_id}, {"_id": 0})
@@ -151,15 +198,132 @@ def create_catalogo_riesgos_router(db, get_current_user: Callable) -> APIRouter:
         await db.catalogo_riesgos.delete_one({"id": riesgo_id})
         
         # Audit log
-        await db.auditoria.insert_one({
+        await db.historial_cambios.insert_one({
+            "id": str(uuid.uuid4()),
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "usuario": current_user.username,
+            "usuario_id": current_user.id,
+            "usuario_nombre": current_user.username,
             "accion": "eliminar",
-            "entidad": "riesgo_catalogo",
+            "entidad": "catalogo_riesgo",
             "entidad_id": riesgo_id,
-            "detalles": {"eliminado": existing}
+            "entidad_nombre": f"{existing.get('codigo_riesgo')} - {existing.get('nombre_corto')}",
+            "descripcion": f"Riesgo eliminado del catálogo: {existing.get('codigo_riesgo')} - {existing.get('nombre_corto')}",
+            "cambios": []
         })
         
         return {"message": "Riesgo eliminado exitosamente del catálogo"}
+
+    @router.post("/import/excel")
+    async def import_riesgos_excel(
+        file: UploadFile = File(...),
+        current_user = Depends(get_current_user)
+    ):
+        """
+        Import riesgos from Excel file.
+        Expected columns: Código, Nombre Corto, Descripción Completa
+        """
+        if not current_user.es_admin:
+            raise HTTPException(status_code=403, detail="Solo administradores pueden importar riesgos")
+        
+        if not (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
+            raise HTTPException(status_code=400, detail="El archivo debe ser Excel (.xlsx o .xls)")
+        
+        try:
+            contents = await file.read()
+            df = pd.read_excel(io.BytesIO(contents))
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Error al leer el archivo: {str(e)}")
+        
+        # Column mapping (Spanish to internal field names)
+        column_mapping = {
+            'Código': 'codigo_riesgo',
+            'Codigo': 'codigo_riesgo',
+            'Código Riesgo': 'codigo_riesgo',
+            'codigo_riesgo': 'codigo_riesgo',
+            'Nombre Corto': 'nombre_corto',
+            'Nombre': 'nombre_corto',
+            'nombre_corto': 'nombre_corto',
+            'Descripción Completa': 'descripcion_completa',
+            'Descripción': 'descripcion_completa',
+            'Descripcion': 'descripcion_completa',
+            'descripcion_completa': 'descripcion_completa',
+        }
+        df = df.rename(columns=column_mapping)
+        
+        # Validate required columns
+        required_cols = ['codigo_riesgo', 'nombre_corto']
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Columnas requeridas faltantes: {', '.join(missing_cols)}. Se esperan: Código, Nombre Corto"
+            )
+        
+        records = df.to_dict('records')
+        inserted_count = 0
+        skipped_count = 0
+        errors = []
+        
+        for idx, record in enumerate(records, start=2):  # Start from 2 to account for header row
+            try:
+                # Clean record
+                cleaned_record = {}
+                for k, v in record.items():
+                    if k in ['codigo_riesgo', 'nombre_corto', 'descripcion_completa']:
+                        if pd.isna(v):
+                            cleaned_record[k] = None if k == 'descripcion_completa' else ''
+                        else:
+                            cleaned_record[k] = str(v).strip()
+                
+                # Skip if codigo is empty
+                if not cleaned_record.get('codigo_riesgo'):
+                    skipped_count += 1
+                    continue
+                
+                # Check if codigo already exists
+                existing = await db.catalogo_riesgos.find_one(
+                    {"codigo_riesgo": {"$regex": f"^{cleaned_record['codigo_riesgo']}$", "$options": "i"}}
+                )
+                if existing:
+                    skipped_count += 1
+                    errors.append(f"Fila {idx}: Código '{cleaned_record['codigo_riesgo']}' ya existe")
+                    continue
+                
+                # Create riesgo
+                riesgo = RiesgoCatalogo(
+                    codigo_riesgo=cleaned_record['codigo_riesgo'].upper(),
+                    nombre_corto=cleaned_record.get('nombre_corto', ''),
+                    descripcion_completa=cleaned_record.get('descripcion_completa', '')
+                )
+                doc = riesgo.model_dump()
+                doc['created_at'] = doc['created_at'].isoformat()
+                
+                await db.catalogo_riesgos.insert_one(doc)
+                inserted_count += 1
+                
+            except Exception as e:
+                errors.append(f"Fila {idx}: {str(e)}")
+                continue
+        
+        # Audit log
+        await db.historial_cambios.insert_one({
+            "id": str(uuid.uuid4()),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "usuario_id": current_user.id,
+            "usuario_nombre": current_user.username,
+            "accion": "importar",
+            "entidad": "catalogo_riesgo",
+            "entidad_id": None,
+            "entidad_nombre": f"Importación masiva: {inserted_count} riesgos",
+            "descripcion": f"Importación Excel: {inserted_count} riesgos insertados, {skipped_count} omitidos",
+            "cambios": []
+        })
+        
+        return {
+            "message": f"Importación completada: {inserted_count} riesgos insertados, {skipped_count} omitidos",
+            "inserted": inserted_count,
+            "skipped": skipped_count,
+            "errors": errors[:10] if errors else []  # Return first 10 errors
+        }
 
     return router

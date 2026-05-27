@@ -121,8 +121,29 @@ export default function Auditoria() {
       proveedor: "bg-pink-500/20 text-pink-400 border-pink-500/30",
       informe_pentest: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
       usuario: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
+      // GRC Entities
+      dominio: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+      control: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+      catalogo_riesgo: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+      hallazgo_auditoria: "bg-teal-500/20 text-teal-400 border-teal-500/30",
     };
     return colors[entidad] || "bg-zinc-500/20 text-zinc-400 border-zinc-500/30";
+  };
+
+  const formatEntidadName = (entidad) => {
+    const names = {
+      vulnerabilidad: "Vulnerabilidad",
+      institucion: "Institución",
+      aplicacion: "Aplicación",
+      proveedor: "Proveedor",
+      informe_pentest: "Informe Pentest",
+      usuario: "Usuario",
+      dominio: "Dominio",
+      control: "Control",
+      catalogo_riesgo: "Riesgo",
+      hallazgo_auditoria: "Hallazgo",
+    };
+    return names[entidad] || entidad;
   };
 
   const formatDate = (dateStr) => {
@@ -139,17 +160,40 @@ export default function Auditoria() {
 
   const formatFieldName = (field) => {
     const names = {
+      // Vulnerabilidades
       estatus: "Estatus",
       severidad: "Severidad",
       responsable: "Responsable",
       fecha_compromiso: "Fecha Compromiso",
-      descripcion_riesgo: "Descripción",
+      descripcion_riesgo: "Descripción Riesgo",
       recomendaciones: "Recomendaciones",
       vulnerabilidad: "Nombre",
       institucion: "Institución",
       aplicaciones: "Aplicaciones",
       proveedor: "Proveedor",
       nombre_informe_pentest: "Informe Pentest",
+      control_id: "Control Asociado",
+      riesgo_id: "Riesgo del Catálogo",
+      // Dominios
+      nombre_dominio: "Nombre del Dominio",
+      codigo_referencia: "Código de Referencia",
+      // Controles
+      nombre_control: "Nombre del Control",
+      codigo_control: "Código del Control",
+      dominio_id: "Dominio",
+      // Catálogo de Riesgos
+      codigo_riesgo: "Código de Riesgo",
+      nombre_corto: "Nombre Corto",
+      descripcion_completa: "Descripción Completa",
+      // Hallazgos de Auditoría
+      codigo: "Código",
+      brecha: "Brecha/Hallazgo",
+      probabilidad: "Probabilidad",
+      impacto: "Impacto",
+      riesgo_inherente: "Riesgo Inherente",
+      estado: "Estado",
+      observaciones: "Observaciones",
+      cambio_estado: "Cambio de Estado",
     };
     return names[field] || field;
   };
@@ -208,16 +252,20 @@ export default function Auditoria() {
             </div>
 
             <Select value={filterEntidad} onValueChange={setFilterEntidad}>
-              <SelectTrigger className="w-[150px] bg-black/20 border-zinc-700 text-white" data-testid="filter-entidad">
+              <SelectTrigger className="w-[180px] bg-black/20 border-zinc-700 text-white" data-testid="filter-entidad">
                 <SelectValue placeholder="Entidad" />
               </SelectTrigger>
               <SelectContent className="bg-zinc-900 border-zinc-700">
-                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="all">Todas las entidades</SelectItem>
                 <SelectItem value="vulnerabilidad">Vulnerabilidad</SelectItem>
                 <SelectItem value="institucion">Institución</SelectItem>
                 <SelectItem value="aplicacion">Aplicación</SelectItem>
                 <SelectItem value="proveedor">Proveedor</SelectItem>
                 <SelectItem value="informe_pentest">Informe Pentest</SelectItem>
+                <SelectItem value="dominio">Dominio</SelectItem>
+                <SelectItem value="control">Control</SelectItem>
+                <SelectItem value="catalogo_riesgo">Riesgo (Catálogo)</SelectItem>
+                <SelectItem value="hallazgo_auditoria">Hallazgo de Auditoría</SelectItem>
               </SelectContent>
             </Select>
 
@@ -333,7 +381,7 @@ export default function Auditoria() {
                         variant="outline"
                         className={getEntidadBadge(item.entidad)}
                       >
-                        {item.entidad}
+                        {formatEntidadName(item.entidad)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-zinc-300 max-w-[300px] truncate">

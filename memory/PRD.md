@@ -3,6 +3,7 @@
 ## Última Actualización: 2025-12-27
 
 ### Cambios Recientes
+- **Conexión GRC a Auditoría (Dic 2025)**: Todos los módulos GRC (Dominios, Controles, Catálogo de Riesgos, Hallazgos de Auditoría) ahora registran sus cambios en el historial de auditoría del sistema. El filtro de entidades en Auditoría incluye las nuevas opciones GRC.
 - **Fase Frontend GRC Completada (Dic 2025)**: Implementación completa de UI para módulos GRC:
   - Dominios y Controles integrados como tabs en Configuración
   - Catálogo de Riesgos como página independiente (/catalogo-riesgos)

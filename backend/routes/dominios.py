@@ -5,6 +5,7 @@ Implementado como función factory para inyección de dependencias
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Callable
 from datetime import datetime, timezone
+import uuid
 
 from models.grc_models import Dominio, DominioCreate, DominioUpdate
 
@@ -47,14 +48,18 @@ def create_dominios_router(db, get_current_user: Callable) -> APIRouter:
         
         await db.config_dominios.insert_one(doc)
         
-        # Audit log
-        await db.auditoria.insert_one({
+        # Audit log - using standard historial structure
+        await db.historial_cambios.insert_one({
+            "id": str(uuid.uuid4()),
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "usuario": current_user.username,
+            "usuario_id": current_user.id,
+            "usuario_nombre": current_user.username,
             "accion": "crear",
             "entidad": "dominio",
             "entidad_id": dominio.id,
-            "detalles": {"nombre_dominio": dominio.nombre_dominio}
+            "entidad_nombre": dominio.nombre_dominio,
+            "descripcion": f"Dominio creado: {dominio.nombre_dominio}",
+            "cambios": []
         })
         
         return {"id": dominio.id, "nombre_dominio": dominio.nombre_dominio, "codigo_referencia": dominio.codigo_referencia}
@@ -80,16 +85,31 @@ def create_dominios_router(db, get_current_user: Callable) -> APIRouter:
             if other:
                 raise HTTPException(status_code=400, detail="Ya existe otro dominio con ese nombre")
         
+        # Calculate changes for audit
+        cambios = []
+        for campo, valor_nuevo in update_data.items():
+            valor_anterior = existing.get(campo)
+            if valor_anterior != valor_nuevo:
+                cambios.append({
+                    "campo": campo,
+                    "valor_anterior": valor_anterior,
+                    "valor_nuevo": valor_nuevo
+                })
+        
         await db.config_dominios.update_one({"id": dominio_id}, {"$set": update_data})
         
         # Audit log
-        await db.auditoria.insert_one({
+        await db.historial_cambios.insert_one({
+            "id": str(uuid.uuid4()),
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "usuario": current_user.username,
-            "accion": "editar",
+            "usuario_id": current_user.id,
+            "usuario_nombre": current_user.username,
+            "accion": "actualizar",
             "entidad": "dominio",
             "entidad_id": dominio_id,
-            "detalles": {"cambios": update_data, "anterior": existing}
+            "entidad_nombre": existing.get("nombre_dominio"),
+            "descripcion": f"Dominio actualizado: {existing.get('nombre_dominio')}",
+            "cambios": cambios
         })
         
         updated = await db.config_dominios.find_one({"id": dominio_id}, {"_id": 0})
@@ -116,13 +136,17 @@ def create_dominios_router(db, get_current_user: Callable) -> APIRouter:
         await db.config_dominios.delete_one({"id": dominio_id})
         
         # Audit log
-        await db.auditoria.insert_one({
+        await db.historial_cambios.insert_one({
+            "id": str(uuid.uuid4()),
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "usuario": current_user.username,
+            "usuario_id": current_user.id,
+            "usuario_nombre": current_user.username,
             "accion": "eliminar",
             "entidad": "dominio",
             "entidad_id": dominio_id,
-            "detalles": {"eliminado": existing}
+            "entidad_nombre": existing.get("nombre_dominio"),
+            "descripcion": f"Dominio eliminado: {existing.get('nombre_dominio')}",
+            "cambios": []
         })
         
         return {"message": "Dominio eliminado exitosamente"}

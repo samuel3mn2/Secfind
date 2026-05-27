@@ -5,6 +5,7 @@ Implementado como función factory para inyección de dependencias
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional, Callable
 from datetime import datetime, timezone
+import uuid
 
 from models.grc_models import Control, ControlCreate, ControlUpdate
 
@@ -75,14 +76,18 @@ def create_controles_router(db, get_current_user: Callable) -> APIRouter:
         
         await db.config_controles.insert_one(doc)
         
-        # Audit log
-        await db.auditoria.insert_one({
+        # Audit log - using standard historial structure
+        await db.historial_cambios.insert_one({
+            "id": str(uuid.uuid4()),
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "usuario": current_user.username,
+            "usuario_id": current_user.id,
+            "usuario_nombre": current_user.username,
             "accion": "crear",
             "entidad": "control",
             "entidad_id": control.id,
-            "detalles": {"nombre_control": control.nombre_control, "dominio": dominio["nombre_dominio"]}
+            "entidad_nombre": f"{control.codigo_control or ''} {control.nombre_control}".strip(),
+            "descripcion": f"Control creado: {control.nombre_control} ({dominio['nombre_dominio']})",
+            "cambios": []
         })
         
         return {
@@ -122,16 +127,31 @@ def create_controles_router(db, get_current_user: Callable) -> APIRouter:
             if other:
                 raise HTTPException(status_code=400, detail="Ya existe otro control con ese nombre en este dominio")
         
+        # Calculate changes for audit
+        cambios = []
+        for campo, valor_nuevo in update_data.items():
+            valor_anterior = existing.get(campo)
+            if valor_anterior != valor_nuevo:
+                cambios.append({
+                    "campo": campo,
+                    "valor_anterior": valor_anterior,
+                    "valor_nuevo": valor_nuevo
+                })
+        
         await db.config_controles.update_one({"id": control_id}, {"$set": update_data})
         
         # Audit log
-        await db.auditoria.insert_one({
+        await db.historial_cambios.insert_one({
+            "id": str(uuid.uuid4()),
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "usuario": current_user.username,
-            "accion": "editar",
+            "usuario_id": current_user.id,
+            "usuario_nombre": current_user.username,
+            "accion": "actualizar",
             "entidad": "control",
             "entidad_id": control_id,
-            "detalles": {"cambios": update_data, "anterior": existing}
+            "entidad_nombre": f"{existing.get('codigo_control', '')} {existing.get('nombre_control', '')}".strip(),
+            "descripcion": f"Control actualizado: {existing.get('nombre_control')}",
+            "cambios": cambios
         })
         
         updated = await db.config_controles.find_one({"id": control_id}, {"_id": 0})
@@ -160,13 +180,17 @@ def create_controles_router(db, get_current_user: Callable) -> APIRouter:
         await db.config_controles.delete_one({"id": control_id})
         
         # Audit log
-        await db.auditoria.insert_one({
+        await db.historial_cambios.insert_one({
+            "id": str(uuid.uuid4()),
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "usuario": current_user.username,
+            "usuario_id": current_user.id,
+            "usuario_nombre": current_user.username,
             "accion": "eliminar",
             "entidad": "control",
             "entidad_id": control_id,
-            "detalles": {"eliminado": existing}
+            "entidad_nombre": f"{existing.get('codigo_control', '')} {existing.get('nombre_control', '')}".strip(),
+            "descripcion": f"Control eliminado: {existing.get('nombre_control')}",
+            "cambios": []
         })
         
         return {"message": "Control eliminado exitosamente"}

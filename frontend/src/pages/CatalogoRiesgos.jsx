@@ -33,7 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, AlertTriangle, Save, Loader2, Search, BookOpen } from "lucide-react";
+import { Plus, Pencil, Trash2, AlertTriangle, Save, Loader2, Search, BookOpen, Upload, Download, FileSpreadsheet } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -42,8 +42,13 @@ export default function CatalogoRiesgos() {
   const [riesgos, setRiesgos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [pagination, setPagination] = useState({ total: 0, skip: 0, limit: 50 });
+
+  // Import modal state
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState(null);
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -155,6 +160,63 @@ export default function CatalogoRiesgos() {
     }
   };
 
+  const handleImport = async () => {
+    if (!importFile) {
+      toast.error("Selecciona un archivo Excel");
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const token = localStorage.getItem("token");
+      const formData = new FormData();
+      formData.append("file", importFile);
+
+      const response = await axios.post(`${API}/catalogo-riesgos/import/excel`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      toast.success(response.data.message);
+      if (response.data.errors?.length > 0) {
+        response.data.errors.forEach((err) => toast.warning(err));
+      }
+
+      setShowImportModal(false);
+      setImportFile(null);
+      fetchRiesgos();
+    } catch (error) {
+      console.error("Error importing:", error);
+      toast.error(error.response?.data?.detail || "Error al importar");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const downloadTemplate = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${API}/catalogo-riesgos/plantilla/descargar`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: "blob",
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "plantilla_catalogo_riesgos.xlsx");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error downloading template:", error);
+      toast.error("Error al descargar plantilla");
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8 min-h-screen">
@@ -181,14 +243,34 @@ export default function CatalogoRiesgos() {
           </div>
         </div>
         {isAdmin && (
-          <Button
-            onClick={openCreateModal}
-            className="bg-orange-600 hover:bg-orange-700"
-            data-testid="btn-crear-riesgo"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Nuevo Riesgo
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={downloadTemplate}
+              className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+              data-testid="btn-descargar-plantilla"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Plantilla
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowImportModal(true)}
+              className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
+              data-testid="btn-importar-riesgos"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Importar
+            </Button>
+            <Button
+              onClick={openCreateModal}
+              className="bg-orange-600 hover:bg-orange-700"
+              data-testid="btn-crear-riesgo"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo Riesgo
+            </Button>
+          </div>
         )}
       </div>
 
@@ -410,6 +492,70 @@ export default function CatalogoRiesgos() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Import Modal */}
+      <Dialog open={showImportModal} onOpenChange={setShowImportModal}>
+        <DialogContent className="bg-zinc-900 border-zinc-800 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <FileSpreadsheet className="w-5 h-5 text-orange-500" />
+              Importar Riesgos desde Excel
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <p className="text-zinc-400 text-sm">
+              Sube un archivo Excel (.xlsx) con las columnas: <strong>Código</strong>, <strong>Nombre Corto</strong>, <strong>Descripción Completa</strong>
+            </p>
+
+            <div className="space-y-2">
+              <Label className="text-zinc-300">Archivo Excel</Label>
+              <Input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={(e) => setImportFile(e.target.files[0])}
+                className="bg-zinc-800 border-zinc-700 text-white file:bg-zinc-700 file:text-white file:border-0 file:mr-4"
+                data-testid="input-import-file"
+              />
+            </div>
+
+            <Button
+              variant="link"
+              onClick={downloadTemplate}
+              className="text-orange-400 hover:text-orange-300 p-0 h-auto"
+            >
+              <Download className="w-4 h-4 mr-1" />
+              Descargar plantilla de ejemplo
+            </Button>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowImportModal(false);
+                setImportFile(null);
+              }}
+              className="border-zinc-700 text-zinc-300"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleImport}
+              disabled={importing || !importFile}
+              className="bg-orange-600 hover:bg-orange-700"
+              data-testid="btn-confirmar-importar"
+            >
+              {importing ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Upload className="w-4 h-4 mr-2" />
+              )}
+              Importar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

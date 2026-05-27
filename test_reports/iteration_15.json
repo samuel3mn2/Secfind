@@ -1,0 +1,60 @@
+{
+  "summary": "Completed testing of GRC Auditoría Integration and Excel Import Features (Iteration 15). All 14 backend tests passed. Frontend UI verified: Catálogo Riesgos and Hallazgos Auditoría pages have working 'Plantilla' and 'Importar' buttons. Auditoría del Sistema page shows GRC entity filters (Dominio, Control, Riesgo, Hallazgo) working correctly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "Backend: GET /api/catalogo-riesgos/plantilla/descargar returns Excel file (200 OK)",
+    "Backend: POST /api/catalogo-riesgos/import/excel endpoint exists (422 without file)",
+    "Backend: POST /api/catalogo-riesgos/import/excel rejects non-Excel files (400)",
+    "Backend: GET /api/hallazgos-auditoria/plantilla/descargar returns Excel file (200 OK)",
+    "Backend: POST /api/hallazgos-auditoria/import/excel endpoint exists (422 without file)",
+    "Backend: POST /api/hallazgos-auditoria/import/excel rejects non-Excel files (400)",
+    "Backend: GET /api/historial returns audit history with total count",
+    "Backend: GET /api/historial?entidad=dominio filters correctly",
+    "Backend: GET /api/historial?entidad=control filters correctly",
+    "Backend: GET /api/historial?entidad=catalogo_riesgo filters correctly",
+    "Backend: GET /api/historial?entidad=hallazgo_auditoria filters correctly",
+    "Backend: Creating dominio creates audit log entry in historial_cambios",
+    "Backend: Creating riesgo in catalog creates audit log entry",
+    "Backend: Creating hallazgo creates audit log entry",
+    "UI: Catálogo de Riesgos page has 'Plantilla' button (data-testid='btn-descargar-plantilla')",
+    "UI: Catálogo de Riesgos page has 'Importar' button (data-testid='btn-importar-riesgos')",
+    "UI: Catálogo de Riesgos import modal opens correctly",
+    "UI: Hallazgos de Auditoría page has 'Plantilla' button (data-testid='btn-descargar-plantilla-hallazgos')",
+    "UI: Hallazgos de Auditoría page has 'Importar' button (data-testid='btn-importar-hallazgos')",
+    "UI: Hallazgos de Auditoría import modal opens correctly",
+    "UI: Auditoría del Sistema page shows entity filter dropdown",
+    "UI: Entity filter includes 'Dominio' option",
+    "UI: Entity filter includes 'Control' option",
+    "UI: Entity filter includes 'Riesgo (Catálogo)' option",
+    "UI: Entity filter includes 'Hallazgo de Auditoría' option"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_grc_auditoria_import.py",
+    "/app/test_reports/pytest/pytest_grc_auditoria_import.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_grc_auditoria_import.py (new test file)"
+  ],
+  "success_rate": {
+    "backend": "100% (14/14 tests passed)",
+    "frontend": "100% (All UI features verified)"
+  },
+  "test_credentials": {
+    "user": "admin",
+    "password": "admin123"
+  },
+  "seed_data_creation": "Test data created and cleaned up during testing (TEST_DOMINIO_*, TEST-R-*, TEST-AUD-*)",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 15 tested GRC Auditoría Integration and Excel Import features. Key endpoints verified: GET /api/catalogo-riesgos/plantilla/descargar, POST /api/catalogo-riesgos/import/excel, GET /api/hallazgos-auditoria/plantilla/descargar, POST /api/hallazgos-auditoria/import/excel. The Auditoría del Sistema page (under Configuración tab) has entity filters for all GRC modules. The historial_cambios collection stores audit logs for dominio, control, catalogo_riesgo, and hallazgo_auditoria entities."
+}
