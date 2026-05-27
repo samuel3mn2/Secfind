@@ -118,6 +118,11 @@ class HallazgoAuditoria(HallazgoAuditoriaBase):
     updated_at: Optional[datetime] = None
     created_by: Optional[str] = None
 
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Auto-calculate riesgo_inherente
+        self.riesgo_inherente = self.probabilidad * self.impacto
+
     def calcular_riesgo_inherente(self):
         self.riesgo_inherente = self.probabilidad * self.impacto
         return self.riesgo_inherente
