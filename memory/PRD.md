@@ -310,7 +310,12 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 
 ### P0 (Alta Prioridad)
 - [ ] Detección de duplicados en importación y creación manual
-- [ ] Actualizar Formulario de Vulnerabilidades con campos GRC (control_id, dropdown cascada Dominio→Control, búsqueda de riesgos)
+- [x] **Actualizar Formulario de Vulnerabilidades con GRC** (COMPLETADO - Dic 2025):
+  - [x] Sección "Vinculación GRC" con dropdown cascada Dominio → Control
+  - [x] Campo "Riesgo del Catálogo" con modal de búsqueda
+  - [x] Campo riesgo_asociado eliminado, ahora usa riesgo_id apuntando al catálogo
+  - [x] Modal de visualización muestra GRC con control y riesgo asociados
+  - [x] Edición carga correctamente control_id y riesgo_id existentes
 - [x] **Arquitectura GRC Backend** (COMPLETADO - Dic 2025):
   - [x] Modularización de server.py con factory routers
   - [x] Colecciones: config_dominios, config_controles, catalogo_riesgos, hallazgos_auditoria
