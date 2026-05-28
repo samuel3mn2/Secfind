@@ -1263,12 +1263,15 @@ async def send_test_email(current_user: CurrentUser = Depends(get_current_user))
     user = await db.usuarios.find_one({"id": current_user.id}, {"_id": 0, "email": 1})
     to_email = user.get("email") if user and user.get("email") else config.get("smtp_email")
     
-    # Generate test email
+    # Generate test email with sample data
     test_vulns = [
         {"vulnerabilidad": "Test - SQL Injection en login", "institucion": "Test Corp", "severidad": "Critica", "fecha_compromiso": "2026-04-20", "responsable": "Admin"},
         {"vulnerabilidad": "Test - XSS en formulario", "institucion": "Test Corp", "severidad": "Alta", "fecha_compromiso": "2026-04-22", "responsable": "Admin"}
     ]
-    html_content = generate_alert_email(test_vulns, 7)
+    test_hallazgos = [
+        {"codigo": "AUD-TEST-001", "brecha": "Test - Falta de monitoreo en sistemas críticos", "riesgo_inherente": 16, "fecha_compromiso": "2026-04-25", "responsable": "Auditor"}
+    ]
+    html_content = generate_alert_email(test_vulns, test_hallazgos, 7)
     
     result = email_service.send_email([to_email], "SecFind - Email de Prueba", html_content)
     if not result["success"]:
@@ -1278,7 +1281,7 @@ async def send_test_email(current_user: CurrentUser = Depends(get_current_user))
 
 @api_router.post("/notificaciones/ejecutar")
 async def ejecutar_notificaciones(current_user: CurrentUser = Depends(get_current_user)):
-    """Manually trigger notification check (admin only)"""
+    """Manually trigger notification check for vulnerabilities and audit findings (admin only)"""
     if not current_user.es_admin:
         raise HTTPException(status_code=403, detail="Solo administradores pueden ejecutar notificaciones")
     
@@ -1326,28 +1329,46 @@ async def ejecutar_notificaciones(current_user: CurrentUser = Depends(get_curren
             "estatus": {"$in": ["Pendiente", "En Proceso"]}
         }, {"_id": 0}).to_list(1000)
         
-        if vulns:
-            html_content = generate_alert_email(vulns, dias)
+        # Find hallazgos de auditoría expiring on this date
+        hallazgos = await db.hallazgos_auditoria.find({
+            "fecha_compromiso": target_str,
+            "estado": {"$nin": ["Cerrado"]}
+        }, {"_id": 0}).to_list(1000)
+        
+        if vulns or hallazgos:
+            html_content = generate_alert_email(vulns, hallazgos, dias)
             recipients = admin_emails.copy()
             
             # Add responsables if enabled
             if config.get("enviar_a_responsables"):
+                # Process vulnerability responsables
                 for v in vulns:
                     resp = v.get("responsable")
                     if resp:
-                        # First try to find email in responsables catalog
                         responsable = await db.responsables.find_one({"nombre": resp, "activo": True}, {"_id": 0, "email": 1})
                         if responsable and responsable.get("email") and responsable["email"] not in recipients:
                             recipients.append(responsable["email"])
                         else:
-                            # Fallback: try to find user email by name
+                            user = await db.usuarios.find_one({"nombre": resp, "activo": True}, {"_id": 0, "email": 1})
+                            if user and user.get("email") and user["email"] not in recipients:
+                                recipients.append(user["email"])
+                
+                # Process hallazgo responsables (same logic)
+                for h in hallazgos:
+                    resp = h.get("responsable")
+                    if resp:
+                        responsable = await db.responsables.find_one({"nombre": resp, "activo": True}, {"_id": 0, "email": 1})
+                        if responsable and responsable.get("email") and responsable["email"] not in recipients:
+                            recipients.append(responsable["email"])
+                        else:
                             user = await db.usuarios.find_one({"nombre": resp, "activo": True}, {"_id": 0, "email": 1})
                             if user and user.get("email") and user["email"] not in recipients:
                                 recipients.append(user["email"])
             
+            total_items = len(vulns) + len(hallazgos)
             result = email_service.send_email(
                 recipients,
-                f"SecFind - {len(vulns)} vulnerabilidad(es) vence(n) en {dias} día(s)",
+                f"SecFind - {total_items} remediación(es) vence(n) en {dias} día(s)",
                 html_content
             )
             if result["success"]:
@@ -1363,7 +1384,7 @@ async def ejecutar_notificaciones(current_user: CurrentUser = Depends(get_curren
 
 @api_router.post("/notificaciones/resumen-semanal")
 async def enviar_resumen_semanal(current_user: CurrentUser = Depends(get_current_user)):
-    """Manually send weekly summary (admin only)"""
+    """Manually send weekly summary for vulnerabilities and audit findings (admin only)"""
     if not current_user.es_admin:
         raise HTTPException(status_code=403, detail="Solo administradores pueden enviar el resumen")
     
@@ -1387,45 +1408,81 @@ async def enviar_resumen_semanal(current_user: CurrentUser = Depends(get_current
         admin_emails = [config.get("smtp_email")]
     
     today = datetime.now(timezone.utc).date()
+    today_str = today.strftime("%Y-%m-%d")
+    fecha_7 = (today + timedelta(days=7)).strftime("%Y-%m-%d")
+    fecha_30 = (today + timedelta(days=30)).strftime("%Y-%m-%d")
     
-    # Calculate stats
-    vencidas = await db.vulnerabilidades.count_documents({
-        "fecha_compromiso": {"$lt": today.strftime("%Y-%m-%d")},
+    # === VULNERABILITY STATS ===
+    vuln_vencidas = await db.vulnerabilidades.count_documents({
+        "fecha_compromiso": {"$lt": today_str},
         "estatus": {"$in": ["Pendiente", "En Proceso"]}
     })
     
-    proximas_7 = await db.vulnerabilidades.count_documents({
-        "fecha_compromiso": {"$gte": today.strftime("%Y-%m-%d"), "$lte": (today + timedelta(days=7)).strftime("%Y-%m-%d")},
+    vuln_proximas_7 = await db.vulnerabilidades.count_documents({
+        "fecha_compromiso": {"$gte": today_str, "$lte": fecha_7},
         "estatus": {"$in": ["Pendiente", "En Proceso"]}
     })
     
-    proximas_30 = await db.vulnerabilidades.count_documents({
-        "fecha_compromiso": {"$gte": today.strftime("%Y-%m-%d"), "$lte": (today + timedelta(days=30)).strftime("%Y-%m-%d")},
+    vuln_proximas_30 = await db.vulnerabilidades.count_documents({
+        "fecha_compromiso": {"$gte": today_str, "$lte": fecha_30},
         "estatus": {"$in": ["Pendiente", "En Proceso"]}
     })
     
-    total_pendientes = await db.vulnerabilidades.count_documents({
+    vuln_total_pendientes = await db.vulnerabilidades.count_documents({
         "estatus": {"$in": ["Pendiente", "En Proceso"]}
     })
     
-    stats = {
-        "vencidas": vencidas,
-        "proximas_7_dias": proximas_7,
-        "proximas_30_dias": proximas_30,
-        "total_pendientes": total_pendientes
+    vuln_stats = {
+        "vencidas": vuln_vencidas,
+        "proximas_7_dias": vuln_proximas_7,
+        "proximas_30_dias": vuln_proximas_30,
+        "total_pendientes": vuln_total_pendientes
+    }
+    
+    # === HALLAZGOS STATS ===
+    hallazgo_vencidas = await db.hallazgos_auditoria.count_documents({
+        "fecha_compromiso": {"$lt": today_str, "$ne": None, "$exists": True},
+        "estado": {"$nin": ["Cerrado"]}
+    })
+    
+    hallazgo_proximas_7 = await db.hallazgos_auditoria.count_documents({
+        "fecha_compromiso": {"$gte": today_str, "$lte": fecha_7},
+        "estado": {"$nin": ["Cerrado"]}
+    })
+    
+    hallazgo_proximas_30 = await db.hallazgos_auditoria.count_documents({
+        "fecha_compromiso": {"$gte": today_str, "$lte": fecha_30},
+        "estado": {"$nin": ["Cerrado"]}
+    })
+    
+    hallazgo_total_pendientes = await db.hallazgos_auditoria.count_documents({
+        "estado": {"$nin": ["Cerrado"]}
+    })
+    
+    hallazgo_stats = {
+        "vencidas": hallazgo_vencidas,
+        "proximas_7_dias": hallazgo_proximas_7,
+        "proximas_30_dias": hallazgo_proximas_30,
+        "total_pendientes": hallazgo_total_pendientes
     }
     
     # Get upcoming vulnerabilities for the list
     vulns = await db.vulnerabilidades.find({
-        "fecha_compromiso": {"$gte": today.strftime("%Y-%m-%d"), "$lte": (today + timedelta(days=30)).strftime("%Y-%m-%d")},
+        "fecha_compromiso": {"$gte": today_str, "$lte": fecha_30},
         "estatus": {"$in": ["Pendiente", "En Proceso"]}
-    }, {"_id": 0}).sort("fecha_compromiso", 1).to_list(20)
+    }, {"_id": 0}).sort("fecha_compromiso", 1).to_list(15)
     
-    html_content = generate_weekly_summary_email(stats, vulns)
+    # Get upcoming hallazgos for the list
+    hallazgos = await db.hallazgos_auditoria.find({
+        "fecha_compromiso": {"$gte": today_str, "$lte": fecha_30},
+        "estado": {"$nin": ["Cerrado"]}
+    }, {"_id": 0}).sort("fecha_compromiso", 1).to_list(15)
+    
+    html_content = generate_weekly_summary_email(vuln_stats, hallazgo_stats, vulns, hallazgos)
     
     result = email_service.send_email(
         admin_emails,
-        "SecFind - Resumen Semanal de Vulnerabilidades",
+        "SecFind - Resumen Semanal de Remediaciones",
         html_content
     )
     

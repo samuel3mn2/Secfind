@@ -136,7 +136,7 @@ export default function Notificaciones() {
             <div>
               <CardTitle className="text-white text-lg">Notificaciones por Email</CardTitle>
               <CardDescription className="text-zinc-500">
-                Configura alertas automáticas para fechas de compromiso
+                Configura alertas automáticas para fechas de compromiso de vulnerabilidades y hallazgos de auditoría
               </CardDescription>
             </div>
           </div>
@@ -338,7 +338,7 @@ export default function Notificaciones() {
           <div className="flex items-center justify-between p-4 rounded-lg bg-zinc-900/50 border border-zinc-800">
             <div>
               <p className="text-white font-medium">Enviar también a responsables</p>
-              <p className="text-xs text-zinc-500">Además de administradores, enviar al responsable de cada vulnerabilidad</p>
+              <p className="text-xs text-zinc-500">Además de administradores, enviar al responsable de cada vulnerabilidad o hallazgo de auditoría</p>
             </div>
             <Switch
               checked={config.enviar_a_responsables}
@@ -350,7 +350,7 @@ export default function Notificaciones() {
           <div className="flex items-center justify-between p-4 rounded-lg bg-zinc-900/50 border border-zinc-800">
             <div>
               <p className="text-white font-medium">Resumen semanal</p>
-              <p className="text-xs text-zinc-500">Enviar resumen los lunes con todas las vulnerabilidades próximas a vencer</p>
+              <p className="text-xs text-zinc-500">Enviar resumen los lunes con todas las remediaciones (vulnerabilidades y hallazgos) próximas a vencer</p>
             </div>
             <Switch
               checked={config.resumen_semanal}
