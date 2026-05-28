@@ -1,8 +1,10 @@
 # SecFind - Sistema de Gestión de Vulnerabilidades
 
-## Última Actualización: 2025-12-27
+## Última Actualización: 2026-05-28
 
 ### Cambios Recientes
+- **Unificación Módulo Seguimiento (Mayo 2026)**: El módulo de Seguimiento de Riesgos ahora incluye dos Tabs: "Vulnerabilidades" y "Hallazgos de Auditoría". Ambos tabs comparten KPIs (Vencidas, Próximos 7/30 días, Total Pendientes), filtros comunes, y visualización de detalles en modal. Los registros vencidos (fecha_compromiso < hoy y estado ≠ Cerrado) muestran badge "VENCIDO" en rojo.
+- **Nuevos Campos Hallazgos de Auditoría (Mayo 2026)**: Agregados campos `responsable` (dropdown de catálogo existente), `fecha_hallazgo` (default: hoy), y `fecha_compromiso` (deadline para remediación). Validación: fecha_compromiso no puede ser anterior a fecha_hallazgo. Tabla actualizada con columnas nuevas. Plantilla Excel actualizada para import masivo.
 - **Importación Masiva GRC (Dic 2025)**: Nuevos endpoints para importar Riesgos del Catálogo y Hallazgos de Auditoría desde Excel. Incluye descarga de plantillas, validación de datos y registro automático en auditoría.
 - **Conexión GRC a Auditoría (Dic 2025)**: Todos los módulos GRC (Dominios, Controles, Catálogo de Riesgos, Hallazgos de Auditoría) ahora registran sus cambios en el historial de auditoría del sistema. El filtro de entidades en Auditoría incluye las nuevas opciones GRC.
 - **Fase Frontend GRC Completada (Dic 2025)**: Implementación completa de UI para módulos GRC:
