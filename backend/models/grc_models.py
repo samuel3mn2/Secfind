@@ -89,9 +89,9 @@ class HallazgoAuditoriaBase(BaseModel):
     probabilidad: int = Field(ge=1, le=5, default=1)  # 1-5
     impacto: int = Field(ge=1, le=5, default=1)  # 1-5
     estado: EstadoHallazgo = EstadoHallazgo.ABIERTO
-    responsable: Optional[str] = None
-    fecha_identificacion: Optional[str] = None
-    fecha_compromiso: Optional[str] = None
+    responsable: Optional[str] = None  # Nombre del responsable (del catálogo)
+    fecha_hallazgo: Optional[str] = None  # Fecha de identificación (DD-MM-YYYY)
+    fecha_compromiso: Optional[str] = None  # Fecha límite de remediación (DD-MM-YYYY)
     observaciones: Optional[str] = None
 
 class HallazgoAuditoriaCreate(HallazgoAuditoriaBase):
@@ -106,7 +106,7 @@ class HallazgoAuditoriaUpdate(BaseModel):
     impacto: Optional[int] = Field(default=None, ge=1, le=5)
     estado: Optional[EstadoHallazgo] = None
     responsable: Optional[str] = None
-    fecha_identificacion: Optional[str] = None
+    fecha_hallazgo: Optional[str] = None
     fecha_compromiso: Optional[str] = None
     observaciones: Optional[str] = None
 

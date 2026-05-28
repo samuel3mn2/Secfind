@@ -4,7 +4,7 @@ Implementado como función factory para inyección de dependencias
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from typing import List, Optional, Callable
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import uuid
 import io
 import pandas as pd
@@ -147,6 +147,9 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
             'Riesgo': ['Acceso no autorizado', '', 'Fraude de identidad'],
             'Probabilidad': ['Alta', 'Medio', 'Muy Alta'],  # Muy Baja, Baja, Medio, Alta, Muy Alta
             'Impacto': ['Alto', 'Medio', 'Muy Alto'],  # Muy Bajo, Bajo, Medio, Alto, Muy Alto
+            'Responsable': ['Juan Pérez', 'María García', 'Carlos López'],
+            'Fecha Hallazgo': ['15-01-2025', '20-01-2025', '25-01-2025'],  # DD-MM-YYYY
+            'Fecha Compromiso': ['15-03-2025', '20-03-2025', '25-02-2025'],  # DD-MM-YYYY
             'Estado': ['Abierto', 'En Proceso', 'Abierto'],
             'Observaciones': ['Notas...', '', 'Urgente']
         }
@@ -163,6 +166,151 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
             media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             headers={'Content-Disposition': 'attachment; filename=plantilla_hallazgos_auditoria.xlsx'}
         )
+
+    @router.get("/seguimiento")
+    async def get_hallazgos_seguimiento(
+        filtro: Optional[str] = Query(None),  # vencidas, critico, proximas
+        responsable: Optional[List[str]] = Query(None),
+        riesgo_id: Optional[List[str]] = Query(None),
+        mes: Optional[str] = Query(None),
+        año_compromiso: Optional[str] = Query(None),
+        tipo_fecha: Optional[str] = Query("todas"),
+        current_user = Depends(get_current_user)
+    ):
+        """Get hallazgos for seguimiento view with tracking status"""
+        if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
+            raise HTTPException(status_code=403, detail="No tiene permisos")
+        
+        # Only non-closed hallazgos
+        query = {"estado": {"$ne": "Cerrado"}}
+        
+        # Apply filters
+        if responsable:
+            query["responsable"] = {"$in": responsable}
+        if riesgo_id:
+            query["riesgo_id"] = {"$in": riesgo_id}
+        
+        # Date type filter
+        if tipo_fecha == "con_fecha":
+            query["fecha_compromiso"] = {"$ne": None, "$exists": True}
+        elif tipo_fecha == "sin_fecha":
+            query["$or"] = [
+                {"fecha_compromiso": None},
+                {"fecha_compromiso": {"$exists": False}},
+                {"fecha_compromiso": ""}
+            ]
+        
+        # Month and Year filter
+        if mes and mes != "all":
+            query["fecha_compromiso"] = query.get("fecha_compromiso", {})
+            if isinstance(query["fecha_compromiso"], dict):
+                query["fecha_compromiso"]["$regex"] = f"^\\d{{4}}-{mes}"
+            else:
+                query["fecha_compromiso"] = {"$regex": f"^\\d{{4}}-{mes}"}
+        
+        if año_compromiso and año_compromiso != "all":
+            if "fecha_compromiso" not in query:
+                query["fecha_compromiso"] = {}
+            if isinstance(query["fecha_compromiso"], dict):
+                if "$regex" in query["fecha_compromiso"]:
+                    query["fecha_compromiso"]["$regex"] = f"^{año_compromiso}"
+                else:
+                    query["fecha_compromiso"]["$regex"] = f"^{año_compromiso}"
+            else:
+                query["fecha_compromiso"] = {"$regex": f"^{año_compromiso}"}
+        
+        hallazgos = await db.hallazgos_auditoria.find(query, {"_id": 0}).sort("fecha_compromiso", 1).to_list(1000)
+        
+        today = datetime.now(timezone.utc).date()
+        result = []
+        
+        for h in hallazgos:
+            # Calculate dias_restantes and estado_seguimiento
+            fecha_compromiso_str = h.get("fecha_compromiso")
+            dias_restantes = None
+            estado_seguimiento = "sin_fecha"
+            
+            if fecha_compromiso_str:
+                try:
+                    fecha_compromiso = datetime.strptime(fecha_compromiso_str, "%Y-%m-%d").date()
+                    dias_restantes = (fecha_compromiso - today).days
+                    
+                    if dias_restantes < 0:
+                        estado_seguimiento = "vencida"
+                    elif dias_restantes <= 7:
+                        estado_seguimiento = "critico"
+                    elif dias_restantes <= 30:
+                        estado_seguimiento = "proximo"
+                    else:
+                        estado_seguimiento = "ok"
+                except ValueError:
+                    pass
+            
+            # Apply filtro
+            if filtro:
+                if filtro == "vencidas" and estado_seguimiento != "vencida":
+                    continue
+                if filtro == "critico" and estado_seguimiento != "critico":
+                    continue
+                if filtro == "proximas" and estado_seguimiento not in ["proximo", "ok"]:
+                    continue
+            
+            # Enrich with riesgo name
+            nombre_riesgo = None
+            if h.get("riesgo_id"):
+                riesgo = await db.catalogo_riesgos.find_one({"id": h["riesgo_id"]}, {"_id": 0, "nombre_corto": 1})
+                if riesgo:
+                    nombre_riesgo = riesgo.get("nombre_corto")
+            
+            result.append({
+                **h,
+                "nombre_riesgo": nombre_riesgo,
+                "dias_restantes": dias_restantes,
+                "estado_seguimiento": estado_seguimiento
+            })
+        
+        return result
+
+    @router.get("/seguimiento/resumen")
+    async def get_hallazgos_seguimiento_resumen(current_user = Depends(get_current_user)):
+        """Get summary stats for hallazgos seguimiento"""
+        if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
+            raise HTTPException(status_code=403, detail="No tiene permisos")
+        
+        today = datetime.now(timezone.utc).date()
+        today_str = today.strftime("%Y-%m-%d")
+        
+        # Count non-closed hallazgos
+        base_query = {"estado": {"$ne": "Cerrado"}}
+        
+        total_pendientes = await db.hallazgos_auditoria.count_documents(base_query)
+        
+        # Vencidas: fecha_compromiso < today
+        vencidas = await db.hallazgos_auditoria.count_documents({
+            **base_query,
+            "fecha_compromiso": {"$lt": today_str, "$ne": None, "$exists": True}
+        })
+        
+        # Next 7 days
+        fecha_7 = (today + timedelta(days=7)).strftime("%Y-%m-%d")
+        criticas_7_dias = await db.hallazgos_auditoria.count_documents({
+            **base_query,
+            "fecha_compromiso": {"$gte": today_str, "$lte": fecha_7}
+        })
+        
+        # Next 30 days
+        fecha_30 = (today + timedelta(days=30)).strftime("%Y-%m-%d")
+        proximas_30_dias = await db.hallazgos_auditoria.count_documents({
+            **base_query,
+            "fecha_compromiso": {"$gte": today_str, "$lte": fecha_30}
+        })
+        
+        return {
+            "total_pendientes": total_pendientes,
+            "vencidas": vencidas,
+            "criticas_7_dias": criticas_7_dias,
+            "proximas_30_dias": proximas_30_dias
+        }
 
     @router.get("/{hallazgo_id}")
     async def get_hallazgo(hallazgo_id: str, current_user = Depends(get_current_user)):
@@ -186,6 +334,19 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
         existing = await db.hallazgos_auditoria.find_one({"codigo": data.codigo})
         if existing:
             raise HTTPException(status_code=400, detail="Ya existe un hallazgo con ese código")
+        
+        # Validate fecha_compromiso >= fecha_hallazgo
+        if data.fecha_hallazgo and data.fecha_compromiso:
+            try:
+                fh = datetime.strptime(data.fecha_hallazgo, "%Y-%m-%d")
+                fc = datetime.strptime(data.fecha_compromiso, "%Y-%m-%d")
+                if fc < fh:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="La fecha de compromiso no puede ser anterior a la fecha de hallazgo"
+                    )
+            except ValueError:
+                pass  # Let it through if format is different
         
         # Verify control exists if provided
         if data.control_id:
@@ -237,6 +398,21 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
             raise HTTPException(status_code=404, detail="Hallazgo no encontrado")
         
         update_data = data.model_dump(exclude_unset=True)
+        
+        # Validate fecha_compromiso >= fecha_hallazgo
+        fecha_hallazgo = update_data.get("fecha_hallazgo", existing.get("fecha_hallazgo"))
+        fecha_compromiso = update_data.get("fecha_compromiso", existing.get("fecha_compromiso"))
+        if fecha_hallazgo and fecha_compromiso:
+            try:
+                fh = datetime.strptime(fecha_hallazgo, "%Y-%m-%d")
+                fc = datetime.strptime(fecha_compromiso, "%Y-%m-%d")
+                if fc < fh:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="La fecha de compromiso no puede ser anterior a la fecha de hallazgo"
+                    )
+            except ValueError:
+                pass  # Let it through if format is different
         
         # Check codigo uniqueness if updating
         if "codigo" in update_data:
@@ -374,6 +550,13 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
             'Riesgo Asociado': 'nombre_riesgo',
             'Probabilidad': 'probabilidad',
             'Impacto': 'impacto',
+            'Responsable': 'responsable',
+            'Fecha Hallazgo': 'fecha_hallazgo',
+            'Fecha_Hallazgo': 'fecha_hallazgo',
+            'FechaHallazgo': 'fecha_hallazgo',
+            'Fecha Compromiso': 'fecha_compromiso',
+            'Fecha_Compromiso': 'fecha_compromiso',
+            'FechaCompromiso': 'fecha_compromiso',
             'Estado': 'estado',
             'Estatus': 'estado',
             'Observaciones': 'observaciones',
@@ -436,9 +619,41 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
                 # Try to parse as int
                 try:
                     return max(1, min(5, int(value)))
-                except:
+                except (ValueError, TypeError):
                     return default
             return default
+        
+        def parse_date_ddmmyyyy(value):
+            """Parse date from DD-MM-YYYY format to YYYY-MM-DD for storage"""
+            if value is None:
+                return None
+            if isinstance(value, datetime):
+                return value.strftime("%Y-%m-%d")
+            if isinstance(value, str):
+                value = value.strip()
+                if not value:
+                    return None
+                # Try DD-MM-YYYY format
+                for fmt in ["%d-%m-%Y", "%d/%m/%Y", "%Y-%m-%d"]:
+                    try:
+                        parsed = datetime.strptime(value, fmt)
+                        return parsed.strftime("%Y-%m-%d")
+                    except ValueError:
+                        continue
+                return None
+            return None
+        
+        def validate_dates(fecha_hallazgo, fecha_compromiso, row_num):
+            """Validate that fecha_compromiso >= fecha_hallazgo"""
+            if fecha_hallazgo and fecha_compromiso:
+                try:
+                    fh = datetime.strptime(fecha_hallazgo, "%Y-%m-%d")
+                    fc = datetime.strptime(fecha_compromiso, "%Y-%m-%d")
+                    if fc < fh:
+                        return f"Fila {row_num}: fecha_compromiso ({fecha_compromiso}) no puede ser anterior a fecha_hallazgo ({fecha_hallazgo})"
+                except ValueError:
+                    pass
+            return None
         
         records = df.to_dict('records')
         inserted_count = 0
@@ -505,6 +720,21 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
                 if estado not in valid_estados:
                     estado = 'Abierto'
                 
+                # Parse dates from DD-MM-YYYY format
+                fecha_hallazgo = parse_date_ddmmyyyy(cleaned_record.get('fecha_hallazgo'))
+                fecha_compromiso = parse_date_ddmmyyyy(cleaned_record.get('fecha_compromiso'))
+                
+                # Validate fecha_compromiso >= fecha_hallazgo
+                date_error = validate_dates(fecha_hallazgo, fecha_compromiso, idx)
+                if date_error:
+                    errors.append(date_error)
+                    # Continue anyway but log the error
+                
+                # Get responsable (string name)
+                responsable = cleaned_record.get('responsable', '')
+                if responsable:
+                    responsable = str(responsable).strip()
+                
                 # Create hallazgo
                 hallazgo = HallazgoAuditoria(
                     codigo=cleaned_record['codigo'].upper(),
@@ -514,6 +744,9 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
                     probabilidad=probabilidad,
                     impacto=impacto,
                     estado=estado,
+                    responsable=responsable if responsable else None,
+                    fecha_hallazgo=fecha_hallazgo,
+                    fecha_compromiso=fecha_compromiso,
                     observaciones=cleaned_record.get('observaciones', '')
                 )
                 doc = hallazgo.model_dump()

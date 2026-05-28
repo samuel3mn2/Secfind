@@ -8,6 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   Dialog,
   DialogContent,
@@ -40,8 +47,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, ClipboardCheck, Save, Loader2, Search, Filter, AlertTriangle, X, Upload, Download, FileSpreadsheet } from "lucide-react";
+import { Plus, Pencil, Trash2, ClipboardCheck, Save, Loader2, Search, Filter, AlertTriangle, X, Upload, Download, FileSpreadsheet, Calendar as CalendarIcon, User } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { format, parse, isValid } from "date-fns";
+import { es } from "date-fns/locale";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -100,6 +109,7 @@ export default function HallazgosAuditoria() {
   const [dominios, setDominios] = useState([]);
   const [controles, setControles] = useState([]);
   const [riesgos, setRiesgos] = useState([]);
+  const [responsables, setResponsables] = useState([]);
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -113,6 +123,9 @@ export default function HallazgosAuditoria() {
     probabilidad: 3,
     impacto: 3,
     estado: "Abierto",
+    responsable: "",
+    fecha_hallazgo: "",
+    fecha_compromiso: "",
     observaciones: "",
   });
 
@@ -155,15 +168,17 @@ export default function HallazgosAuditoria() {
       const token = localStorage.getItem("token");
       const headers = { Authorization: `Bearer ${token}` };
 
-      const [dominiosRes, controlesRes, riesgosRes] = await Promise.all([
+      const [dominiosRes, controlesRes, riesgosRes, responsablesRes] = await Promise.all([
         axios.get(`${API}/config/dominios`, { headers }),
         axios.get(`${API}/config/controles`, { headers }),
         axios.get(`${API}/catalogo-riesgos/all`, { headers }),
+        axios.get(`${API}/config/responsables`, { headers }),
       ]);
 
       setDominios(dominiosRes.data);
       setControles(controlesRes.data);
       setRiesgos(riesgosRes.data);
+      setResponsables(responsablesRes.data);
     } catch (error) {
       console.error("Error fetching reference data:", error);
     }
@@ -232,6 +247,7 @@ export default function HallazgosAuditoria() {
   const openCreateModal = async () => {
     setEditingHallazgo(null);
     const nextCodigo = await getNextCodigo();
+    const today = format(new Date(), "yyyy-MM-dd");
     setFormData({
       codigo: nextCodigo,
       dominio_id: "",
@@ -241,6 +257,9 @@ export default function HallazgosAuditoria() {
       probabilidad: 3,
       impacto: 3,
       estado: "Abierto",
+      responsable: "",
+      fecha_hallazgo: today,
+      fecha_compromiso: "",
       observaciones: "",
     });
     setIsModalOpen(true);
@@ -259,6 +278,9 @@ export default function HallazgosAuditoria() {
       probabilidad: hallazgo.probabilidad || 3,
       impacto: hallazgo.impacto || 3,
       estado: hallazgo.estado || "Abierto",
+      responsable: hallazgo.responsable || "",
+      fecha_hallazgo: hallazgo.fecha_hallazgo || "",
+      fecha_compromiso: hallazgo.fecha_compromiso || "",
       observaciones: hallazgo.observaciones || "",
     });
     setIsModalOpen(true);
@@ -276,6 +298,9 @@ export default function HallazgosAuditoria() {
       probabilidad: 3,
       impacto: 3,
       estado: "Abierto",
+      responsable: "",
+      fecha_hallazgo: "",
+      fecha_compromiso: "",
       observaciones: "",
     });
   };
@@ -284,6 +309,16 @@ export default function HallazgosAuditoria() {
     if (!formData.codigo.trim() || !formData.brecha.trim()) {
       toast.error("El código y la brecha son requeridos");
       return;
+    }
+
+    // Validate fecha_compromiso >= fecha_hallazgo
+    if (formData.fecha_hallazgo && formData.fecha_compromiso) {
+      const fh = new Date(formData.fecha_hallazgo);
+      const fc = new Date(formData.fecha_compromiso);
+      if (fc < fh) {
+        toast.error("La fecha de compromiso no puede ser anterior a la fecha de hallazgo");
+        return;
+      }
     }
 
     setSaving(true);
@@ -552,72 +587,98 @@ export default function HallazgosAuditoria() {
                     <TableHead className="text-zinc-400">Brecha</TableHead>
                     <TableHead className="text-zinc-400 hidden lg:table-cell">Control</TableHead>
                     <TableHead className="text-zinc-400 hidden md:table-cell">Riesgo</TableHead>
-                    <TableHead className="text-zinc-400 text-center w-[80px]">R.I.</TableHead>
+                    <TableHead className="text-zinc-400 text-center w-[60px]">R.I.</TableHead>
+                    <TableHead className="text-zinc-400 hidden lg:table-cell">Responsable</TableHead>
+                    <TableHead className="text-zinc-400 hidden md:table-cell">F. Compromiso</TableHead>
                     <TableHead className="text-zinc-400">Estado</TableHead>
                     <TableHead className="text-zinc-400 text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {hallazgos.map((hallazgo) => (
-                    <TableRow
-                      key={hallazgo.id}
-                      className="border-zinc-800 hover:bg-zinc-800/50"
-                      data-testid={`hallazgo-row-${hallazgo.id}`}
-                    >
-                      <TableCell>
-                        <Badge variant="outline" className="bg-teal-500/10 text-teal-400 border-teal-500/30 font-mono text-xs">
-                          {hallazgo.codigo}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-white font-medium max-w-[200px] truncate">
-                        {hallazgo.brecha}
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell text-zinc-400 text-sm">
-                        {hallazgo.codigo_control || "—"}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        {hallazgo.codigo_riesgo ? (
-                          <Badge variant="outline" className="bg-orange-500/10 text-orange-400 border-orange-500/30 text-xs">
-                            {hallazgo.codigo_riesgo}
+                  {hallazgos.map((hallazgo) => {
+                    // Check if vencido (fecha_compromiso < today AND estado != Cerrado)
+                    const isVencido = hallazgo.fecha_compromiso && 
+                      hallazgo.estado !== "Cerrado" &&
+                      new Date(hallazgo.fecha_compromiso) < new Date(new Date().toDateString());
+                    
+                    return (
+                      <TableRow
+                        key={hallazgo.id}
+                        className={`border-zinc-800 hover:bg-zinc-800/50 ${isVencido ? "bg-red-500/5" : ""}`}
+                        data-testid={`hallazgo-row-${hallazgo.id}`}
+                      >
+                        <TableCell>
+                          <Badge variant="outline" className="bg-teal-500/10 text-teal-400 border-teal-500/30 font-mono text-xs">
+                            {hallazgo.codigo}
                           </Badge>
-                        ) : "—"}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline" className={`${getRiesgoColor(hallazgo.riesgo_inherente)} font-bold`}>
-                          {hallazgo.riesgo_inherente || "—"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={getEstadoColor(hallazgo.estado)}>
-                          {hallazgo.estado}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          {canEditHallazgo && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => openEditModal(hallazgo)}
-                              className="text-zinc-400 hover:text-white"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                          )}
-                          {canDeleteHallazgo && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setDeleteConfirm(hallazgo)}
-                              className="text-red-400 hover:text-red-300"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                        <TableCell className="text-white font-medium max-w-[200px] truncate">
+                          {hallazgo.brecha}
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-zinc-400 text-sm">
+                          {hallazgo.codigo_control || "—"}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {hallazgo.codigo_riesgo ? (
+                            <Badge variant="outline" className="bg-orange-500/10 text-orange-400 border-orange-500/30 text-xs">
+                              {hallazgo.codigo_riesgo}
+                            </Badge>
+                          ) : "—"}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className={`${getRiesgoColor(hallazgo.riesgo_inherente)} font-bold`}>
+                            {hallazgo.riesgo_inherente || "—"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-zinc-300 text-sm">
+                          {hallazgo.responsable || "—"}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {hallazgo.fecha_compromiso ? (
+                            <div className="flex items-center gap-1">
+                              <span className={`font-mono text-xs ${isVencido ? "text-red-400" : "text-zinc-300"}`}>
+                                {format(new Date(hallazgo.fecha_compromiso), "dd/MM/yyyy")}
+                              </span>
+                              {isVencido && (
+                                <Badge variant="outline" className="bg-red-500/20 text-red-400 border-red-500/30 text-[10px] px-1">
+                                  VENCIDO
+                                </Badge>
+                              )}
+                            </div>
+                          ) : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={getEstadoColor(hallazgo.estado)}>
+                            {hallazgo.estado}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            {canEditHallazgo && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => openEditModal(hallazgo)}
+                                className="text-zinc-400 hover:text-white"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {canDeleteHallazgo && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setDeleteConfirm(hallazgo)}
+                                className="text-red-400 hover:text-red-300"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -825,6 +886,84 @@ export default function HallazgosAuditoria() {
                   {riesgoInherente}
                 </div>
                 <p className="text-xs text-zinc-500 text-center">Probabilidad × Impacto</p>
+              </div>
+            </div>
+
+            {/* Responsable & Fechas */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label className="text-zinc-300">Responsable</Label>
+                <SearchableSelect
+                  value={formData.responsable || ""}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, responsable: value }))}
+                  options={responsables.map(r => ({
+                    value: r.nombre,
+                    label: r.nombre,
+                    subtext: r.email || null
+                  }))}
+                  placeholder="Seleccionar..."
+                  searchPlaceholder="Buscar responsable..."
+                  emptyText="No hay responsables"
+                  allowCreate={true}
+                  onCreateNew={(name) => setFormData((prev) => ({ ...prev, responsable: name }))}
+                  data-testid="input-responsable-hallazgo"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-zinc-300">Fecha Hallazgo</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700"
+                      data-testid="input-fecha-hallazgo"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4 text-zinc-400" />
+                      {formData.fecha_hallazgo ? format(new Date(formData.fecha_hallazgo), "dd/MM/yyyy") : "Seleccionar..."}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-zinc-900 border-zinc-700" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={formData.fecha_hallazgo ? new Date(formData.fecha_hallazgo) : undefined}
+                      onSelect={(date) => setFormData((prev) => ({ 
+                        ...prev, 
+                        fecha_hallazgo: date ? format(date, "yyyy-MM-dd") : "" 
+                      }))}
+                      locale={es}
+                      initialFocus
+                      className="bg-zinc-900"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-zinc-300">Fecha Compromiso</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700"
+                      data-testid="input-fecha-compromiso-hallazgo"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4 text-zinc-400" />
+                      {formData.fecha_compromiso ? format(new Date(formData.fecha_compromiso), "dd/MM/yyyy") : "Seleccionar..."}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-zinc-900 border-zinc-700" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={formData.fecha_compromiso ? new Date(formData.fecha_compromiso) : undefined}
+                      onSelect={(date) => setFormData((prev) => ({ 
+                        ...prev, 
+                        fecha_compromiso: date ? format(date, "yyyy-MM-dd") : "" 
+                      }))}
+                      locale={es}
+                      initialFocus
+                      className="bg-zinc-900"
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 
