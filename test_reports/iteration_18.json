@@ -1,0 +1,75 @@
+{
+  "summary": "Completed testing of Iteration 18 features: Hallazgos table improvements (Brecha column expansion, Dominio column) and Vulnerabilidades column selector additions (Dominio, Control Asociado). All 8 backend tests passed. All 5 requested features verified working correctly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Dashboard",
+        "issues": ["Chart console warnings about width/height being -1 (non-blocking, cosmetic)"]
+      }
+    ]
+  },
+  "passed_tests": [
+    "Backend: GET /api/vulnerabilidades returns nombre_dominio field",
+    "Backend: GET /api/vulnerabilidades returns codigo_control field",
+    "Backend: Vulnerability enrichment with control_id works correctly",
+    "Backend: GET /api/hallazgos-auditoria returns paginated data (184 items)",
+    "Backend: Hallazgos enrichment logic present (no hallazgos have control_id assigned)",
+    "Backend: GET /api/config/dominios returns list of dominios",
+    "Backend: GET /api/config/controles returns list of controles",
+    "UI: Hallazgos table has Dominio column header visible",
+    "UI: Hallazgos table has Brecha column header visible (with min-w-[300px])",
+    "UI: Hallazgos form Dominio dropdown shows 'N/A' option",
+    "UI: Hallazgos form Dominio dropdown does NOT show 'Todos los dominios'",
+    "UI: Vulnerabilidades column selector includes 'Dominio' option",
+    "UI: Vulnerabilidades column selector includes 'Control Asociado' option"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_iteration18_features.py",
+    "/app/test_reports/pytest/pytest_iteration18.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_iteration18_features.py (new test file for iteration 18 features)"
+  ],
+  "success_rate": {
+    "backend": "100% (8/8 tests passed)",
+    "frontend": "100% (All UI features verified)"
+  },
+  "test_credentials": {
+    "user": "admin",
+    "password": "admin123"
+  },
+  "seed_data_creation": "None - used existing data",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 18 tested UI improvements for Hallazgos and Vulnerabilidades pages. Key findings: (1) Hallazgos table now has Dominio column visible and Brecha column with min-w-[300px] and line-clamp-2 for better readability. (2) Hallazgos form Dominio dropdown shows 'N/A' instead of 'Todos los dominios'. (3) Vulnerabilidades column selector now includes 'Dominio' and 'Control Asociado' options. (4) Backend enriches vulnerabilidades with nombre_dominio and codigo_control when control_id is set. (5) Existing hallazgos don't have control_id assigned, so enrichment fields are not populated for them. (6) Existing vulnerabilidades don't have control_id assigned either.",
+  "features_verified": {
+    "hallazgos_table": [
+      "Brecha column has min-w-[300px] for expanded width",
+      "Brecha column uses line-clamp-2 with title for hover text",
+      "Dominio column visible in table header",
+      "Dominio column shows nombre_dominio or '—' when not set"
+    ],
+    "hallazgos_form": [
+      "Dominio dropdown shows 'N/A' as first option",
+      "'Todos los dominios' text replaced with 'N/A'"
+    ],
+    "vulnerabilidades_columns": [
+      "Column selector includes 'Dominio' option (id: dominio)",
+      "Column selector includes 'Control Asociado' option (id: control_asociado)",
+      "Both columns are not visible by default (default: false in ALL_COLUMNS)"
+    ],
+    "backend_enrichment": [
+      "GET /api/vulnerabilidades returns nombre_dominio field",
+      "GET /api/vulnerabilidades returns codigo_control field",
+      "Enrichment works when control_id is set on vulnerability"
+    ]
+  }
+}

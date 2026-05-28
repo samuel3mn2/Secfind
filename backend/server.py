@@ -150,6 +150,9 @@ class Vulnerabilidad(VulnerabilidadBase):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # Enriched fields (populated by API, not stored)
+    nombre_dominio: Optional[str] = None
+    codigo_control: Optional[str] = None
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # Report Groups Model
@@ -1731,6 +1734,34 @@ async def get_vulnerabilidades(
         ]
     
     vulnerabilidades = await db.vulnerabilidades.find(query, {"_id": 0}).to_list(10000)
+    
+    # Enrich with dominio/control names
+    controles_ids = list(set(v.get("control_id") for v in vulnerabilidades if v.get("control_id")))
+    controles_map = {}
+    if controles_ids:
+        controles = await db.config_controles.find({"id": {"$in": controles_ids}}, {"_id": 0}).to_list(1000)
+        controles_map = {c["id"]: c for c in controles}
+    
+    dominios_ids = list(set(c.get("dominio_id") for c in controles_map.values() if c.get("dominio_id")))
+    dominios_map = {}
+    if dominios_ids:
+        dominios = await db.config_dominios.find({"id": {"$in": dominios_ids}}, {"_id": 0}).to_list(100)
+        dominios_map = {d["id"]: d for d in dominios}
+    
+    for v in vulnerabilidades:
+        control_id = v.get("control_id")
+        if control_id and control_id in controles_map:
+            control = controles_map[control_id]
+            v["codigo_control"] = control.get("codigo_control")
+            dominio_id = control.get("dominio_id")
+            if dominio_id and dominio_id in dominios_map:
+                v["nombre_dominio"] = dominios_map[dominio_id].get("nombre_dominio")
+            else:
+                v["nombre_dominio"] = None
+        else:
+            v["codigo_control"] = None
+            v["nombre_dominio"] = None
+    
     return vulnerabilidades
 
 @api_router.get("/vulnerabilidades/{vuln_id}", response_model=Vulnerabilidad)

@@ -125,6 +125,8 @@ const ALL_COLUMNS = [
   { id: "estatus", label: "Estatus", default: true },
   { id: "responsable", label: "Responsable", default: true },
   { id: "fecha_compromiso", label: "Fecha Compromiso", default: false },
+  { id: "dominio", label: "Dominio", default: false },
+  { id: "control_asociado", label: "Control Asociado", default: false },
   { id: "resultado_re_test", label: "Resultado Retest", default: false },
   { id: "veces_en_retest", label: "Veces Retest", default: false },
   { id: "nombre_informe_pentest", label: "Informe Pentest", default: false },
@@ -949,6 +951,8 @@ export default function Vulnerabilidades() {
                   {isColumnVisible("estatus") && <TableHead className="text-zinc-400">Estatus</TableHead>}
                   {isColumnVisible("responsable") && <TableHead className="text-zinc-400">Responsable</TableHead>}
                   {isColumnVisible("fecha_compromiso") && <TableHead className="text-zinc-400">F. Compromiso</TableHead>}
+                  {isColumnVisible("dominio") && <TableHead className="text-zinc-400">Dominio</TableHead>}
+                  {isColumnVisible("control_asociado") && <TableHead className="text-zinc-400">Control</TableHead>}
                   {isColumnVisible("resultado_re_test") && <TableHead className="text-zinc-400">Res. Retest</TableHead>}
                   {isColumnVisible("veces_en_retest") && <TableHead className="text-zinc-400">Veces Retest</TableHead>}
                   {isColumnVisible("nombre_informe_pentest") && <TableHead className="text-zinc-400">Informe</TableHead>}
@@ -1022,6 +1026,12 @@ export default function Vulnerabilidades() {
                       )}
                       {isColumnVisible("fecha_compromiso") && (
                         <TableCell className="text-zinc-300 font-mono text-xs">{vuln.fecha_compromiso || "-"}</TableCell>
+                      )}
+                      {isColumnVisible("dominio") && (
+                        <TableCell className="text-zinc-300 text-sm">{vuln.nombre_dominio || "-"}</TableCell>
+                      )}
+                      {isColumnVisible("control_asociado") && (
+                        <TableCell className="text-zinc-300 text-sm">{vuln.codigo_control || "-"}</TableCell>
                       )}
                       {isColumnVisible("resultado_re_test") && (
                         <TableCell className="text-zinc-300">{vuln.resultado_re_test || "-"}</TableCell>

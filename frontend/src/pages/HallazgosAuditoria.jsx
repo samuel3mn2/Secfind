@@ -584,7 +584,8 @@ export default function HallazgosAuditoria() {
                 <TableHeader>
                   <TableRow className="border-zinc-800 hover:bg-transparent">
                     <TableHead className="text-zinc-400 w-[100px]">Código</TableHead>
-                    <TableHead className="text-zinc-400">Brecha</TableHead>
+                    <TableHead className="text-zinc-400 min-w-[300px]">Brecha</TableHead>
+                    <TableHead className="text-zinc-400 hidden xl:table-cell">Dominio</TableHead>
                     <TableHead className="text-zinc-400 hidden lg:table-cell">Control</TableHead>
                     <TableHead className="text-zinc-400 hidden md:table-cell">Riesgo</TableHead>
                     <TableHead className="text-zinc-400 text-center w-[60px]">R.I.</TableHead>
@@ -612,8 +613,13 @@ export default function HallazgosAuditoria() {
                             {hallazgo.codigo}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-white font-medium max-w-[200px] truncate">
-                          {hallazgo.brecha}
+                        <TableCell className="text-white font-medium min-w-[300px]">
+                          <span className="line-clamp-2" title={hallazgo.brecha}>
+                            {hallazgo.brecha}
+                          </span>
+                        </TableCell>
+                        <TableCell className="hidden xl:table-cell text-zinc-400 text-sm">
+                          {hallazgo.nombre_dominio || "—"}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-zinc-400 text-sm">
                           {hallazgo.codigo_control || "—"}
@@ -778,7 +784,7 @@ export default function HallazgosAuditoria() {
                     <SelectValue placeholder="Filtrar por dominio..." />
                   </SelectTrigger>
                   <SelectContent className="bg-zinc-900 border-zinc-700">
-                    <SelectItem value="_none" className="text-zinc-300">Todos los dominios</SelectItem>
+                    <SelectItem value="_none" className="text-zinc-300">N/A</SelectItem>
                     {dominios.map((d) => (
                       <SelectItem key={d.id} value={d.id} className="text-zinc-300">
                         {d.nombre_dominio}
