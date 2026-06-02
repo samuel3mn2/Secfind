@@ -1693,7 +1693,6 @@ async def get_dropdown_options():
 async def get_vulnerabilidades(
     request: Request,
     search: Optional[str] = None,
-    año: Optional[int] = None,
     proveedor: Optional[str] = None,
     current_user: CurrentUser = Depends(get_current_user)
 ):
@@ -1707,6 +1706,9 @@ async def get_vulnerabilidades(
     aplicaciones = request.query_params.getlist("aplicacion")
     informes = request.query_params.getlist("informe_pentest")
     responsables = request.query_params.getlist("responsable")
+    años = request.query_params.getlist("año")
+    dominios_filter = request.query_params.getlist("dominio")
+    controles_filter = request.query_params.getlist("control")
     
     query = {}
     if severidades:
@@ -1723,15 +1725,25 @@ async def get_vulnerabilidades(
         query["nombre_informe_pentest"] = {"$in": informes}
     if responsables:
         query["responsable"] = {"$in": responsables}
-    if año:
-        query["fecha_hallazgo"] = {"$regex": f"^{año}"}
+    if años:
+        # Multiple years - use $or with regex for each year
+        year_conditions = [{"fecha_hallazgo": {"$regex": f"^{año}"}} for año in años]
+        if len(year_conditions) == 1:
+            query["fecha_hallazgo"] = year_conditions[0]["fecha_hallazgo"]
+        else:
+            query["$and"] = query.get("$and", [])
+            query["$and"].append({"$or": year_conditions})
     if search:
-        query["$or"] = [
+        search_conditions = [
             {"vulnerabilidad": {"$regex": search, "$options": "i"}},
             {"aplicaciones": {"$regex": search, "$options": "i"}},
             {"responsable": {"$regex": search, "$options": "i"}},
             {"nombre_informe_pentest": {"$regex": search, "$options": "i"}}
         ]
+        if "$and" in query:
+            query["$and"].append({"$or": search_conditions})
+        else:
+            query["$or"] = search_conditions
     
     vulnerabilidades = await db.vulnerabilidades.find(query, {"_id": 0}).to_list(10000)
     
@@ -1748,21 +1760,31 @@ async def get_vulnerabilidades(
         dominios = await db.config_dominios.find({"id": {"$in": dominios_ids}}, {"_id": 0}).to_list(100)
         dominios_map = {d["id"]: d for d in dominios}
     
+    result = []
     for v in vulnerabilidades:
         control_id = v.get("control_id")
+        nombre_dominio = None
+        codigo_control = None
+        
         if control_id and control_id in controles_map:
             control = controles_map[control_id]
-            v["codigo_control"] = control.get("codigo_control")
+            codigo_control = control.get("codigo_control")
             dominio_id = control.get("dominio_id")
             if dominio_id and dominio_id in dominios_map:
-                v["nombre_dominio"] = dominios_map[dominio_id].get("nombre_dominio")
-            else:
-                v["nombre_dominio"] = None
-        else:
-            v["codigo_control"] = None
-            v["nombre_dominio"] = None
+                nombre_dominio = dominios_map[dominio_id].get("nombre_dominio")
+        
+        v["codigo_control"] = codigo_control
+        v["nombre_dominio"] = nombre_dominio
+        
+        # Apply dominio/control filters after enrichment
+        if dominios_filter and nombre_dominio not in dominios_filter:
+            continue
+        if controles_filter and codigo_control not in controles_filter:
+            continue
+        
+        result.append(v)
     
-    return vulnerabilidades
+    return result
 
 @api_router.get("/vulnerabilidades/{vuln_id}", response_model=Vulnerabilidad)
 async def get_vulnerabilidad(vuln_id: str, current_user: CurrentUser = Depends(get_current_user)):

@@ -51,6 +51,7 @@ import { Plus, Pencil, Trash2, ClipboardCheck, Save, Loader2, Search, Filter, Al
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format, parse, isValid } from "date-fns";
 import { es } from "date-fns/locale";
+import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -99,6 +100,10 @@ export default function HallazgosAuditoria() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterEstado, setFilterEstado] = useState("all");
   const [filterRiesgo, setFilterRiesgo] = useState("all");
+  const [filterAño, setFilterAño] = useState([]);
+  const [filterResponsable, setFilterResponsable] = useState([]);
+  const [filterDominio, setFilterDominio] = useState([]);
+  const [filterControl, setFilterControl] = useState([]);
   const [pagination, setPagination] = useState({ total: 0, skip: 0, limit: 50 });
 
   // Import modal state
@@ -191,6 +196,10 @@ export default function HallazgosAuditoria() {
       if (searchTerm) params.append("search", searchTerm);
       if (filterEstado !== "all") params.append("estado", filterEstado);
       if (filterRiesgo !== "all") params.append("riesgo_id", filterRiesgo);
+      if (filterAño.length > 0) filterAño.forEach(v => params.append("año", v));
+      if (filterResponsable.length > 0) filterResponsable.forEach(v => params.append("responsable", v));
+      if (filterDominio.length > 0) filterDominio.forEach(v => params.append("dominio", v));
+      if (filterControl.length > 0) filterControl.forEach(v => params.append("control", v));
       params.append("skip", pagination.skip.toString());
       params.append("limit", pagination.limit.toString());
 
@@ -205,7 +214,7 @@ export default function HallazgosAuditoria() {
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, filterEstado, filterRiesgo, pagination.skip, pagination.limit]);
+  }, [searchTerm, filterEstado, filterRiesgo, filterAño, filterResponsable, filterDominio, filterControl, pagination.skip, pagination.limit]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -557,7 +566,7 @@ export default function HallazgosAuditoria() {
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-zinc-500" />
           <Select value={filterEstado} onValueChange={(v) => { setFilterEstado(v); setPagination((prev) => ({ ...prev, skip: 0 })); }}>
-            <SelectTrigger className="w-[180px] bg-zinc-800 border-zinc-700 text-white">
+            <SelectTrigger className="w-[150px] bg-zinc-800 border-zinc-700 text-white">
               <SelectValue placeholder="Estado" />
             </SelectTrigger>
             <SelectContent className="bg-zinc-900 border-zinc-700">
@@ -567,6 +576,64 @@ export default function HallazgosAuditoria() {
               ))}
             </SelectContent>
           </Select>
+
+          <MultiSelectFilter
+            options={[...new Set(hallazgos.map(h => h.fecha_hallazgo?.substring(0, 4)).filter(Boolean))].sort().reverse()}
+            selected={filterAño}
+            onChange={(v) => { setFilterAño(v); setPagination((prev) => ({ ...prev, skip: 0 })); }}
+            placeholder="Año"
+            searchPlaceholder="Buscar año..."
+            allLabel="Todos los años"
+            data-testid="filter-año-hallazgos"
+          />
+
+          <MultiSelectFilter
+            options={responsables.map(r => r.nombre)}
+            selected={filterResponsable}
+            onChange={(v) => { setFilterResponsable(v); setPagination((prev) => ({ ...prev, skip: 0 })); }}
+            placeholder="Responsable"
+            searchPlaceholder="Buscar responsable..."
+            allLabel="Todos"
+            data-testid="filter-responsable-hallazgos"
+          />
+
+          <MultiSelectFilter
+            options={dominios.map(d => d.nombre_dominio)}
+            selected={filterDominio}
+            onChange={(v) => { setFilterDominio(v); setPagination((prev) => ({ ...prev, skip: 0 })); }}
+            placeholder="Dominio"
+            searchPlaceholder="Buscar dominio..."
+            allLabel="Todos"
+            data-testid="filter-dominio-hallazgos"
+          />
+
+          <MultiSelectFilter
+            options={controles.map(c => c.codigo_control)}
+            selected={filterControl}
+            onChange={(v) => { setFilterControl(v); setPagination((prev) => ({ ...prev, skip: 0 })); }}
+            placeholder="Control"
+            searchPlaceholder="Buscar control..."
+            allLabel="Todos"
+            data-testid="filter-control-hallazgos"
+          />
+
+          {(filterAño.length > 0 || filterResponsable.length > 0 || filterDominio.length > 0 || filterControl.length > 0 || filterEstado !== "all") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setFilterAño([]);
+                setFilterResponsable([]);
+                setFilterDominio([]);
+                setFilterControl([]);
+                setFilterEstado("all");
+                setPagination((prev) => ({ ...prev, skip: 0 }));
+              }}
+              className="text-zinc-400 hover:text-white"
+            >
+              Limpiar filtros
+            </Button>
+          )}
         </div>
       </div>
 

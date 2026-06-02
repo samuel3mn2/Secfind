@@ -3,6 +3,7 @@ Routes for Hallazgos de Auditoría (Audit Findings)
 Implementado como función factory para inyección de dependencias
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from starlette.requests import Request
 from typing import List, Optional, Callable
 from datetime import datetime, timezone, timedelta
 import uuid
@@ -38,6 +39,7 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
 
     @router.get("")
     async def get_hallazgos(
+        request: Request,
         estado: Optional[str] = Query(None),
         control_id: Optional[str] = Query(None),
         riesgo_id: Optional[str] = Query(None),
@@ -50,6 +52,12 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
         if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
             raise HTTPException(status_code=403, detail="No tiene permisos para ver hallazgos")
         
+        # Get multi-value params
+        años = request.query_params.getlist("año")
+        responsables = request.query_params.getlist("responsable")
+        dominios_filter = request.query_params.getlist("dominio")
+        controles_filter = request.query_params.getlist("control")
+        
         query = {}
         
         if estado:
@@ -58,13 +66,27 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
             query["control_id"] = control_id
         if riesgo_id:
             query["riesgo_id"] = riesgo_id
+        if responsables:
+            query["responsable"] = {"$in": responsables}
+        if años:
+            # Multiple years - use $or with regex for fecha_hallazgo
+            year_conditions = [{"fecha_hallazgo": {"$regex": f"^{año}"}} for año in años]
+            if len(year_conditions) == 1:
+                query["fecha_hallazgo"] = year_conditions[0]["fecha_hallazgo"]
+            else:
+                query["$and"] = query.get("$and", [])
+                query["$and"].append({"$or": year_conditions})
         if search:
             search_regex = {"$regex": search, "$options": "i"}
-            query["$or"] = [
+            search_conditions = [
                 {"codigo": search_regex},
                 {"brecha": search_regex},
                 {"observaciones": search_regex}
             ]
+            if "$and" in query:
+                query["$and"].append({"$or": search_conditions})
+            else:
+                query["$or"] = search_conditions
         
         total = await db.hallazgos_auditoria.count_documents(query)
         hallazgos = await db.hallazgos_auditoria.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
@@ -72,7 +94,17 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
         # Enrich all hallazgos
         enriched = []
         for h in hallazgos:
-            enriched.append(await enrich_hallazgo(h))
+            enriched_h = await enrich_hallazgo(h)
+            
+            # Apply dominio/control filters after enrichment
+            if dominios_filter and enriched_h.get("nombre_dominio") not in dominios_filter:
+                total -= 1
+                continue
+            if controles_filter and enriched_h.get("codigo_control") not in controles_filter:
+                total -= 1
+                continue
+            
+            enriched.append(enriched_h)
         
         return {
             "items": enriched,

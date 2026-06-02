@@ -228,10 +228,12 @@ export default function Vulnerabilidades() {
   const [filterSeveridad, setFilterSeveridad] = useState([]);
   const [filterEstatus, setFilterEstatus] = useState([]);
   const [filterInstitucion, setFilterInstitucion] = useState([]);
-  const [filterAño, setFilterAño] = useState("");
+  const [filterAño, setFilterAño] = useState([]);
   const [filterAplicacion, setFilterAplicacion] = useState([]);
   const [filterInforme, setFilterInforme] = useState([]);
   const [filterResponsable, setFilterResponsable] = useState([]);
+  const [filterDominio, setFilterDominio] = useState([]);
+  const [filterControl, setFilterControl] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showBulkEntryModal, setShowBulkEntryModal] = useState(false);
@@ -365,10 +367,12 @@ export default function Vulnerabilidades() {
       if (filterSeveridad.length > 0) filterSeveridad.forEach(v => params.append("severidad", v));
       if (filterEstatus.length > 0) filterEstatus.forEach(v => params.append("estatus", v));
       if (filterInstitucion.length > 0) filterInstitucion.forEach(v => params.append("institucion", v));
-      if (filterAño && filterAño !== "all") params.append("año", filterAño);
+      if (filterAño.length > 0) filterAño.forEach(v => params.append("año", v));
       if (filterAplicacion.length > 0) filterAplicacion.forEach(v => params.append("aplicacion", v));
       if (filterInforme.length > 0) filterInforme.forEach(v => params.append("informe_pentest", v));
       if (filterResponsable.length > 0) filterResponsable.forEach(v => params.append("responsable", v));
+      if (filterDominio.length > 0) filterDominio.forEach(v => params.append("dominio", v));
+      if (filterControl.length > 0) filterControl.forEach(v => params.append("control", v));
 
       const response = await axios.get(`${API}/vulnerabilidades?${params.toString()}`);
       setVulnerabilidades(response.data);
@@ -379,7 +383,7 @@ export default function Vulnerabilidades() {
     } finally {
       setLoading(false);
     }
-  }, [search, filterSeveridad, filterEstatus, filterInstitucion, filterAño, filterAplicacion, filterInforme, filterResponsable]);
+  }, [search, filterSeveridad, filterEstatus, filterInstitucion, filterAño, filterAplicacion, filterInforme, filterResponsable, filterDominio, filterControl]);
 
   useEffect(() => {
     fetchOptions();
@@ -480,8 +484,8 @@ export default function Vulnerabilidades() {
       // Add search filter
       if (search) params.append("search", search);
       
-      // Add year filter
-      if (filterAño && filterAño !== "all") params.append("año", filterAño);
+      // Add year filter (multi-select)
+      if (filterAño.length > 0) filterAño.forEach(v => params.append("año", v));
       
       // Add multi-select filters
       if (filterSeveridad.length > 0) filterSeveridad.forEach(v => params.append("severidad", v));
@@ -490,6 +494,8 @@ export default function Vulnerabilidades() {
       if (filterAplicacion.length > 0) filterAplicacion.forEach(v => params.append("aplicacion", v));
       if (filterInforme.length > 0) filterInforme.forEach(v => params.append("informe_pentest", v));
       if (filterResponsable.length > 0) filterResponsable.forEach(v => params.append("responsable", v));
+      if (filterDominio.length > 0) filterDominio.forEach(v => params.append("dominio", v));
+      if (filterControl.length > 0) filterControl.forEach(v => params.append("control", v));
       
       // Add visible columns
       if (visibleColumns.length > 0) {
@@ -643,7 +649,7 @@ export default function Vulnerabilidades() {
           </h1>
           <p className="text-zinc-500 mt-1">
             {vulnerabilidades.length} registros encontrados
-            {(filterSeveridad.length > 0 || filterEstatus.length > 0 || filterInstitucion.length > 0 || filterAplicacion.length > 0 || filterInforme.length > 0 || (filterAño && filterAño !== "all")) && (
+            {(filterSeveridad.length > 0 || filterEstatus.length > 0 || filterInstitucion.length > 0 || filterAplicacion.length > 0 || filterInforme.length > 0 || filterAño.length > 0 || filterDominio.length > 0 || filterControl.length > 0) && (
               <span className="ml-2 text-indigo-400">(filtrado)</span>
             )}
           </p>
@@ -697,17 +703,15 @@ export default function Vulnerabilidades() {
 
             {/* Filters Row */}
             <div className="flex flex-wrap gap-2">
-              <Select value={filterAño} onValueChange={setFilterAño}>
-                <SelectTrigger className="w-[100px] bg-black/20 border-zinc-700 text-white" data-testid="filter-año">
-                  <SelectValue placeholder="Año" />
-                </SelectTrigger>
-                <SelectContent className="bg-zinc-900 border-zinc-700">
-                  <SelectItem value="all">Todos</SelectItem>
-                  {options?.años?.map((año) => (
-                    <SelectItem key={año} value={String(año)}>{año}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <MultiSelectFilter
+                options={options?.años?.map(String) || []}
+                selected={filterAño}
+                onChange={setFilterAño}
+                placeholder="Año"
+                searchPlaceholder="Buscar año..."
+                allLabel="Todos los años"
+                data-testid="filter-año"
+              />
 
               <MultiSelectFilter
                 options={options?.severidades || []}
@@ -767,6 +771,26 @@ export default function Vulnerabilidades() {
                 searchPlaceholder="Buscar responsable..."
                 allLabel="Todos los responsables"
                 data-testid="filter-responsable"
+              />
+
+              <MultiSelectFilter
+                options={dominios?.map(d => d.nombre_dominio) || []}
+                selected={filterDominio}
+                onChange={setFilterDominio}
+                placeholder="Dominio"
+                searchPlaceholder="Buscar dominio..."
+                allLabel="Todos los dominios"
+                data-testid="filter-dominio"
+              />
+
+              <MultiSelectFilter
+                options={controles?.map(c => c.codigo_control) || []}
+                selected={filterControl}
+                onChange={setFilterControl}
+                placeholder="Control"
+                searchPlaceholder="Buscar control..."
+                allLabel="Todos los controles"
+                data-testid="filter-control"
               />
 
               {/* Import/Export */}
