@@ -263,6 +263,11 @@ export default function Vulnerabilidades() {
   const [selectedDominioId, setSelectedDominioId] = useState("");
   const [showRiskSearchModal, setShowRiskSearchModal] = useState(false);
   const [riskSearchTerm, setRiskSearchTerm] = useState("");
+  
+  // Duplicate detection state
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+  const [duplicatesFound, setDuplicatesFound] = useState([]);
+  const [pendingFormData, setPendingFormData] = useState(null);
 
   // Toggle column visibility
   const toggleColumn = (columnId) => {
@@ -445,14 +450,47 @@ export default function Vulnerabilidades() {
     setEditingVuln(null);
   };
 
+  // Check for duplicates before submitting
+  const checkDuplicates = async (data, excludeId = null) => {
+    try {
+      const params = new URLSearchParams();
+      params.append("vulnerabilidad", data.vulnerabilidad || "");
+      params.append("aplicaciones", data.aplicaciones || "");
+      params.append("institucion", data.institucion || "");
+      if (excludeId) params.append("exclude_id", excludeId);
+      
+      const response = await axios.post(`${API}/vulnerabilidades/verificar-duplicado?${params}`);
+      return response.data;
+    } catch (error) {
+      console.error("Error checking duplicates:", error);
+      return { has_duplicates: false, duplicates: [] };
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // For new records, check for duplicates first
+    if (!editingVuln) {
+      const duplicateCheck = await checkDuplicates(formData);
+      if (duplicateCheck.has_duplicates) {
+        setDuplicatesFound(duplicateCheck.duplicates);
+        setPendingFormData(formData);
+        setShowDuplicateWarning(true);
+        return;
+      }
+    }
+    
+    await submitForm(formData, editingVuln?.id);
+  };
+
+  const submitForm = async (data, editId = null) => {
     try {
-      if (editingVuln) {
-        await axios.put(`${API}/vulnerabilidades/${editingVuln.id}`, formData);
+      if (editId) {
+        await axios.put(`${API}/vulnerabilidades/${editId}`, data);
         toast.success("Vulnerabilidad actualizada exitosamente");
       } else {
-        await axios.post(`${API}/vulnerabilidades`, formData);
+        await axios.post(`${API}/vulnerabilidades`, data);
         toast.success("Vulnerabilidad creada exitosamente");
       }
       handleCloseModal();
@@ -461,6 +499,22 @@ export default function Vulnerabilidades() {
       console.error("Error saving:", error);
       toast.error("Error al guardar la vulnerabilidad");
     }
+  };
+
+  const handleConfirmDuplicate = async () => {
+    // User confirmed to create despite duplicate warning
+    if (pendingFormData) {
+      await submitForm(pendingFormData);
+    }
+    setShowDuplicateWarning(false);
+    setDuplicatesFound([]);
+    setPendingFormData(null);
+  };
+
+  const handleCancelDuplicate = () => {
+    setShowDuplicateWarning(false);
+    setDuplicatesFound([]);
+    setPendingFormData(null);
   };
 
   const handleDelete = async () => {
@@ -1893,6 +1947,49 @@ export default function Vulnerabilidades() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Duplicate Warning Dialog */}
+      <AlertDialog open={showDuplicateWarning} onOpenChange={setShowDuplicateWarning}>
+        <AlertDialogContent className="bg-zinc-900 border-zinc-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-amber-400 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5" />
+              Posible Duplicado Detectado
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-zinc-400">
+              <p className="mb-3">Se encontró una vulnerabilidad similar en el sistema:</p>
+              <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                {duplicatesFound.map((dup, idx) => (
+                  <div key={idx} className="p-3 bg-zinc-800 rounded-lg border border-zinc-700">
+                    <p className="text-white font-medium text-sm">{dup.vulnerabilidad}</p>
+                    <div className="flex gap-4 mt-1 text-xs text-zinc-500">
+                      <span>Código: <span className="text-zinc-300">{dup.codigo}</span></span>
+                      <span>App: <span className="text-zinc-300">{dup.aplicaciones}</span></span>
+                      <span>Inst: <span className="text-zinc-300">{dup.institucion}</span></span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-amber-400/80">¿Desea crear la vulnerabilidad de todas formas?</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={handleCancelDuplicate}
+              className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700"
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDuplicate}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              data-testid="confirm-duplicate-btn"
+            >
+              Crear de todas formas
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

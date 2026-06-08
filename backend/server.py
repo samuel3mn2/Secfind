@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
+import re as regex_module
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
@@ -1796,6 +1797,51 @@ async def get_vulnerabilidad(vuln_id: str, current_user: CurrentUser = Depends(g
         raise HTTPException(status_code=404, detail="Vulnerabilidad no encontrada")
     return vuln
 
+@api_router.post("/vulnerabilidades/verificar-duplicado")
+async def verificar_duplicado_vulnerabilidad(
+    vulnerabilidad: str,
+    aplicaciones: Optional[str] = None,
+    institucion: Optional[str] = None,
+    exclude_id: Optional[str] = None,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Check if a vulnerability with same text, application, and institution already exists"""
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos")
+    
+    # Build query - case insensitive comparison
+    query = {
+        "vulnerabilidad": {"$regex": f"^{regex_module.escape(vulnerabilidad.strip())}$", "$options": "i"}
+    }
+    
+    # Handle nullable fields
+    if aplicaciones and aplicaciones.strip():
+        query["aplicaciones"] = {"$regex": f"^{regex_module.escape(aplicaciones.strip())}$", "$options": "i"}
+    else:
+        query["$or"] = [{"aplicaciones": None}, {"aplicaciones": ""}, {"aplicaciones": {"$exists": False}}]
+    
+    if institucion and institucion.strip():
+        if "$or" in query:
+            # Need to combine conditions properly
+            app_cond = query.pop("$or")
+            query["$and"] = [
+                {"$or": app_cond},
+                {"institucion": {"$regex": f"^{regex_module.escape(institucion.strip())}$", "$options": "i"}}
+            ]
+        else:
+            query["institucion"] = {"$regex": f"^{regex_module.escape(institucion.strip())}$", "$options": "i"}
+    
+    # Exclude current record if editing
+    if exclude_id:
+        query["id"] = {"$ne": exclude_id}
+    
+    duplicates = await db.vulnerabilidades.find(query, {"_id": 0, "id": 1, "vulnerabilidad": 1, "aplicaciones": 1, "institucion": 1, "codigo": 1, "fecha_hallazgo": 1}).to_list(5)
+    
+    return {
+        "has_duplicates": len(duplicates) > 0,
+        "duplicates": duplicates
+    }
+
 @api_router.post("/vulnerabilidades", response_model=Vulnerabilidad)
 async def create_vulnerabilidad(vuln_data: VulnerabilidadCreate, current_user: CurrentUser = Depends(get_current_user)):
     if not current_user.es_admin and not current_user.permisos.vulnerabilidades.crear:
@@ -2898,6 +2944,7 @@ async def import_excel(file: UploadFile = File(...), current_user: CurrentUser =
     
     records = df.to_dict('records')
     inserted_count = 0
+    skipped_duplicates = 0
     catalogs_created = {"instituciones": 0, "aplicaciones": 0, "proveedores": 0, "informes": 0}
     
     for record in records:
@@ -3006,6 +3053,21 @@ async def import_excel(file: UploadFile = File(...), current_user: CurrentUser =
             elif resultado_retest in ["vulnerable", "impedimento"]:
                 cleaned_record["estatus"] = "Pendiente"
         
+        # Check for duplicates before inserting
+        vuln_text = cleaned_record.get("vulnerabilidad", "").strip()
+        app_text = cleaned_record.get("aplicaciones", "").strip() if cleaned_record.get("aplicaciones") else ""
+        inst_text = cleaned_record.get("institucion", "").strip() if cleaned_record.get("institucion") else ""
+        
+        if vuln_text and app_text and inst_text:
+            duplicate = await db.vulnerabilidades.find_one({
+                "vulnerabilidad": {"$regex": f"^{regex_module.escape(vuln_text)}$", "$options": "i"},
+                "aplicaciones": {"$regex": f"^{regex_module.escape(app_text)}$", "$options": "i"},
+                "institucion": {"$regex": f"^{regex_module.escape(inst_text)}$", "$options": "i"}
+            })
+            if duplicate:
+                skipped_duplicates += 1
+                continue
+        
         vuln = Vulnerabilidad(**cleaned_record)
         doc = vuln.model_dump()
         doc['created_at'] = doc['created_at'].isoformat()
@@ -3024,10 +3086,12 @@ async def import_excel(file: UploadFile = File(...), current_user: CurrentUser =
         catalog_msg.append(f"{catalogs_created['informes']} informes")
     
     msg = f"Se importaron {inserted_count} registros exitosamente"
+    if skipped_duplicates > 0:
+        msg += f". Se omitieron {skipped_duplicates} duplicados"
     if catalog_msg:
         msg += f". Se crearon: {', '.join(catalog_msg)}"
     
-    return {"message": msg, "inserted": inserted_count, "catalogs_created": catalogs_created}
+    return {"message": msg, "inserted": inserted_count, "skipped_duplicates": skipped_duplicates, "catalogs_created": catalogs_created}
 
 @api_router.delete("/vulnerabilidades")
 async def delete_all_vulnerabilidades(current_user: CurrentUser = Depends(get_current_user)):
