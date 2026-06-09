@@ -761,7 +761,7 @@ export default function DashboardGRC() {
         <KPICard
           title="Hallazgos Abiertos"
           value={kpis.hallazgos_abiertos || 0}
-          subtitle={`Riesgo prom: ${kpis.riesgo_promedio_hallazgos || 0}`}
+          subtitle={`Riesgo máx: ${kpis.riesgo_max_hallazgos || 0}/25`}
           icon={AlertTriangle}
           color="orange"
         />
@@ -773,11 +773,11 @@ export default function DashboardGRC() {
           color={kpis.indice_exposicion > 70 ? "red" : kpis.indice_exposicion > 40 ? "orange" : "green"}
         />
         <KPICard
-          title="Riesgo Total Hallazgos"
-          value={kpis.riesgo_total_hallazgos || 0}
-          subtitle={`Máx: ${kpis.riesgo_max_hallazgos || 0}`}
+          title="Riesgo Promedio"
+          value={kpis.riesgo_promedio_hallazgos || 0}
+          subtitle={`Máx posible: 25 | Actual máx: ${kpis.riesgo_max_hallazgos || 0}`}
           icon={TrendingUp}
-          color="indigo"
+          color={kpis.riesgo_promedio_hallazgos > 15 ? "red" : kpis.riesgo_promedio_hallazgos > 10 ? "orange" : "indigo"}
         />
       </div>
 

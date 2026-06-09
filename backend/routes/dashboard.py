@@ -454,9 +454,9 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
                 "Media": vuln_data.get("medias", 0),
                 "Baja": vuln_data.get("bajas", 0)
             },
+            # KPI principal: Riesgo Promedio de Hallazgos (más metodológico que la suma total)
             "riesgo_promedio_hallazgos": round(hall_data.get("riesgo_promedio") or 0, 1),
-            "riesgo_max_hallazgos": hall_data.get("riesgo_max") or 0,
-            "riesgo_total_hallazgos": hall_data.get("riesgo_total") or 0
+            "riesgo_max_hallazgos": hall_data.get("riesgo_max") or 0
         }
 
     async def _get_matriz_5x5(db, filtros: dict) -> dict:
