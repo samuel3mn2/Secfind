@@ -34,6 +34,11 @@ import {
 } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { toast } from "sonner";
 import { 
   LayoutDashboard, 
@@ -383,6 +388,12 @@ export default function DashboardGRC() {
   const [dashboardData, setDashboardData] = useState(null);
   const [filterOptions, setFilterOptions] = useState(null);
   
+  // Groups of reports
+  const [grupos, setGrupos] = useState([]);
+  const [selectedGrupos, setSelectedGrupos] = useState([]);
+  const [gruposPopoverOpen, setGruposPopoverOpen] = useState(false);
+  const [grupoSearch, setGrupoSearch] = useState("");
+  
   // Filters
   const [selectedInformes, setSelectedInformes] = useState([]);
   const [selectedDominios, setSelectedDominios] = useState([]);
@@ -407,16 +418,43 @@ export default function DashboardGRC() {
   // Ref to track if initial load is done
   const isInitialMount = useRef(true);
 
+  // Handler for popover open change - clears search on close
+  const handleGruposPopoverChange = (open) => {
+    setGruposPopoverOpen(open);
+    if (!open) setGrupoSearch("");
+  };
+
+  // Filter grupos by search
+  const filteredGrupos = React.useMemo(() => {
+    if (!grupoSearch.trim()) return grupos;
+    const searchLower = grupoSearch.toLowerCase().trim();
+    return grupos.filter(g => g.nombre.toLowerCase().includes(searchLower));
+  }, [grupos, grupoSearch]);
+
+  // Get all informes from selected grupos
+  const informesFromGrupos = React.useMemo(() => {
+    return selectedGrupos.flatMap(grupoId => {
+      const grupo = grupos.find(g => g.id === grupoId);
+      return grupo?.informes || [];
+    });
+  }, [selectedGrupos, grupos]);
+
+  // Combined informes (from grupos + individual selection)
+  const combinedInformes = React.useMemo(() => {
+    const all = [...new Set([...informesFromGrupos, ...selectedInformes])];
+    return all;
+  }, [informesFromGrupos, selectedInformes]);
+
   // Build query params from filters
   const buildQueryParams = useCallback(() => {
     const params = new URLSearchParams();
-    if (selectedInformes.length > 0) params.set('informes', selectedInformes.join(','));
+    if (combinedInformes.length > 0) params.set('informes', combinedInformes.join(','));
     if (selectedDominios.length > 0) params.set('dominios', selectedDominios.join(','));
     if (selectedResponsables.length > 0) params.set('responsables', selectedResponsables.join(','));
     if (selectedEstadosVuln.length > 0) params.set('estados_vuln', selectedEstadosVuln.join(','));
     if (selectedEstadosHall.length > 0) params.set('estados_hall', selectedEstadosHall.join(','));
     return params.toString();
-  }, [selectedInformes, selectedDominios, selectedResponsables, selectedEstadosVuln, selectedEstadosHall]);
+  }, [combinedInformes, selectedDominios, selectedResponsables, selectedEstadosVuln, selectedEstadosHall]);
 
   // Refresh function for manual refresh
   const refreshData = useCallback(async () => {
@@ -452,13 +490,15 @@ export default function DashboardGRC() {
         isInitialMount.current = false;
         setLoading(true);
         try {
-          const [dataRes, vistasRes] = await Promise.all([
+          const [dataRes, vistasRes, gruposRes] = await Promise.all([
             axios.get(`${API}/dashboard/data`),
-            axios.get(`${API}/dashboard/vistas`)
+            axios.get(`${API}/dashboard/vistas`),
+            axios.get(`${API}/config/grupos-informes`)
           ]);
           setDashboardData(dataRes.data);
           setFilterOptions(dataRes.data.opciones_filtros);
           setVistas(vistasRes.data);
+          setGrupos(gruposRes.data || []);
         } catch (error) {
           console.error("Error fetching dashboard data:", error);
           toast.error("Error al cargar datos del dashboard");
@@ -560,6 +600,7 @@ export default function DashboardGRC() {
 
   // Clear all filters
   const clearFilters = () => {
+    setSelectedGrupos([]);
     setSelectedInformes([]);
     setSelectedDominios([]);
     setSelectedResponsables([]);
@@ -568,8 +609,25 @@ export default function DashboardGRC() {
     setSelectedVista(null);
   };
 
-  const hasActiveFilters = selectedInformes.length > 0 || selectedDominios.length > 0 || 
+  const hasActiveFilters = selectedGrupos.length > 0 || selectedInformes.length > 0 || selectedDominios.length > 0 || 
     selectedResponsables.length > 0 || selectedEstadosVuln.length > 0 || selectedEstadosHall.length > 0;
+
+  // Grupo toggle handler
+  const handleGrupoToggle = (grupoId) => {
+    setSelectedGrupos(prev => 
+      prev.includes(grupoId)
+        ? prev.filter(g => g !== grupoId)
+        : [...prev, grupoId]
+    );
+  };
+
+  const handleSelectAllGrupos = () => {
+    if (selectedGrupos.length === grupos.length) {
+      setSelectedGrupos([]);
+    } else {
+      setSelectedGrupos(grupos.map(g => g.id));
+    }
+  };
 
   // Handle matrix cell click
   const handleMatrixCellClick = (cellData) => {
@@ -704,46 +762,133 @@ export default function DashboardGRC() {
             )}
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          {/* First row: Groups + Individual Reports */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+            {/* Grupos de Informes Selector */}
+            {grupos.length > 0 && (
+              <Popover open={gruposPopoverOpen} onOpenChange={handleGruposPopoverChange}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="justify-between bg-zinc-900 border-zinc-700 text-white hover:bg-zinc-800 w-full"
+                    data-testid="filter-grupos"
+                  >
+                    <span className="truncate text-sm">
+                      {selectedGrupos.length === 0 
+                        ? "Seleccionar Grupos" 
+                        : selectedGrupos.length === grupos.length 
+                          ? "Todos los grupos" 
+                          : `${selectedGrupos.length} grupo(s)`}
+                    </span>
+                    <div className="flex items-center gap-1 ml-2">
+                      {selectedGrupos.length > 0 && (
+                        <Badge variant="secondary" className="h-5 px-1.5 bg-purple-600 text-white text-xs">
+                          {selectedGrupos.length}
+                        </Badge>
+                      )}
+                      <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                    </div>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[320px] p-0 bg-zinc-900 border-zinc-700" align="start">
+                  {/* Search */}
+                  <div className="flex items-center border-b border-zinc-700 px-3">
+                    <Filter className="mr-2 h-4 w-4 shrink-0 text-zinc-500" />
+                    <input
+                      placeholder="Buscar grupo..."
+                      value={grupoSearch}
+                      onChange={(e) => setGrupoSearch(e.target.value)}
+                      className="flex h-10 w-full bg-transparent py-3 text-sm text-white placeholder:text-zinc-500 outline-none"
+                      autoFocus
+                    />
+                  </div>
+                  {/* Select All */}
+                  <div 
+                    className="flex items-center gap-2 p-3 border-b border-zinc-800 cursor-pointer hover:bg-zinc-800"
+                    onClick={handleSelectAllGrupos}
+                  >
+                    <Checkbox checked={selectedGrupos.length === grupos.length && grupos.length > 0} className="border-zinc-600" />
+                    <span className="text-sm font-medium text-zinc-300">Todos los grupos</span>
+                  </div>
+                  {/* Groups List */}
+                  <ScrollArea className="h-[200px]">
+                    <div className="p-2 space-y-1">
+                      {filteredGrupos.map(grupo => (
+                        <div
+                          key={grupo.id}
+                          className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+                            selectedGrupos.includes(grupo.id) ? "bg-purple-950/50" : "hover:bg-zinc-800"
+                          }`}
+                          onClick={() => handleGrupoToggle(grupo.id)}
+                        >
+                          <Checkbox checked={selectedGrupos.includes(grupo.id)} className="border-zinc-600" />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm text-zinc-300 block truncate">{grupo.nombre}</span>
+                            <span className="text-xs text-zinc-500">{grupo.informes?.length || 0} informes</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
+            )}
+            
+            {/* Individual Informes */}
             <MultiSelectFilter
-              label="Informes Pentest"
-              options={filterOptions?.informes?.map(i => ({ value: i, label: i })) || []}
+              options={filterOptions?.informes || []}
               selected={selectedInformes}
-              onSelectedChange={setSelectedInformes}
-              placeholder="Todos los informes"
+              onChange={setSelectedInformes}
+              placeholder={grupos.length > 0 ? "Informes adicionales" : "Todos los informes"}
               className="w-full"
+              data-testid="filter-informes"
             />
+          </div>
+          
+          {/* Show combined informes count if both grupos and individual are selected */}
+          {(selectedGrupos.length > 0 || selectedInformes.length > 0) && (
+            <div className="text-xs text-zinc-500 mb-3 flex items-center gap-2">
+              <Info className="w-3 h-3" />
+              <span>
+                {combinedInformes.length} informe(s) seleccionados en total
+                {selectedGrupos.length > 0 && ` (${informesFromGrupos.length} de grupos)`}
+              </span>
+            </div>
+          )}
+          
+          {/* Second row: Other filters */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <MultiSelectFilter
-              label="Dominios"
-              options={filterOptions?.dominios?.map(d => ({ value: d, label: d })) || []}
+              options={filterOptions?.dominios || []}
               selected={selectedDominios}
-              onSelectedChange={setSelectedDominios}
+              onChange={setSelectedDominios}
               placeholder="Todos los dominios"
               className="w-full"
+              data-testid="filter-dominios"
             />
             <MultiSelectFilter
-              label="Responsables"
-              options={filterOptions?.responsables?.map(r => ({ value: r, label: r })) || []}
+              options={filterOptions?.responsables || []}
               selected={selectedResponsables}
-              onSelectedChange={setSelectedResponsables}
-              placeholder="Todos"
+              onChange={setSelectedResponsables}
+              placeholder="Responsables"
               className="w-full"
+              data-testid="filter-responsables"
             />
             <MultiSelectFilter
-              label="Estado Vuln."
-              options={filterOptions?.estados_vulnerabilidad?.map(e => ({ value: e, label: e })) || []}
+              options={filterOptions?.estados_vulnerabilidad || []}
               selected={selectedEstadosVuln}
-              onSelectedChange={setSelectedEstadosVuln}
-              placeholder="Todos"
+              onChange={setSelectedEstadosVuln}
+              placeholder="Estado Vuln."
               className="w-full"
+              data-testid="filter-estados-vuln"
             />
             <MultiSelectFilter
-              label="Estado Hallazgo"
-              options={filterOptions?.estados_hallazgo?.map(e => ({ value: e, label: e })) || []}
+              options={filterOptions?.estados_hallazgo || []}
               selected={selectedEstadosHall}
-              onSelectedChange={setSelectedEstadosHall}
-              placeholder="Todos"
+              onChange={setSelectedEstadosHall}
+              placeholder="Estado Hallazgo"
               className="w-full"
+              data-testid="filter-estados-hall"
             />
           </div>
         </CardContent>
