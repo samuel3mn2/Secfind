@@ -79,23 +79,22 @@ const SEVERITY_COLORS = {
   Baja: "#2563eb",
 };
 
-// Colores estáticos para la Matriz de Riesgo 5x5
-// Basado en metodología clásica: Verde (bajo), Amarillo (medio), Naranja (alto), Rojo (muy alto/crítico)
+// Colores estáticos para la Matriz de Riesgo 4x4
+// Basado en metodología clásica: Verde (bajo), Amarillo (medio), Naranja (alto), Rojo (crítico)
 const MATRIX_COLORS = {
   // Probabilidad (row) x Impacto (col) -> [prob][imp]
-  "1-1": "#22c55e", "1-2": "#22c55e", "1-3": "#84cc16", "1-4": "#eab308", "1-5": "#f97316",
-  "2-1": "#22c55e", "2-2": "#84cc16", "2-3": "#eab308", "2-4": "#f97316", "2-5": "#ef4444",
-  "3-1": "#84cc16", "3-2": "#eab308", "3-3": "#f97316", "3-4": "#ef4444", "3-5": "#dc2626",
-  "4-1": "#eab308", "4-2": "#f97316", "4-3": "#ef4444", "4-4": "#dc2626", "4-5": "#b91c1c",
-  "5-1": "#f97316", "5-2": "#ef4444", "5-3": "#dc2626", "5-4": "#b91c1c", "5-5": "#7f1d1d",
+  // 1=Bajo, 2=Medio, 3=Medio-Alto, 4=Alto
+  "1-1": "#22c55e", "1-2": "#84cc16", "1-3": "#eab308", "1-4": "#f97316",
+  "2-1": "#84cc16", "2-2": "#eab308", "2-3": "#f97316", "2-4": "#ef4444",
+  "3-1": "#eab308", "3-2": "#f97316", "3-3": "#ef4444", "3-4": "#dc2626",
+  "4-1": "#f97316", "4-2": "#ef4444", "4-3": "#dc2626", "4-4": "#7f1d1d",
 };
 
 const RISK_LEVEL_LABELS = {
-  "1": "Muy Bajo",
-  "2": "Bajo", 
-  "3": "Medio",
-  "4": "Alto",
-  "5": "Muy Alto"
+  "1": "Bajo",
+  "2": "Medio", 
+  "3": "Medio-Alto",
+  "4": "Alto"
 };
 
 // ============ COMPONENTS ============
@@ -174,7 +173,7 @@ const KPICard = ({ title, value, subtitle, icon: Icon, color = "indigo", trend, 
   );
 };
 
-// Matriz de Riesgo 5x5
+// Matriz de Riesgo 4x4
 const RiskMatrix = ({ data, onCellClick }) => {
   // Crear mapa de celdas con datos
   const cellDataMap = {};
@@ -202,17 +201,17 @@ const RiskMatrix = ({ data, onCellClick }) => {
           </span>
         </div>
         
-        {/* Matrix */}
+        {/* Matrix 4x4 */}
         <div className="flex-1">
-          <div className="grid grid-cols-6 gap-1">
+          <div className="grid grid-cols-5 gap-1">
             {/* Header row */}
             <div className="h-8"></div>
-            {[1, 2, 3, 4, 5].map(imp => (
+            {[1, 2, 3, 4].map(imp => (
               <div key={`header-${imp}`} className="h-8 flex items-center justify-center">
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger>
-                      <span className="text-xs text-zinc-400 font-medium">{imp}</span>
+                      <span className="text-xs text-zinc-400 font-medium">{RISK_LEVEL_LABELS[imp]?.charAt(0) || imp}</span>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="bg-zinc-800 text-white border-zinc-700">
                       {RISK_LEVEL_LABELS[imp]}
@@ -222,14 +221,14 @@ const RiskMatrix = ({ data, onCellClick }) => {
               </div>
             ))}
             
-            {/* Matrix rows (5 to 1, top to bottom) */}
-            {[5, 4, 3, 2, 1].map(prob => (
+            {/* Matrix rows (4 to 1, top to bottom) */}
+            {[4, 3, 2, 1].map(prob => (
               <React.Fragment key={`row-${prob}`}>
-                <div className="h-14 flex items-center justify-center">
+                <div className="h-16 flex items-center justify-center">
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger>
-                        <span className="text-xs text-zinc-400 font-medium">{prob}</span>
+                        <span className="text-xs text-zinc-400 font-medium">{RISK_LEVEL_LABELS[prob]?.charAt(0) || prob}</span>
                       </TooltipTrigger>
                       <TooltipContent side="left" className="bg-zinc-800 text-white border-zinc-700">
                         {RISK_LEVEL_LABELS[prob]}
@@ -237,7 +236,7 @@ const RiskMatrix = ({ data, onCellClick }) => {
                     </Tooltip>
                   </TooltipProvider>
                 </div>
-                {[1, 2, 3, 4, 5].map(imp => {
+                {[1, 2, 3, 4].map(imp => {
                   const key = `${prob}-${imp}`;
                   const cellData = cellDataMap[key];
                   const count = cellData?.count || 0;
@@ -248,7 +247,7 @@ const RiskMatrix = ({ data, onCellClick }) => {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <button
-                            className="h-14 rounded-md flex items-center justify-center transition-all hover:scale-105 hover:ring-2 hover:ring-white/30"
+                            className="h-16 rounded-md flex items-center justify-center transition-all hover:scale-105 hover:ring-2 hover:ring-white/30"
                             style={{ backgroundColor: MATRIX_COLORS[key] }}
                             onClick={() => count > 0 && onCellClick && onCellClick(cellData)}
                             data-testid={`matrix-cell-${prob}-${imp}`}
@@ -262,7 +261,7 @@ const RiskMatrix = ({ data, onCellClick }) => {
                         </TooltipTrigger>
                         <TooltipContent side="top" className="bg-zinc-900 text-white border-zinc-700">
                           <div className="text-sm">
-                            <p className="font-medium">Prob: {prob} × Imp: {imp}</p>
+                            <p className="font-medium">{RISK_LEVEL_LABELS[prob]} × {RISK_LEVEL_LABELS[imp]}</p>
                             <p className="text-zinc-400">Hallazgos: {count}</p>
                             {count > 0 && <p className="text-zinc-400">Riesgo Total: {riesgoTotal}</p>}
                           </div>
@@ -922,7 +921,7 @@ export default function DashboardGRC() {
         <KPICard
           title="Hallazgos Abiertos"
           value={kpis.hallazgos_abiertos || 0}
-          subtitle={`Riesgo máx: ${kpis.riesgo_max_hallazgos || 0}/25`}
+          subtitle={`Riesgo máx: ${kpis.riesgo_max_hallazgos || 0}/16`}
           icon={AlertTriangle}
           color="orange"
         />
@@ -936,9 +935,9 @@ export default function DashboardGRC() {
         <KPICard
           title="Riesgo Promedio"
           value={kpis.riesgo_promedio_hallazgos || 0}
-          subtitle={`Máx posible: 25 | Actual máx: ${kpis.riesgo_max_hallazgos || 0}`}
+          subtitle={`Máx posible: 16 | Actual máx: ${kpis.riesgo_max_hallazgos || 0}`}
           icon={TrendingUp}
-          color={kpis.riesgo_promedio_hallazgos > 15 ? "red" : kpis.riesgo_promedio_hallazgos > 10 ? "orange" : "indigo"}
+          color={kpis.riesgo_promedio_hallazgos > 12 ? "red" : kpis.riesgo_promedio_hallazgos > 8 ? "orange" : "indigo"}
         />
       </div>
 
@@ -949,14 +948,15 @@ export default function DashboardGRC() {
           <CardHeader className="pb-2">
             <CardTitle className="text-white text-base flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-              Matriz de Riesgo 5×5
+              Matriz de Riesgo 4×4
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger>
                     <Info className="w-4 h-4 text-zinc-500" />
                   </TooltipTrigger>
                   <TooltipContent className="bg-zinc-800 text-white border-zinc-700 max-w-xs">
-                    Hallazgos de Auditoría agrupados por Probabilidad × Impacto. 
+                    Hallazgos de Auditoría agrupados por Probabilidad × Impacto.
+                    Escala: Bajo, Medio, Medio-Alto, Alto.
                     Click en una celda para ver detalles.
                   </TooltipContent>
                 </Tooltip>
@@ -965,7 +965,7 @@ export default function DashboardGRC() {
           </CardHeader>
           <CardContent>
             <RiskMatrix 
-              data={dashboardData?.matriz_5x5} 
+              data={dashboardData?.matriz_4x4} 
               onCellClick={handleMatrixCellClick}
             />
           </CardContent>
@@ -1101,7 +1101,7 @@ export default function DashboardGRC() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-orange-400" />
-              Hallazgos - Prob: {matrixDetailData?.probabilidad} × Imp: {matrixDetailData?.impacto}
+              Hallazgos - {RISK_LEVEL_LABELS[matrixDetailData?.probabilidad]} × {RISK_LEVEL_LABELS[matrixDetailData?.impacto]}
               <Badge variant="outline" className="ml-2 border-zinc-600">
                 {matrixDetailData?.count || 0} hallazgos
               </Badge>

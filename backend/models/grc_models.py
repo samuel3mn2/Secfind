@@ -86,8 +86,8 @@ class HallazgoAuditoriaBase(BaseModel):
     control_id: Optional[str] = None  # FK a config_controles
     brecha: str  # Descripción de la deficiencia encontrada
     riesgo_id: Optional[str] = None  # FK a catalogo_riesgos
-    probabilidad: int = Field(ge=1, le=5, default=1)  # 1-5
-    impacto: int = Field(ge=1, le=5, default=1)  # 1-5
+    probabilidad: int = Field(ge=1, le=4, default=1)  # 1=Bajo, 2=Medio, 3=Medio-Alto, 4=Alto
+    impacto: int = Field(ge=1, le=4, default=1)  # 1=Bajo, 2=Medio, 3=Medio-Alto, 4=Alto
     estado: EstadoHallazgo = EstadoHallazgo.ABIERTO
     responsable: Optional[str] = None  # Nombre del responsable (del catálogo)
     fecha_hallazgo: Optional[str] = None  # Fecha de identificación (DD-MM-YYYY)
@@ -102,8 +102,8 @@ class HallazgoAuditoriaUpdate(BaseModel):
     control_id: Optional[str] = None
     brecha: Optional[str] = None
     riesgo_id: Optional[str] = None
-    probabilidad: Optional[int] = Field(default=None, ge=1, le=5)
-    impacto: Optional[int] = Field(default=None, ge=1, le=5)
+    probabilidad: Optional[int] = Field(default=None, ge=1, le=4)
+    impacto: Optional[int] = Field(default=None, ge=1, le=4)
     estado: Optional[EstadoHallazgo] = None
     responsable: Optional[str] = None
     fecha_hallazgo: Optional[str] = None

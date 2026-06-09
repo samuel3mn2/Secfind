@@ -57,24 +57,22 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const ESTADOS = ["Abierto", "En Proceso", "Listo para Revisión", "Cerrado"];
 const PROBABILIDAD_OPTIONS = [
-  { value: 1, label: "1 - Muy Baja" },
-  { value: 2, label: "2 - Baja" },
-  { value: 3, label: "3 - Media" },
-  { value: 4, label: "4 - Alta" },
-  { value: 5, label: "5 - Muy Alta" },
+  { value: 1, label: "1 - Bajo" },
+  { value: 2, label: "2 - Medio" },
+  { value: 3, label: "3 - Medio-Alto" },
+  { value: 4, label: "4 - Alto" },
 ];
 const IMPACTO_OPTIONS = [
-  { value: 1, label: "1 - Muy Bajo" },
-  { value: 2, label: "2 - Bajo" },
-  { value: 3, label: "3 - Medio" },
+  { value: 1, label: "1 - Bajo" },
+  { value: 2, label: "2 - Medio" },
+  { value: 3, label: "3 - Medio-Alto" },
   { value: 4, label: "4 - Alto" },
-  { value: 5, label: "5 - Muy Alto" },
 ];
 
 const getRiesgoColor = (value) => {
-  if (value >= 15) return "bg-red-500/20 text-red-400 border-red-500/30";
-  if (value >= 8) return "bg-orange-500/20 text-orange-400 border-orange-500/30";
-  if (value >= 4) return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
+  if (value >= 12) return "bg-red-500/20 text-red-400 border-red-500/30";
+  if (value >= 6) return "bg-orange-500/20 text-orange-400 border-orange-500/30";
+  if (value >= 3) return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
   return "bg-green-500/20 text-green-400 border-green-500/30";
 };
 

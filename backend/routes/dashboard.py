@@ -251,7 +251,7 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
         
         # Ejecutar todas las agregaciones
         kpis = await _get_kpis(db, filtros)
-        matriz = await _get_matriz_5x5(db, filtros)
+        matriz = await _get_matriz_4x4(db, filtros)
         panel_severidad = await _get_panel_severidad(db, filtros)
         top_dominios = await _get_top_dominios(db, filtros)
         
@@ -260,7 +260,7 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
         
         return {
             "kpis": kpis,
-            "matriz_5x5": matriz,
+            "matriz_4x4": matriz,
             "panel_severidad": panel_severidad,
             "top_dominios": top_dominios,
             "filtros_aplicados": filtros,
@@ -459,10 +459,11 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
             "riesgo_max_hallazgos": hall_data.get("riesgo_max") or 0
         }
 
-    async def _get_matriz_5x5(db, filtros: dict) -> dict:
+    async def _get_matriz_4x4(db, filtros: dict) -> dict:
         """
         Agrupa hallazgos por probabilidad × impacto.
-        Retorna datos para pintar matriz 5×5.
+        Retorna datos para pintar matriz 4×4.
+        Escala: 1=Bajo, 2=Medio, 3=Medio-Alto, 4=Alto
         """
         match_stage = {"estado": {"$nin": ["Cerrado"]}}
         
