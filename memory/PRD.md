@@ -1,8 +1,17 @@
 # SecFind - Sistema de Gestión de Vulnerabilidades
 
-## Última Actualización: 2026-05-28
+## Última Actualización: 2026-06-09
 
 ### Cambios Recientes
+- **Dashboard de Mando Unificado GRC (Junio 2026)**: Nuevo dashboard tipo Tableau que combina vulnerabilidades técnicas y hallazgos de auditoría en una sola vista. Incluye:
+  - 4 KPIs: Vulnerabilidades Activas, Hallazgos Abiertos, Índice de Exposición (score ponderado), Riesgo Total Hallazgos
+  - Matriz de Riesgo 5×5 para Hallazgos (colores estáticos basados en metodología clásica, contadores dinámicos con drill-down)
+  - Panel de Severidad para Vulnerabilidades (gráfico de barras horizontal con desglose)
+  - Top 5 Dominios con Carga Combinada (barras apiladas: severidades + hallazgos)
+  - 5 Filtros Globales Multi-select: Informes, Dominios, Responsables, Estado Vuln, Estado Hallazgo
+  - Sistema de Vistas Guardadas (CRUD con nombres únicos por usuario, vistas públicas globalmente únicas)
+  - Backend: /api/dashboard/data y /api/dashboard/vistas (GET/POST/DELETE)
+  - Frontend: /dashboard-grc con Recharts
 - **Sistema de Notificaciones Unificado GRC (Mayo 2026)**: El motor de notificaciones por email ahora aplica tanto a Vulnerabilidades como a Hallazgos de Auditoría. Los endpoints `ejecutar_notificaciones` y `resumen_semanal` consultan ambas colecciones en paralelo. El toggle "Enviar a responsables" mapea el responsable de ambas entidades. Emails de alerta y resumen semanal muestran secciones separadas para cada tipo.
 - **Unificación Módulo Seguimiento (Mayo 2026)**: El módulo de Seguimiento de Riesgos ahora incluye dos Tabs: "Vulnerabilidades" y "Hallazgos de Auditoría". Ambos tabs comparten KPIs (Vencidas, Próximos 7/30 días, Total Pendientes), filtros comunes, y visualización de detalles en modal. Los registros vencidos (fecha_compromiso < hoy y estado ≠ Cerrado) muestran badge "VENCIDO" en rojo.
 - **Nuevos Campos Hallazgos de Auditoría (Mayo 2026)**: Agregados campos `responsable` (dropdown de catálogo existente), `fecha_hallazgo` (default: hoy), y `fecha_compromiso` (deadline para remediación). Validación: fecha_compromiso no puede ser anterior a fecha_hallazgo. Tabla actualizada con columnas nuevas. Plantilla Excel actualizada para import masivo.
@@ -70,6 +79,18 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 | **Importar PDF con IA** | ❌ Error | ✅ Funciona |
 
 ## Funcionalidades Implementadas
+
+### Dashboard GRC Unificado (NUEVO - Junio 2026)
+- [x] 4 KPIs: Vulnerabilidades Activas, Hallazgos Abiertos, Índice de Exposición, Riesgo Total
+- [x] Matriz de Riesgo 5×5 para Hallazgos de Auditoría (colores estáticos, contadores dinámicos)
+- [x] Drill-down en celdas de la matriz (modal con lista de hallazgos)
+- [x] Panel de Severidad para Vulnerabilidades (gráfico de barras horizontal)
+- [x] Top 5 Dominios con Carga Combinada (barras apiladas)
+- [x] 5 Filtros Globales Multi-select (Informes, Dominios, Responsables, Estado Vuln, Estado Hallazgo)
+- [x] Sistema de Vistas Guardadas (crear, aplicar, eliminar)
+- [x] Vistas públicas (visibles para todos) y privadas (solo el creador)
+- [x] Backend: `/api/dashboard/data`, `/api/dashboard/vistas` (GET/POST/DELETE)
+- [x] Frontend: `/dashboard-grc` con Recharts
 
 ### Dashboard (6 KPIs)
 - [x] Total Vulnerabilidades

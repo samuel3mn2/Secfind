@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -219,8 +219,8 @@ const RiskMatrix = ({ data, onCellClick }) => {
             
             {/* Matrix rows (5 to 1, top to bottom) */}
             {[5, 4, 3, 2, 1].map(prob => (
-              <>
-                <div key={`label-${prob}`} className="h-14 flex items-center justify-center">
+              <React.Fragment key={`row-${prob}`}>
+                <div className="h-14 flex items-center justify-center">
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger>
@@ -266,7 +266,7 @@ const RiskMatrix = ({ data, onCellClick }) => {
                     </TooltipProvider>
                   );
                 })}
-              </>
+              </React.Fragment>
             ))}
           </div>
         </div>
