@@ -439,6 +439,13 @@ export default function DashboardGRC() {
     });
   }, [selectedGrupos, grupos]);
 
+  // Available informes for additional selection (excluding those already in selected grupos)
+  const informesDisponibles = React.useMemo(() => {
+    const allInformes = filterOptions?.informes || [];
+    if (informesFromGrupos.length === 0) return allInformes;
+    return allInformes.filter(inf => !informesFromGrupos.includes(inf));
+  }, [filterOptions?.informes, informesFromGrupos]);
+
   // Combined informes (from grupos + individual selection)
   const combinedInformes = React.useMemo(() => {
     const all = [...new Set([...informesFromGrupos, ...selectedInformes])];
@@ -614,18 +621,27 @@ export default function DashboardGRC() {
 
   // Grupo toggle handler
   const handleGrupoToggle = (grupoId) => {
-    setSelectedGrupos(prev => 
-      prev.includes(grupoId)
-        ? prev.filter(g => g !== grupoId)
-        : [...prev, grupoId]
-    );
+    const isRemoving = selectedGrupos.includes(grupoId);
+    if (isRemoving) {
+      setSelectedGrupos(prev => prev.filter(g => g !== grupoId));
+    } else {
+      // Adding grupo - also remove its informes from individual selection
+      const grupo = grupos.find(g => g.id === grupoId);
+      const grupoInformes = grupo?.informes || [];
+      setSelectedGrupos(prev => [...prev, grupoId]);
+      setSelectedInformes(prev => prev.filter(inf => !grupoInformes.includes(inf)));
+    }
   };
 
   const handleSelectAllGrupos = () => {
     if (selectedGrupos.length === grupos.length) {
       setSelectedGrupos([]);
     } else {
-      setSelectedGrupos(grupos.map(g => g.id));
+      const allGrupoIds = grupos.map(g => g.id);
+      setSelectedGrupos(allGrupoIds);
+      // Clean up informes that will now be covered by grupos
+      const allInformesFromAllGrupos = grupos.flatMap(g => g.informes || []);
+      setSelectedInformes(prev => prev.filter(inf => !allInformesFromAllGrupos.includes(inf)));
     }
   };
 
@@ -834,9 +850,9 @@ export default function DashboardGRC() {
               </Popover>
             )}
             
-            {/* Individual Informes */}
+            {/* Individual Informes - exclude those already in selected grupos */}
             <MultiSelectFilter
-              options={filterOptions?.informes || []}
+              options={informesDisponibles}
               selected={selectedInformes}
               onChange={setSelectedInformes}
               placeholder={grupos.length > 0 ? "Informes adicionales" : "Todos los informes"}
