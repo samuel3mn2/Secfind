@@ -1,6 +1,6 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { Shield, LayoutDashboard, List, Menu, X, Settings, LogOut, User, CalendarClock, Users, Key, AlertTriangle, ClipboardCheck, BookOpen } from "lucide-react";
+import { Shield, LayoutDashboard, List, Menu, X, Settings, LogOut, User, CalendarClock, Users, Key, AlertTriangle, ClipboardCheck, BookOpen, Gauge } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -99,6 +99,12 @@ export const Layout = () => {
       to: "/", 
       icon: LayoutDashboard, 
       label: "Dashboard",
+      show: isAdmin || canView("dashboard")
+    },
+    { 
+      to: "/dashboard-grc", 
+      icon: Gauge, 
+      label: "Dashboard GRC",
       show: isAdmin || canView("dashboard")
     },
     { 

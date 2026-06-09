@@ -23,6 +23,7 @@ from routes.dominios import create_dominios_router
 from routes.controles import create_controles_router
 from routes.catalogo_riesgos import create_catalogo_riesgos_router
 from routes.hallazgos_auditoria import create_hallazgos_router
+from routes.dashboard import create_dashboard_router
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -3814,12 +3815,14 @@ def setup_grc_routers():
     controles_router = create_controles_router(db, get_current_user)
     catalogo_riesgos_router = create_catalogo_riesgos_router(db, get_current_user)
     hallazgos_router = create_hallazgos_router(db, get_current_user)
+    dashboard_grc_router = create_dashboard_router(db, get_current_user)
     
     # Register routers with api_router
     api_router.include_router(dominios_router)
     api_router.include_router(controles_router)
     api_router.include_router(catalogo_riesgos_router)
     api_router.include_router(hallazgos_router)
+    api_router.include_router(dashboard_grc_router)
 
 setup_grc_routers()
 

@@ -1,0 +1,66 @@
+{
+  "summary": "Completed full-stack testing of Dashboard GRC (Iteration 21 - Fase 2 backend + Fase 3 frontend). 12/12 pytest backend tests passed covering GET /api/dashboard/data (with/without filters), GET/POST/DELETE /api/dashboard/vistas (CRUD with uniqueness validation). Frontend at /dashboard-grc loads correctly with all components: 4 KPI cards, Matriz 5x5 with static colors and dynamic counters, drill-down modal opens with hallazgos list, Panel Severidad horizontal bar chart, Top 5 Dominios stacked bars, Filtros Globales (5 multi-select dropdowns), and Vistas Guardadas dropdown with create/apply/delete functionality.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "DashboardGRC", "issues": [
+        "Console warning: 'Each child in a list should have a unique key prop' originating from RiskMatrix component - needs unique keys in mapped cells",
+        "Recharts warning: width(-1) height(-1) on initial render before container size is computed - cosmetic only, charts render correctly afterwards",
+        "Accessibility warning: DialogContent missing `Description` or `aria-describedby` for the drill-down modal"
+      ]}
+    ]
+  },
+  "passed_tests": [
+    "Backend GET /api/dashboard/data returns full structure (kpis, matriz_5x5, panel_severidad, top_dominios, filtros_aplicados, opciones_filtros)",
+    "Backend GET /api/dashboard/data with estados_vuln, estados_hall query params filters correctly and echoes filtros_aplicados",
+    "Backend GET /api/dashboard/data with dominios filter works",
+    "Backend GET /api/dashboard/data requires auth (401/403 without token)",
+    "Backend GET /api/dashboard/vistas returns user + public vistas as array",
+    "Backend POST /api/dashboard/vistas creates vista and persists (verified via GET)",
+    "Backend POST /api/dashboard/vistas rejects duplicate name per user (400)",
+    "Backend POST /api/dashboard/vistas rejects empty/whitespace name (400)",
+    "Backend POST /api/dashboard/vistas updates existing vista when 'id' is in body (verified name, informes_seleccionados, filtros)",
+    "Backend POST /api/dashboard/vistas public vista duplicate name rejected",
+    "Backend DELETE /api/dashboard/vistas/{id} removes vista and is verified absent on GET",
+    "Backend DELETE /api/dashboard/vistas/{nonexistent} returns 404",
+    "Frontend /dashboard-grc loads with data-testid='dashboard-grc'",
+    "Frontend renders 4 KPI cards (vulnerabilidades-activas, hallazgos-abiertos, indice-de-exposicion, riesgo-total-hallazgos)",
+    "Frontend renders 25 matrix cells (5x5) with static colors and numeric counts",
+    "Frontend clicking non-empty matrix cell opens drill-down modal showing list of hallazgos with codigo/estado/riesgo",
+    "Frontend Vistas Guardadas dropdown opens and shows existing user vistas, 'Sin Vista (Limpiar)' and 'Guardar Vista Actual' option",
+    "Frontend Filtros Globales section visible with 5 multi-select dropdowns",
+    "Frontend Panel de Severidad and Top 5 Dominios charts render with data"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_dashboard_grc.py",
+    "/app/test_reports/pytest/pytest_dashboard_grc.xml"
+  ],
+  "action_items": [
+    "Optional: Add unique `key` prop to mapped cells inside RiskMatrix component to silence React key warning",
+    "Optional: Wrap Recharts ResponsiveContainer with proper minWidth/minHeight or remove pre-render warnings (cosmetic)",
+    "Optional: Add a DialogDescription (or aria-describedby) to the matrix drill-down DialogContent for a11y compliance"
+  ],
+  "critical_code_review_comments": [
+    "routes/dashboard.py: 'creado_por' field is read on PUT/DELETE assuming it always exists - acceptable since insert always sets it.",
+    "DashboardVistaUpdate Pydantic model is declared but not used; POST endpoint uses raw dict. Consider switching to typed model for stronger validation.",
+    "_get_filter_options hardcodes estados_vulnerabilidad and estados_hallazgo lists - acceptable but should align with single source of truth used elsewhere in the app.",
+    "Recharts charts inside DashboardGRC initialize with width=-1/height=-1 due to container size not yet computed; consider providing explicit dimensions or skipping render until container has size."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_dashboard_grc.py (new pytest suite for Dashboard GRC endpoints)"
+  ],
+  "success_rate": {
+    "backend": "100% (12/12 pytest tests passed)",
+    "frontend": "100% (all critical UI flows verified)"
+  },
+  "test_credentials": {"user": "admin", "password": "admin123"},
+  "seed_data_creation": "Each test creates its own TEST_-prefixed vistas and cleans them up via DELETE afterwards. No persistent test data left over.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Dashboard GRC (Fase 2 + 3) is fully functional: backend endpoints /api/dashboard/data and /api/dashboard/vistas (GET/POST/DELETE) work with auth + uniqueness validations. Frontend /dashboard-grc has data-testid selectors: 'dashboard-grc', 'kpi-*', 'matrix-cell-{prob}-{imp}', 'vistas-dropdown', 'refresh-btn', 'save-view-name-input', 'confirm-save-view-btn'. Matrix drill-down opens a modal on cell click (only when count > 0). Minor non-blocking warnings exist (React key prop in RiskMatrix, Recharts dimensions, Dialog a11y) - safe to leave or fix later."
+}

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import Dashboard from "@/pages/Dashboard";
+import DashboardGRC from "@/pages/DashboardGRC";
 import Vulnerabilidades from "@/pages/Vulnerabilidades";
 import Configuracion from "@/pages/Configuracion";
 import SeguimientoRiesgos from "@/pages/SeguimientoRiesgos";
@@ -70,6 +71,7 @@ function AppRoutes() {
         }
       >
         <Route index element={<Dashboard />} />
+        <Route path="dashboard-grc" element={<DashboardGRC />} />
         <Route path="vulnerabilidades" element={<Vulnerabilidades />} />
         <Route path="seguimiento-riesgos" element={<SeguimientoRiesgos />} />
         <Route path="vista-comite" element={<VistaComite />} />
