@@ -25,6 +25,14 @@ class PentrazePDFParser:
         'critical': 'Critica'
     }
     
+    # Mapeo de Severidad Técnica a Nivel de Riesgo Corporativo GRC
+    NIVEL_RIESGO_MAP = {
+        'Critica': 'Alto',
+        'Alta': 'Medio Alto',
+        'Media': 'Medio',
+        'Baja': 'Bajo'
+    }
+    
     def __init__(self, pdf_content: bytes):
         self.pdf_content = pdf_content
         self.full_text = ""
@@ -266,6 +274,10 @@ class PentrazePDFParser:
         secfind_vulns = []
         
         for vuln in self.vulnerabilities:
+            severidad = vuln['severidad']
+            # Calcular nivel_riesgo desde severidad
+            nivel_riesgo = self.NIVEL_RIESGO_MAP.get(severidad, 'Medio')
+            
             secfind_vuln = {
                 'codigo': f"PEN-{vuln['numero'].zfill(3)}" if vuln.get('numero') else None,
                 'fecha_hallazgo': self.metadata.get('fecha_informe'),
@@ -273,7 +285,8 @@ class PentrazePDFParser:
                 'aplicaciones': vuln.get('activos_afectados', []),
                 'vulnerabilidad': vuln['titulo'],
                 'recomendaciones': vuln.get('recomendaciones', ''),
-                'severidad': vuln['severidad'],
+                'severidad': severidad,
+                'nivel_riesgo': nivel_riesgo,  # Nuevo campo GRC
                 'riesgo_asociado': vuln.get('impacto', ''),
                 'descripcion_riesgo': vuln.get('descripcion', ''),
                 'estatus': 'Pendiente',

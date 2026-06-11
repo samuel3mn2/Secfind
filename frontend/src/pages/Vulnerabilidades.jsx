@@ -114,6 +114,35 @@ const StatusBadge = ({ status }) => {
   );
 };
 
+// Opciones de Nivel de Riesgo Corporativo GRC
+const NIVEL_RIESGO_OPTIONS = ["Alto", "Medio Alto", "Medio", "Bajo"];
+
+// Colores para el badge de Nivel de Riesgo
+const getNivelRiesgoClass = (nivel) => {
+  switch (nivel) {
+    case "Alto":
+      return "bg-red-500/20 text-red-400 border-red-500/30";
+    case "Medio Alto":
+      return "bg-orange-500/20 text-orange-400 border-orange-500/30";
+    case "Medio":
+      return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
+    case "Bajo":
+      return "bg-green-500/20 text-green-400 border-green-500/30";
+    default:
+      return "bg-zinc-500/20 text-zinc-400 border-zinc-500/30";
+  }
+};
+
+// NivelRiesgoBadge component
+const NivelRiesgoBadge = ({ nivel }) => {
+  if (!nivel) return <span className="text-zinc-500 text-xs">-</span>;
+  return (
+    <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getNivelRiesgoClass(nivel)}`}>
+      {nivel}
+    </span>
+  );
+};
+
 // Available columns configuration
 const ALL_COLUMNS = [
   { id: "codigo", label: "Código", default: true },
@@ -122,6 +151,7 @@ const ALL_COLUMNS = [
   { id: "aplicaciones", label: "Aplicaciones", default: true },
   { id: "vulnerabilidad", label: "Vulnerabilidad", default: true },
   { id: "severidad", label: "Severidad", default: true },
+  { id: "nivel_riesgo", label: "Nivel Riesgo", default: true },
   { id: "estatus", label: "Estatus", default: true },
   { id: "responsable", label: "Responsable", default: true },
   { id: "fecha_compromiso", label: "Fecha Compromiso", default: false },
@@ -298,6 +328,7 @@ export default function Vulnerabilidades() {
     vulnerabilidad: "",
     recomendaciones: "",
     severidad: "",
+    nivel_riesgo: "",
     control_id: "",
     riesgo_id: "",
     descripcion_riesgo: "",
@@ -429,6 +460,7 @@ export default function Vulnerabilidades() {
         vulnerabilidad: "",
         recomendaciones: "",
         severidad: "",
+        nivel_riesgo: "",
         control_id: "",
         riesgo_id: "",
         descripcion_riesgo: "",
@@ -1026,6 +1058,7 @@ export default function Vulnerabilidades() {
                   {isColumnVisible("aplicaciones") && <TableHead className="text-zinc-400">Aplicaciones</TableHead>}
                   {isColumnVisible("vulnerabilidad") && <TableHead className="text-zinc-400 min-w-[200px]">Vulnerabilidad</TableHead>}
                   {isColumnVisible("severidad") && <TableHead className="text-zinc-400">Severidad</TableHead>}
+                  {isColumnVisible("nivel_riesgo") && <TableHead className="text-zinc-400">Nivel Riesgo</TableHead>}
                   {isColumnVisible("estatus") && <TableHead className="text-zinc-400">Estatus</TableHead>}
                   {isColumnVisible("responsable") && <TableHead className="text-zinc-400">Responsable</TableHead>}
                   {isColumnVisible("fecha_compromiso") && <TableHead className="text-zinc-400">F. Compromiso</TableHead>}
@@ -1092,6 +1125,11 @@ export default function Vulnerabilidades() {
                       {isColumnVisible("severidad") && (
                         <TableCell>
                           <SeverityBadge severity={vuln.severidad} />
+                        </TableCell>
+                      )}
+                      {isColumnVisible("nivel_riesgo") && (
+                        <TableCell>
+                          <NivelRiesgoBadge nivel={vuln.nivel_riesgo} />
                         </TableCell>
                       )}
                       {isColumnVisible("estatus") && (
@@ -1217,6 +1255,7 @@ export default function Vulnerabilidades() {
                 {/* Header Info */}
                 <div className="flex flex-wrap gap-3">
                   <SeverityBadge severity={viewingVuln.severidad} />
+                  <NivelRiesgoBadge nivel={viewingVuln.nivel_riesgo} />
                   <StatusBadge status={viewingVuln.estatus} />
                 </div>
 
@@ -1439,7 +1478,7 @@ export default function Vulnerabilidades() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-zinc-400">Severidad</Label>
+                  <Label className="text-zinc-400">Severidad Técnica</Label>
                   <Select
                     value={formData.severidad || ""}
                     onValueChange={(v) => setFormData({ ...formData, severidad: v })}
@@ -1450,6 +1489,36 @@ export default function Vulnerabilidades() {
                     <SelectContent className="bg-zinc-900 border-zinc-700">
                       {options?.severidades?.map((s) => (
                         <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-zinc-400 flex items-center gap-2">
+                    Nivel de Riesgo Corporativo
+                    <span className="text-[10px] text-cyan-500 bg-cyan-500/10 px-1.5 py-0.5 rounded">GRC</span>
+                  </Label>
+                  <Select
+                    value={formData.nivel_riesgo || ""}
+                    onValueChange={(v) => setFormData({ ...formData, nivel_riesgo: v })}
+                  >
+                    <SelectTrigger className="bg-black/20 border-zinc-700 text-white" data-testid="input-nivel-riesgo">
+                      <SelectValue placeholder="Seleccionar nivel de riesgo..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-900 border-zinc-700">
+                      {NIVEL_RIESGO_OPTIONS.map((nivel) => (
+                        <SelectItem key={nivel} value={nivel}>
+                          <div className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full ${
+                              nivel === "Alto" ? "bg-red-500" :
+                              nivel === "Medio Alto" ? "bg-orange-500" :
+                              nivel === "Medio" ? "bg-yellow-500" :
+                              "bg-green-500"
+                            }`}></span>
+                            {nivel}
+                          </div>
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

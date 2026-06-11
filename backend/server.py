@@ -3124,6 +3124,9 @@ async def import_excel(file: UploadFile = File(...), current_user: CurrentUser =
         'Vulnerabilidad': 'vulnerabilidad',
         'Recomendaciones': 'recomendaciones',
         'Severidad': 'severidad',
+        'Nivel Riesgo': 'nivel_riesgo',
+        'Nivel de Riesgo': 'nivel_riesgo',
+        'Nivel Riesgo Corporativo': 'nivel_riesgo',
         'Riesgo Asociado': 'riesgo_asociado',
         'Descripción Riesgo': 'descripcion_riesgo',
         'Descripción del Riesgo': 'descripcion_riesgo',
@@ -3250,6 +3253,24 @@ async def import_excel(file: UploadFile = File(...), current_user: CurrentUser =
             elif resultado_retest in ["vulnerable", "impedimento"]:
                 cleaned_record["estatus"] = "Pendiente"
         
+        # Procesar nivel_riesgo: validar o calcular desde severidad
+        nivel_riesgo_raw = cleaned_record.get("nivel_riesgo", "").strip() if cleaned_record.get("nivel_riesgo") else ""
+        nivel_riesgo_valid = ["Bajo", "Medio", "Medio Alto", "Alto"]
+        
+        if nivel_riesgo_raw and nivel_riesgo_raw in nivel_riesgo_valid:
+            # Valor válido, mantener
+            cleaned_record["nivel_riesgo"] = nivel_riesgo_raw
+        else:
+            # Calcular desde severidad como fallback
+            severidad = cleaned_record.get("severidad", "").strip() if cleaned_record.get("severidad") else ""
+            nivel_riesgo_map = {
+                "Critica": "Alto",
+                "Alta": "Medio Alto", 
+                "Media": "Medio",
+                "Baja": "Bajo"
+            }
+            cleaned_record["nivel_riesgo"] = nivel_riesgo_map.get(severidad, None)
+        
         # Check for duplicates before inserting
         vuln_text = cleaned_record.get("vulnerabilidad", "").strip()
         app_text = cleaned_record.get("aplicaciones", "").strip() if cleaned_record.get("aplicaciones") else ""
@@ -3303,6 +3324,7 @@ async def delete_all_vulnerabilidades(current_user: CurrentUser = Depends(get_cu
 class ExtractedVulnerability(BaseModel):
     titulo: str
     severidad: str
+    nivel_riesgo: Optional[str] = None  # "Alto", "Medio Alto", "Medio", "Bajo"
     activos_afectados: List[str] = []
     descripcion: str
     impacto: str = ""
@@ -3326,6 +3348,7 @@ class VulnerabilidadParaAgregar(BaseModel):
     descripcion_riesgo: str
     recomendaciones: str
     severidad: str
+    nivel_riesgo: Optional[NivelRiesgoGRC] = None  # "Alto", "Medio Alto", "Medio", "Bajo"
     estatus: str = "Pendiente"
     nombre_informe_pentest: str
     proveedor: str
@@ -3366,7 +3389,7 @@ async def extract_vulnerabilities_from_pdf(
             full_text = full_text[:50000]
         
         # System message for extraction
-        system_message = """Eres un experto en ciberseguridad que analiza informes de pruebas de penetración (pentest).
+        system_message = """Eres un experto en ciberseguridad y gestión de riesgos corporativos que analiza informes de pruebas de penetración (pentest).
 Tu tarea es extraer información estructurada de informes de pentest en español.
 
 IMPORTANTE: Responde SOLO con JSON válido, sin texto adicional ni markdown.
@@ -3382,6 +3405,7 @@ El JSON debe tener esta estructura exacta:
         {
             "titulo": "título de la vulnerabilidad",
             "severidad": "Critica|Alta|Media|Baja",
+            "nivel_riesgo": "Alto|Medio Alto|Medio|Bajo",
             "activos_tecnicos": ["servidores", "IPs", "URLs afectados"],
             "descripcion": "descripción detallada de la vulnerabilidad",
             "impacto": "impacto de la vulnerabilidad",
@@ -3392,7 +3416,13 @@ El JSON debe tener esta estructura exacta:
 
 Reglas IMPORTANTES:
 - La fecha debe estar en formato YYYY-MM-DD
-- La severidad debe ser exactamente: Critica, Alta, Media o Baja
+- La severidad técnica debe ser exactamente: Critica, Alta, Media o Baja
+- El nivel_riesgo corporativo debe ser ESTRICTAMENTE uno de estos 4 valores: "Alto", "Medio Alto", "Medio", "Bajo"
+  * "Alto" = Vulnerabilidades que pueden causar daño crítico al negocio, pérdida financiera significativa, o exposición de datos sensibles
+  * "Medio Alto" = Vulnerabilidades que representan un riesgo importante pero con algún factor mitigante
+  * "Medio" = Vulnerabilidades que requieren atención pero no representan un riesgo inmediato
+  * "Bajo" = Vulnerabilidades menores o informativas con bajo impacto al negocio
+- Si el informe no especifica nivel_riesgo, infiere basándote en la severidad: Critica→Alto, Alta→Medio Alto, Media→Medio, Baja→Bajo
 - Extrae TODAS las vulnerabilidades del informe
 - "aplicacion_evaluada" es el SISTEMA o APLICACIÓN principal que se evaluó en el pentest (ej: SWIFT, SAP, Active Directory, Portal Web, etc.)
 - "activos_tecnicos" son los SERVIDORES, IPs, URLs o hosts específicos donde se encontró la vulnerabilidad. NO son aplicaciones.
@@ -3630,6 +3660,17 @@ async def add_vulnerability_from_pdf(
             await db.informes_pentest.insert_one(doc)
             logging.info(f"Auto-created informe pentest: {data.nombre_informe_pentest}")
     
+    # Calcular nivel_riesgo si no viene especificado
+    nivel_riesgo_final = data.nivel_riesgo
+    if not nivel_riesgo_final:
+        nivel_riesgo_map = {
+            "Critica": "Alto",
+            "Alta": "Medio Alto",
+            "Media": "Medio",
+            "Baja": "Bajo"
+        }
+        nivel_riesgo_final = nivel_riesgo_map.get(data.severidad)
+    
     vuln = Vulnerabilidad(
         fecha_hallazgo=data.fecha_hallazgo,
         institucion=final_institucion,
@@ -3638,6 +3679,7 @@ async def add_vulnerability_from_pdf(
         descripcion_riesgo=data.descripcion_riesgo,
         recomendaciones=data.recomendaciones,
         severidad=data.severidad,
+        nivel_riesgo=nivel_riesgo_final,
         estatus=data.estatus,
         nombre_informe_pentest=final_informe,
         proveedor=final_proveedor,
