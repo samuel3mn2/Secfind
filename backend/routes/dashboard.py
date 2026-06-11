@@ -10,6 +10,77 @@ import uuid
 
 
 # ============================================================
+# CONSTANTES NIVEL DE RIESGO GRC
+# ============================================================
+
+# Mapeo de Severidad Técnica a Nivel de Riesgo GRC
+SEVERIDAD_TO_NIVEL_RIESGO = {
+    "Critica": "Alto",
+    "Alta": "Medio Alto",
+    "Media": "Medio",
+    "Baja": "Bajo"
+}
+
+# Pesos para el cálculo del índice de exposición usando nivel_riesgo
+NIVEL_RIESGO_WEIGHTS = {
+    "Alto": 10,        # Equivalente a Critica
+    "Medio Alto": 7,   # Equivalente a Alta
+    "Medio": 4,        # Equivalente a Media
+    "Bajo": 1          # Equivalente a Baja
+}
+
+# Pipeline stage para calcular nivel_riesgo_computed dinámicamente
+# Aplica fallback SOLO para informes "Primera emulación" de 2024 o anterior
+NIVEL_RIESGO_COMPUTED_STAGE = {
+    "$addFields": {
+        "nivel_riesgo_computed": {
+            "$cond": {
+                # Si ya tiene nivel_riesgo asignado, usar ese valor
+                "if": {"$and": [
+                    {"$ne": ["$nivel_riesgo", None]},
+                    {"$ne": ["$nivel_riesgo", ""]},
+                    {"$gt": [{"$type": "$nivel_riesgo"}, "missing"]}
+                ]},
+                "then": "$nivel_riesgo",
+                # Si no, aplicar fallback condicional
+                "else": {
+                    "$cond": {
+                        # Verificar si es "Primera emulación" Y año ≤ 2024
+                        "if": {"$and": [
+                            {"$or": [
+                                {"$regexMatch": {"input": {"$ifNull": ["$nombre_informe_pentest", ""]}, "regex": "primera emulacion", "options": "i"}},
+                                {"$regexMatch": {"input": {"$ifNull": ["$nombre_informe_pentest", ""]}, "regex": "primera emulación", "options": "i"}}
+                            ]},
+                            {"$or": [
+                                # Año extraído de fecha_hallazgo YYYY-MM-DD
+                                {"$lte": [{"$toInt": {"$substrCP": [{"$ifNull": ["$fecha_hallazgo", "2024"]}, 0, 4]}}, 2024]},
+                                # Si no hay fecha, asumir que aplica
+                                {"$eq": [{"$ifNull": ["$fecha_hallazgo", None]}, None]}
+                            ]}
+                        ]},
+                        # Aplicar mapeo de severidad
+                        "then": {
+                            "$switch": {
+                                "branches": [
+                                    {"case": {"$eq": ["$severidad", "Critica"]}, "then": "Alto"},
+                                    {"case": {"$eq": ["$severidad", "Alta"]}, "then": "Medio Alto"},
+                                    {"case": {"$eq": ["$severidad", "Media"]}, "then": "Medio"},
+                                    {"case": {"$eq": ["$severidad", "Baja"]}, "then": "Bajo"}
+                                ],
+                                "default": None
+                            }
+                        },
+                        # Para informes 2025+, no aplicar fallback (nivel_riesgo debe venir poblado)
+                        "else": "$nivel_riesgo"
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+# ============================================================
 # MODELOS PYDANTIC
 # ============================================================
 
@@ -285,7 +356,11 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
             vuln_match["estatus"] = {"$in": filtros["estados_vulnerabilidad"]}
         
         # Pipeline para vulns con lookup de dominio si hay filtro
-        vuln_pipeline = [{"$match": vuln_match}]
+        vuln_pipeline = [
+            {"$match": vuln_match},
+            # Agregar nivel_riesgo_computed con lógica condicional
+            NIVEL_RIESGO_COMPUTED_STAGE
+        ]
         
         if filtros.get("dominios"):
             vuln_pipeline.extend([
@@ -320,15 +395,46 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
                 }
             ])
         
-        # Agregar cálculo de índice
+        # Agregar cálculo de índice usando nivel_riesgo_computed con fallback a severidad
+        vuln_pipeline.append({
+            "$addFields": {
+                # Calcular peso para índice: usar nivel_riesgo_computed si existe, sino mapear severidad
+                "peso_indice": {
+                    "$switch": {
+                        "branches": [
+                            # Primero intentar nivel_riesgo_computed
+                            {"case": {"$eq": ["$nivel_riesgo_computed", "Alto"]}, "then": 10},
+                            {"case": {"$eq": ["$nivel_riesgo_computed", "Medio Alto"]}, "then": 7},
+                            {"case": {"$eq": ["$nivel_riesgo_computed", "Medio"]}, "then": 4},
+                            {"case": {"$eq": ["$nivel_riesgo_computed", "Bajo"]}, "then": 1},
+                            # Fallback a severidad para el cálculo del índice (sin persistir)
+                            {"case": {"$eq": ["$severidad", "Critica"]}, "then": 10},
+                            {"case": {"$eq": ["$severidad", "Alta"]}, "then": 7},
+                            {"case": {"$eq": ["$severidad", "Media"]}, "then": 4},
+                            {"case": {"$eq": ["$severidad", "Baja"]}, "then": 1}
+                        ],
+                        "default": 1
+                    }
+                }
+            }
+        })
+        
         vuln_pipeline.append({
             "$group": {
                 "_id": None,
                 "total": {"$sum": 1},
+                # Desglose por severidad técnica (legacy)
                 "criticas": {"$sum": {"$cond": [{"$eq": ["$severidad", "Critica"]}, 1, 0]}},
                 "altas": {"$sum": {"$cond": [{"$eq": ["$severidad", "Alta"]}, 1, 0]}},
                 "medias": {"$sum": {"$cond": [{"$eq": ["$severidad", "Media"]}, 1, 0]}},
-                "bajas": {"$sum": {"$cond": [{"$eq": ["$severidad", "Baja"]}, 1, 0]}}
+                "bajas": {"$sum": {"$cond": [{"$eq": ["$severidad", "Baja"]}, 1, 0]}},
+                # Desglose por nivel_riesgo GRC (solo los que tienen nivel_riesgo_computed poblado)
+                "nivel_alto": {"$sum": {"$cond": [{"$eq": ["$nivel_riesgo_computed", "Alto"]}, 1, 0]}},
+                "nivel_medio_alto": {"$sum": {"$cond": [{"$eq": ["$nivel_riesgo_computed", "Medio Alto"]}, 1, 0]}},
+                "nivel_medio": {"$sum": {"$cond": [{"$eq": ["$nivel_riesgo_computed", "Medio"]}, 1, 0]}},
+                "nivel_bajo": {"$sum": {"$cond": [{"$eq": ["$nivel_riesgo_computed", "Bajo"]}, 1, 0]}},
+                # Score usando peso_indice (híbrido nivel_riesgo + severidad)
+                "score_actual": {"$sum": "$peso_indice"}
             }
         })
         
@@ -340,14 +446,11 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
                 "altas": 1,
                 "medias": 1,
                 "bajas": 1,
-                "score_actual": {
-                    "$add": [
-                        {"$multiply": ["$criticas", 10]},
-                        {"$multiply": ["$altas", 7]},
-                        {"$multiply": ["$medias", 4]},
-                        {"$multiply": ["$bajas", 1]}
-                    ]
-                },
+                "nivel_alto": 1,
+                "nivel_medio_alto": 1,
+                "nivel_medio": 1,
+                "nivel_bajo": 1,
+                "score_actual": 1,
                 "score_maximo": {"$multiply": ["$total", 10]}
             }
         })
@@ -448,11 +551,19 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
             "vulnerabilidades_activas": vuln_data.get("total", 0),
             "hallazgos_abiertos": hall_data.get("total", 0),
             "indice_exposicion": vuln_data.get("indice_exposicion", 0.0),
+            # Desglose por severidad técnica (legacy para compatibilidad)
             "desglose_severidad": {
                 "Critica": vuln_data.get("criticas", 0),
                 "Alta": vuln_data.get("altas", 0),
                 "Media": vuln_data.get("medias", 0),
                 "Baja": vuln_data.get("bajas", 0)
+            },
+            # Desglose por nivel_riesgo GRC normalizado
+            "desglose_nivel_riesgo": {
+                "Alto": vuln_data.get("nivel_alto", 0),
+                "Medio Alto": vuln_data.get("nivel_medio_alto", 0),
+                "Medio": vuln_data.get("nivel_medio", 0),
+                "Bajo": vuln_data.get("nivel_bajo", 0)
             },
             # KPI principal: Riesgo Promedio de Hallazgos (más metodológico que la suma total)
             "riesgo_promedio_hallazgos": round(hall_data.get("riesgo_promedio") or 0, 1),
@@ -553,7 +664,8 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
 
     async def _get_panel_severidad(db, filtros: dict) -> dict:
         """
-        Agrupa vulnerabilidades activas por severidad.
+        Agrupa vulnerabilidades activas por severidad y nivel_riesgo GRC.
+        Incluye el cálculo condicional de nivel_riesgo_computed.
         """
         match_stage = {"estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]}}
         
@@ -564,7 +676,11 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
         if filtros.get("responsables"):
             match_stage["responsable"] = {"$in": filtros["responsables"]}
         
-        pipeline = [{"$match": match_stage}]
+        pipeline = [
+            {"$match": match_stage},
+            # Agregar nivel_riesgo_computed con lógica condicional
+            NIVEL_RIESGO_COMPUTED_STAGE
+        ]
         
         # Lookup dominio si hay filtro
         if filtros.get("dominios"):
@@ -600,7 +716,7 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
                 }
             ])
         
-        # Agrupar por severidad
+        # Agrupar por severidad (mantenemos compatibilidad con gráfico existente)
         pipeline.append({
             "$group": {
                 "_id": "$severidad",
@@ -613,7 +729,8 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
                         "institucion": "$institucion",
                         "aplicaciones": "$aplicaciones",
                         "responsable": "$responsable",
-                        "estatus": "$estatus"
+                        "estatus": "$estatus",
+                        "nivel_riesgo": "$nivel_riesgo_computed"
                     }
                 }
             }

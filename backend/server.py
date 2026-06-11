@@ -8,7 +8,7 @@ import re as regex_module
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Literal
 import uuid
 from datetime import datetime, timezone, date, timedelta
 import pandas as pd
@@ -121,6 +121,67 @@ class CurrentUser(BaseModel):
 
 # ============ VULNERABILITY MODELS ============
 
+# Nivel de Riesgo GRC - valores normalizados
+NivelRiesgoGRC = Literal["Bajo", "Medio", "Medio Alto", "Alto"]
+
+# Mapeo de Severidad Técnica a Nivel de Riesgo GRC
+SEVERIDAD_TO_NIVEL_RIESGO = {
+    "Critica": "Alto",
+    "Alta": "Medio Alto",
+    "Media": "Medio",
+    "Baja": "Bajo"
+}
+
+def es_informe_primera_emulacion_2024_o_anterior(nombre_informe: str, fecha_hallazgo: str) -> bool:
+    """
+    Determina si una vulnerabilidad pertenece a un informe de "Primera emulación" 
+    del año 2024 o anteriores.
+    
+    Args:
+        nombre_informe: Nombre del informe pentest
+        fecha_hallazgo: Fecha del hallazgo en formato YYYY-MM-DD o DD-MM-YYYY
+        
+    Returns:
+        True si aplica el fallback de severidad, False si es 2025+
+    """
+    if not nombre_informe:
+        return False
+    
+    # Verificar si es informe de "Primera emulación" (case insensitive)
+    nombre_lower = nombre_informe.lower()
+    if "primera emulacion" not in nombre_lower and "primera emulación" not in nombre_lower:
+        return False
+    
+    # Extraer año de la fecha de hallazgo
+    if fecha_hallazgo:
+        try:
+            # Intentar formato YYYY-MM-DD
+            if len(fecha_hallazgo) >= 4 and fecha_hallazgo[:4].isdigit():
+                year = int(fecha_hallazgo[:4])
+            # Intentar formato DD-MM-YYYY
+            elif len(fecha_hallazgo) >= 10 and fecha_hallazgo[-4:].isdigit():
+                year = int(fecha_hallazgo[-4:])
+            else:
+                year = 2024  # Default conservador
+            
+            return year <= 2024
+        except (ValueError, IndexError):
+            return True  # Conservador: aplicar fallback si no se puede parsear
+    
+    return True  # Conservador: si no hay fecha, asumir que necesita fallback
+
+def calcular_nivel_riesgo_desde_severidad(severidad: str) -> Optional[str]:
+    """
+    Calcula el nivel de riesgo GRC a partir de la severidad técnica.
+    
+    Args:
+        severidad: Severidad técnica (Critica, Alta, Media, Baja)
+        
+    Returns:
+        Nivel de riesgo GRC normalizado o None si la severidad no es válida
+    """
+    return SEVERIDAD_TO_NIVEL_RIESGO.get(severidad)
+
 class VulnerabilidadBase(BaseModel):
     codigo: Optional[str] = None  # Código único de la vulnerabilidad
     fecha_hallazgo: Optional[str] = None
@@ -129,6 +190,7 @@ class VulnerabilidadBase(BaseModel):
     vulnerabilidad: Optional[str] = None
     recomendaciones: Optional[str] = None
     severidad: Optional[str] = None
+    nivel_riesgo: Optional[NivelRiesgoGRC] = None  # Nivel de riesgo GRC normalizado
     riesgo_asociado: Optional[str] = None  # Legacy field - kept for backward compatibility
     descripcion_riesgo: Optional[str] = None
     responsable: Optional[str] = None
@@ -1598,6 +1660,63 @@ async def migrate_aplicaciones():
     if vulns:
         logging.info(f"Migrated {len(vulns)} vulnerabilities to new aplicaciones format")
 
+# Migrate nivel_riesgo field for "Primera emulación" reports (2024 or earlier)
+async def migrate_nivel_riesgo():
+    """
+    Migra el campo nivel_riesgo para vulnerabilidades de informes 
+    "Primera emulación" del año 2024 o anteriores.
+    
+    Mapeo:
+    - Critica -> "Alto"
+    - Alta -> "Medio Alto"
+    - Media -> "Medio"
+    - Baja -> "Bajo"
+    """
+    # Buscar vulnerabilidades de "Primera emulación" sin nivel_riesgo
+    query = {
+        "$or": [
+            {"nombre_informe_pentest": {"$regex": "primera emulacion", "$options": "i"}},
+            {"nombre_informe_pentest": {"$regex": "primera emulación", "$options": "i"}}
+        ],
+        "$or": [
+            {"nivel_riesgo": {"$exists": False}},
+            {"nivel_riesgo": None},
+            {"nivel_riesgo": ""}
+        ]
+    }
+    
+    vulns = await db.vulnerabilidades.find(
+        query,
+        {"_id": 0, "id": 1, "severidad": 1, "fecha_hallazgo": 1, "nombre_informe_pentest": 1}
+    ).to_list(10000)
+    
+    migrated = 0
+    skipped = 0
+    
+    for v in vulns:
+        # Verificar si es 2024 o anterior
+        if not es_informe_primera_emulacion_2024_o_anterior(
+            v.get("nombre_informe_pentest"), 
+            v.get("fecha_hallazgo")
+        ):
+            skipped += 1
+            continue
+        
+        severidad = v.get("severidad")
+        nivel_riesgo = calcular_nivel_riesgo_desde_severidad(severidad)
+        
+        if nivel_riesgo:
+            await db.vulnerabilidades.update_one(
+                {"id": v["id"]},
+                {"$set": {"nivel_riesgo": nivel_riesgo}}
+            )
+            migrated += 1
+    
+    if migrated > 0 or skipped > 0:
+        logging.info(f"Migración nivel_riesgo: {migrated} actualizados, {skipped} omitidos (2025+)")
+    
+    return {"migrated": migrated, "skipped": skipped}
+
 # Initialize admin user
 async def init_admin_user():
     admin = await db.usuarios.find_one({"username": "admin"})
@@ -1624,6 +1743,83 @@ async def init_admin_user():
         
         await db.usuarios.insert_one(doc)
         logging.info("Admin user created: admin / admin123")
+
+@api_router.post("/admin/migrate-nivel-riesgo")
+async def api_migrate_nivel_riesgo(current_user: Usuario = Depends(get_current_user)):
+    """
+    Endpoint para ejecutar la migración de nivel_riesgo manualmente.
+    Solo accesible por administradores.
+    
+    Aplica el mapeo de severidad a nivel_riesgo ÚNICAMENTE para:
+    - Informes de "Primera emulación" 
+    - Año 2024 o anteriores
+    
+    Mapeo:
+    - Critica -> "Alto"
+    - Alta -> "Medio Alto"  
+    - Media -> "Medio"
+    - Baja -> "Bajo"
+    """
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden ejecutar migraciones")
+    
+    result = await migrate_nivel_riesgo()
+    return {
+        "mensaje": "Migración de nivel_riesgo completada",
+        "migrados": result["migrated"],
+        "omitidos_2025_plus": result["skipped"]
+    }
+
+@api_router.get("/admin/nivel-riesgo-stats")
+async def get_nivel_riesgo_stats(current_user: Usuario = Depends(get_current_user)):
+    """
+    Retorna estadísticas del campo nivel_riesgo en vulnerabilidades.
+    """
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores")
+    
+    total = await db.vulnerabilidades.count_documents({})
+    
+    # Contar por nivel_riesgo
+    pipeline = [
+        {"$group": {"_id": "$nivel_riesgo", "count": {"$sum": 1}}},
+        {"$sort": {"_id": 1}}
+    ]
+    nivel_riesgo_dist = await db.vulnerabilidades.aggregate(pipeline).to_list(10)
+    
+    # Contar sin nivel_riesgo
+    sin_nivel = await db.vulnerabilidades.count_documents({
+        "$or": [
+            {"nivel_riesgo": {"$exists": False}},
+            {"nivel_riesgo": None},
+            {"nivel_riesgo": ""}
+        ]
+    })
+    
+    # Contar "Primera emulación" que necesitan migración
+    primera_emulacion_sin_nivel = await db.vulnerabilidades.count_documents({
+        "$and": [
+            {"$or": [
+                {"nombre_informe_pentest": {"$regex": "primera emulacion", "$options": "i"}},
+                {"nombre_informe_pentest": {"$regex": "primera emulación", "$options": "i"}}
+            ]},
+            {"$or": [
+                {"nivel_riesgo": {"$exists": False}},
+                {"nivel_riesgo": None},
+                {"nivel_riesgo": ""}
+            ]}
+        ]
+    })
+    
+    return {
+        "total_vulnerabilidades": total,
+        "sin_nivel_riesgo": sin_nivel,
+        "primera_emulacion_pendientes": primera_emulacion_sin_nivel,
+        "distribucion_nivel_riesgo": {
+            item["_id"] if item["_id"] else "Sin asignar": item["count"] 
+            for item in nivel_riesgo_dist
+        }
+    }
 
 @api_router.get("/dropdown-options", response_model=DropdownOptions)
 async def get_dropdown_options():
@@ -3851,6 +4047,7 @@ async def startup_event():
     await init_proveedores()
     await init_informes_pentest()
     await migrate_aplicaciones()
+    await migrate_nivel_riesgo()  # Migrate nivel_riesgo for "Primera emulación" 2024 or earlier
     await init_admin_user()
     await init_grc_data()  # Initialize GRC seed data
 
