@@ -1821,6 +1821,70 @@ async def get_nivel_riesgo_stats(current_user: Usuario = Depends(get_current_use
         }
     }
 
+@api_router.post("/admin/migrate-nivel-riesgo-all")
+async def api_migrate_nivel_riesgo_all(current_user: Usuario = Depends(get_current_user)):
+    """
+    Endpoint para migrar nivel_riesgo de TODAS las vulnerabilidades que no lo tengan.
+    Calcula el valor desde la severidad técnica sin restricción de fecha/informe.
+    
+    Mapeo:
+    - Critica -> "Alto"
+    - Alta -> "Medio Alto"  
+    - Media -> "Medio"
+    - Baja -> "Bajo"
+    
+    Uso en instalación local:
+    curl -X POST http://localhost:8001/api/admin/migrate-nivel-riesgo-all \
+      -H "Authorization: Bearer <token>"
+    """
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden ejecutar migraciones")
+    
+    # Mapeo de severidad a nivel_riesgo
+    nivel_riesgo_map = {
+        "Critica": "Alto",
+        "Alta": "Medio Alto",
+        "Media": "Medio",
+        "Baja": "Bajo"
+    }
+    
+    # Buscar vulnerabilidades sin nivel_riesgo
+    vulns = await db.vulnerabilidades.find(
+        {
+            "$or": [
+                {"nivel_riesgo": {"$exists": False}},
+                {"nivel_riesgo": None},
+                {"nivel_riesgo": ""}
+            ]
+        },
+        {"_id": 0, "id": 1, "severidad": 1}
+    ).to_list(50000)
+    
+    migrated = 0
+    skipped = 0
+    
+    for v in vulns:
+        severidad = v.get("severidad")
+        nivel_riesgo = nivel_riesgo_map.get(severidad)
+        
+        if nivel_riesgo:
+            await db.vulnerabilidades.update_one(
+                {"id": v["id"]},
+                {"$set": {"nivel_riesgo": nivel_riesgo}}
+            )
+            migrated += 1
+        else:
+            skipped += 1  # Severidad no reconocida
+    
+    logging.info(f"Migración nivel_riesgo (ALL): {migrated} actualizados, {skipped} sin severidad válida")
+    
+    return {
+        "mensaje": "Migración de nivel_riesgo completada (todas las vulnerabilidades)",
+        "migrados": migrated,
+        "omitidos_sin_severidad": skipped,
+        "total_procesados": len(vulns)
+    }
+
 @api_router.get("/dropdown-options", response_model=DropdownOptions)
 async def get_dropdown_options():
     instituciones_docs = await db.instituciones.find({"activo": True}, {"_id": 0}).to_list(1000)
