@@ -98,11 +98,43 @@ const RISK_LEVEL_LABELS = {
 };
 
 // Colores rígidos para Mapa de Calor GRC por nivel_riesgo
-const NIVEL_RIESGO_COLORS = {
-  "Alto": { bg: "bg-red-500", text: "text-white", hex: "#ef4444" },
-  "Medio Alto": { bg: "bg-orange-500", text: "text-white", hex: "#f97316" },
-  "Medio": { bg: "bg-yellow-500", text: "text-zinc-900", hex: "#eab308" },
-  "Bajo": { bg: "bg-emerald-500", text: "text-white", hex: "#10b981" },
+// Basado en puntuación de la celda (probabilidad * impacto)
+const HEATMAP_CELL_COLORS = {
+  // Puntuación 12-16: Crítico (rojo)
+  "4-4": { bg: "bg-red-600", text: "text-white" },     // 16
+  "4-3": { bg: "bg-red-500", text: "text-white" },     // 12
+  "3-4": { bg: "bg-red-500", text: "text-white" },     // 12
+  // Puntuación 8-11: Alto (naranja/rojo claro)
+  "4-2": { bg: "bg-orange-600", text: "text-white" },  // 8
+  "2-4": { bg: "bg-orange-600", text: "text-white" },  // 8
+  "3-3": { bg: "bg-orange-500", text: "text-white" },  // 9
+  "4-1": { bg: "bg-orange-400", text: "text-white" },  // 4 -> pero es prob alta
+  "1-4": { bg: "bg-orange-400", text: "text-white" },  // 4 -> pero es imp alto
+  // Puntuación 4-7: Medio (amarillo)
+  "3-2": { bg: "bg-yellow-500", text: "text-zinc-900" }, // 6
+  "2-3": { bg: "bg-yellow-500", text: "text-zinc-900" }, // 6
+  "3-1": { bg: "bg-yellow-400", text: "text-zinc-900" }, // 3 -> prob medio-alta
+  "1-3": { bg: "bg-yellow-400", text: "text-zinc-900" }, // 3 -> imp medio-alto
+  "2-2": { bg: "bg-yellow-400", text: "text-zinc-900" }, // 4
+  // Puntuación 1-3: Bajo (verde)
+  "2-1": { bg: "bg-emerald-400", text: "text-white" }, // 2
+  "1-2": { bg: "bg-emerald-400", text: "text-white" }, // 2
+  "1-1": { bg: "bg-emerald-500", text: "text-white" }, // 1
+};
+
+// Labels para los ejes de la matriz
+const PROBABILIDAD_LABELS = {
+  "4": "Alta",
+  "3": "Media-Alta",
+  "2": "Media", 
+  "1": "Baja"
+};
+
+const IMPACTO_LABELS = {
+  "4": "Crítico",
+  "3": "Alto",
+  "2": "Medio",
+  "1": "Bajo"
 };
 
 // ============ COMPONENTS ============
@@ -181,78 +213,155 @@ const KPICard = ({ title, value, subtitle, icon: Icon, color = "indigo", trend, 
   );
 };
 
-// Mapa de Calor GRC - Vulnerabilidades por Nivel de Riesgo (colores rígidos)
-const RiskHeatmapGRC = ({ data, onCellClick }) => {
+// Mapa de Calor GRC Unificado - Matriz Bidimensional (Probabilidad × Impacto)
+const UnifiedRiskHeatmap = ({ data, onCellClick }) => {
   const celdas = data?.celdas || [];
-  const total = data?.total_vulnerabilidades || 0;
+  const totales = data?.totales || { vulnerabilidades: 0, hallazgos: 0, combinado: 0 };
 
-  // Orden fijo de niveles
-  const nivelesOrden = ["Alto", "Medio Alto", "Medio", "Bajo"];
+  // Crear mapa de celdas para acceso rápido
+  const cellDataMap = {};
+  celdas.forEach(cell => {
+    const key = `${cell.probabilidad}-${cell.impacto}`;
+    cellDataMap[key] = cell;
+  });
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
+    <div className="space-y-3">
+      {/* Header con totales */}
       <div className="flex items-center justify-between">
-        <span className="text-xs text-zinc-500 font-medium uppercase tracking-wider">
-          Vulnerabilidades por Nivel de Riesgo GRC
-        </span>
-        <div className="text-xs text-zinc-500">
-          Total: <span className="text-white font-medium">{total}</span> vulnerabilidades
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-zinc-500 font-medium">IMPACTO →</span>
+        </div>
+        <div className="text-xs text-zinc-500 flex gap-4">
+          <span>Vulns: <span className="text-red-400 font-medium">{totales.vulnerabilidades}</span></span>
+          <span>Hallazgos: <span className="text-orange-400 font-medium">{totales.hallazgos}</span></span>
+          <span>Total: <span className="text-white font-medium">{totales.combinado}</span></span>
         </div>
       </div>
-
-      {/* Grid de celdas rígidas */}
-      <div className="grid grid-cols-4 gap-3">
-        {nivelesOrden.map(nivel => {
-          const celda = celdas.find(c => c.nivel_riesgo === nivel) || { nivel_riesgo: nivel, count: 0, vulnerabilidades: [] };
-          const colorConfig = NIVEL_RIESGO_COLORS[nivel];
-          const count = celda.count || 0;
-
-          return (
-            <TooltipProvider key={nivel}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    className={`${colorConfig.bg} ${colorConfig.text} rounded-lg p-4 flex flex-col items-center justify-center transition-all hover:scale-105 hover:ring-2 hover:ring-white/40 min-h-[100px] shadow-lg`}
-                    onClick={() => count > 0 && onCellClick && onCellClick(celda)}
-                    data-testid={`heatmap-cell-${nivel.toLowerCase().replace(' ', '-')}`}
-                    disabled={count === 0}
-                  >
-                    <span className="text-3xl font-bold drop-shadow-md">
-                      {count}
-                    </span>
-                    <span className={`text-sm font-medium mt-1 ${colorConfig.text} opacity-90`}>
-                      {nivel}
-                    </span>
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="bg-zinc-900 text-white border-zinc-700">
-                  <div className="text-sm">
-                    <p className="font-medium">{nivel}</p>
-                    <p className="text-zinc-400">Vulnerabilidades: {count}</p>
-                    {count > 0 && <p className="text-zinc-500 text-xs mt-1">Click para ver detalles</p>}
-                  </div>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          );
-        })}
-      </div>
-
-      {/* Legend */}
-      <div className="flex items-center justify-center gap-4 mt-3 pt-3 border-t border-zinc-800">
-        {nivelesOrden.map(nivel => (
-          <div key={nivel} className="flex items-center gap-1.5">
-            <div className={`w-3 h-3 rounded ${NIVEL_RIESGO_COLORS[nivel].bg}`}></div>
-            <span className="text-xs text-zinc-500">{nivel}</span>
+      
+      <div className="flex">
+        {/* Y-axis label */}
+        <div className="flex flex-col justify-center mr-2">
+          <span className="text-xs text-zinc-500 font-medium writing-vertical transform -rotate-180" style={{ writingMode: 'vertical-rl' }}>
+            ← PROBABILIDAD
+          </span>
+        </div>
+        
+        {/* Matrix 4x4 */}
+        <div className="flex-1">
+          <div className="grid grid-cols-5 gap-1">
+            {/* Header row - Impacto labels */}
+            <div className="h-8"></div>
+            {[1, 2, 3, 4].map(imp => (
+              <div key={`header-${imp}`} className="h-8 flex items-center justify-center">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <span className="text-xs text-zinc-400 font-medium">{IMPACTO_LABELS[imp]?.charAt(0)}</span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="bg-zinc-800 text-white border-zinc-700">
+                      {IMPACTO_LABELS[imp]}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            ))}
+            
+            {/* Matrix rows (4 to 1, top to bottom = alta a baja probabilidad) */}
+            {[4, 3, 2, 1].map(prob => (
+              <React.Fragment key={`row-${prob}`}>
+                {/* Row label - Probabilidad */}
+                <div className="h-16 flex items-center justify-center">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <span className="text-xs text-zinc-400 font-medium">{PROBABILIDAD_LABELS[prob]?.charAt(0)}</span>
+                      </TooltipTrigger>
+                      <TooltipContent side="left" className="bg-zinc-800 text-white border-zinc-700">
+                        {PROBABILIDAD_LABELS[prob]}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                
+                {/* Cells */}
+                {[1, 2, 3, 4].map(imp => {
+                  const key = `${prob}-${imp}`;
+                  const cellData = cellDataMap[key] || { count_vulns: 0, count_hallazgos: 0, count_total: 0 };
+                  const colorConfig = HEATMAP_CELL_COLORS[key] || { bg: "bg-zinc-700", text: "text-white" };
+                  const countTotal = cellData.count_total || 0;
+                  const countVulns = cellData.count_vulns || 0;
+                  const countHalls = cellData.count_hallazgos || 0;
+                  
+                  return (
+                    <TooltipProvider key={key}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            className={`h-16 rounded-md flex flex-col items-center justify-center transition-all hover:scale-105 hover:ring-2 hover:ring-white/30 ${colorConfig.bg}`}
+                            onClick={() => countTotal > 0 && onCellClick && onCellClick(cellData)}
+                            data-testid={`heatmap-cell-${prob}-${imp}`}
+                            disabled={countTotal === 0}
+                          >
+                            {countTotal > 0 ? (
+                              <>
+                                <span className={`font-bold text-lg drop-shadow-md ${colorConfig.text}`}>
+                                  {countTotal}
+                                </span>
+                                <div className="flex gap-1 text-[10px]">
+                                  {countVulns > 0 && <span className={`${colorConfig.text} opacity-80`}>V:{countVulns}</span>}
+                                  {countHalls > 0 && <span className={`${colorConfig.text} opacity-80`}>H:{countHalls}</span>}
+                                </div>
+                              </>
+                            ) : (
+                              <span className={`text-sm opacity-30 ${colorConfig.text}`}>-</span>
+                            )}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="bg-zinc-900 text-white border-zinc-700">
+                          <div className="text-sm">
+                            <p className="font-medium">{PROBABILIDAD_LABELS[prob]} × {IMPACTO_LABELS[imp]}</p>
+                            <p className="text-zinc-400">Vulnerabilidades: {countVulns}</p>
+                            <p className="text-zinc-400">Hallazgos: {countHalls}</p>
+                            {countTotal > 0 && <p className="text-zinc-500 text-xs mt-1">Click para ver detalles</p>}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  );
+                })}
+              </React.Fragment>
+            ))}
           </div>
-        ))}
+        </div>
+      </div>
+      
+      {/* Legend */}
+      <div className="flex items-center justify-center gap-4 mt-4 pt-3 border-t border-zinc-800">
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded bg-emerald-500"></div>
+          <span className="text-xs text-zinc-500">Bajo</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded bg-yellow-500"></div>
+          <span className="text-xs text-zinc-500">Medio</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded bg-orange-500"></div>
+          <span className="text-xs text-zinc-500">Alto</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded bg-red-500"></div>
+          <span className="text-xs text-zinc-500">Crítico</span>
+        </div>
+        <span className="text-zinc-600 mx-2">|</span>
+        <span className="text-xs text-zinc-500">V = Vulnerabilidad, H = Hallazgo</span>
       </div>
     </div>
   );
 };
 
-// Matriz de Riesgo 4x4
+// Matriz de Riesgo 4x4 (solo para Hallazgos - legacy)
 const RiskMatrix = ({ data, onCellClick }) => {
   // Crear mapa de celdas con datos
   const cellDataMap = {};
@@ -1119,28 +1228,31 @@ export default function DashboardGRC() {
         </CardContent>
       </Card>
 
-      {/* Mapa de Calor GRC - Vulnerabilidades por Nivel de Riesgo */}
+      {/* Mapa de Calor GRC - Matriz Unificada Probabilidad × Impacto */}
       <Card className="bg-zinc-900/50 border-zinc-800">
         <CardHeader className="pb-2">
           <CardTitle className="text-white text-base flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-            Mapa de Calor GRC
+            Mapa de Calor GRC Unificado
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger>
                   <Info className="w-4 h-4 text-zinc-500" />
                 </TooltipTrigger>
                 <TooltipContent className="bg-zinc-800 text-white border-zinc-700 max-w-xs">
-                  Vulnerabilidades activas agrupadas por Nivel de Riesgo GRC (Alto, Medio Alto, Medio, Bajo).
-                  Los colores son fijos según la clasificación del riesgo corporativo.
-                  Click en una celda para ver las vulnerabilidades.
+                  <div className="space-y-1">
+                    <p className="font-medium">Matriz Bidimensional (Probabilidad × Impacto)</p>
+                    <p className="text-zinc-400 text-xs">• Vulnerabilidades: Probabilidad siempre Alta (fila 3-4)</p>
+                    <p className="text-zinc-400 text-xs">• Hallazgos: Probabilidad e Impacto dinámicos</p>
+                    <p className="text-zinc-400 text-xs">• V = Vulnerabilidad, H = Hallazgo</p>
+                  </div>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <RiskHeatmapGRC 
+          <UnifiedRiskHeatmap 
             data={dashboardData?.mapa_calor_grc} 
             onCellClick={handleHeatmapCellClick}
           />
@@ -1307,57 +1419,83 @@ export default function DashboardGRC() {
         </DialogContent>
       </Dialog>
 
-      {/* Heatmap GRC Detail Modal */}
+      {/* Heatmap GRC Detail Modal - Unified View */}
       <Dialog open={showHeatmapDetail} onOpenChange={setShowHeatmapDetail}>
         <DialogContent className="bg-zinc-900 border-zinc-700 text-white max-w-2xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <div 
-                className={`w-5 h-5 rounded ${NIVEL_RIESGO_COLORS[heatmapDetailData?.nivel_riesgo]?.bg || 'bg-zinc-600'}`}
+                className={`w-5 h-5 rounded ${HEATMAP_CELL_COLORS[`${heatmapDetailData?.probabilidad}-${heatmapDetailData?.impacto}`]?.bg || 'bg-zinc-600'}`}
               ></div>
-              Vulnerabilidades - Nivel: {heatmapDetailData?.nivel_riesgo}
+              {PROBABILIDAD_LABELS[heatmapDetailData?.probabilidad]} × {IMPACTO_LABELS[heatmapDetailData?.impacto]}
               <Badge variant="outline" className="ml-2 border-zinc-600">
-                {heatmapDetailData?.count || 0} vulnerabilidades
+                {heatmapDetailData?.count_total || 0} items
               </Badge>
             </DialogTitle>
           </DialogHeader>
-          <ScrollArea className="max-h-[60vh]">
+          
+          {/* Resumen */}
+          <div className="flex gap-4 text-sm mb-4">
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-red-400" />
+              <span className="text-zinc-400">Vulnerabilidades:</span>
+              <span className="text-white font-medium">{heatmapDetailData?.count_vulns || 0}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-orange-400" />
+              <span className="text-zinc-400">Hallazgos:</span>
+              <span className="text-white font-medium">{heatmapDetailData?.count_hallazgos || 0}</span>
+            </div>
+          </div>
+          
+          <ScrollArea className="max-h-[55vh]">
             <div className="space-y-3 pr-4">
-              {heatmapDetailData?.vulnerabilidades?.map((v, idx) => (
-                <div key={v.id || idx} className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700">
+              {heatmapDetailData?.items?.map((item, idx) => (
+                <div key={item.id || idx} className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        {v.codigo && <span className="text-indigo-400 font-mono text-xs">{v.codigo}</span>}
+                        {/* Tipo badge */}
+                        <Badge 
+                          className={`text-xs ${
+                            item.tipo === 'vulnerabilidad' 
+                              ? 'bg-red-500/20 text-red-400 border-red-500/30' 
+                              : 'bg-orange-500/20 text-orange-400 border-orange-500/30'
+                          }`}
+                        >
+                          {item.tipo === 'vulnerabilidad' ? 'VULN' : 'HALL'}
+                        </Badge>
+                        {item.codigo && <span className="text-indigo-400 font-mono text-xs">{item.codigo}</span>}
                         <Badge 
                           variant="outline" 
                           className={`text-xs ${
-                            ['Cerrado', 'Corregido'].includes(v.estatus) ? 'border-green-500/50 text-green-400' :
-                            v.estatus === 'En Proceso' ? 'border-yellow-500/50 text-yellow-400' :
+                            ['Cerrado', 'Corregido'].includes(item.estatus || item.estado) ? 'border-green-500/50 text-green-400' :
+                            (item.estatus || item.estado) === 'En Proceso' ? 'border-yellow-500/50 text-yellow-400' :
                             'border-zinc-600 text-zinc-400'
                           }`}
                         >
-                          {v.estatus}
-                        </Badge>
-                        <Badge 
-                          className={`text-xs ${NIVEL_RIESGO_COLORS[v.nivel_riesgo]?.bg || 'bg-zinc-600'} ${NIVEL_RIESGO_COLORS[v.nivel_riesgo]?.text || 'text-white'}`}
-                        >
-                          {v.nivel_riesgo}
+                          {item.estatus || item.estado}
                         </Badge>
                       </div>
-                      <p className="text-sm text-zinc-300 line-clamp-2">{v.vulnerabilidad}</p>
+                      <p className="text-sm text-zinc-300 line-clamp-2">{item.descripcion}</p>
                       <div className="flex items-center gap-4 mt-2 text-xs text-zinc-500 flex-wrap">
-                        {v.severidad && <span>Severidad: <span className="text-zinc-300">{v.severidad}</span></span>}
-                        {v.riesgo_nombre && <span>Riesgo: <span className="text-zinc-300">{v.riesgo_nombre}</span></span>}
-                        {v.dominio_nombre && <span>Dominio: <span className="text-zinc-300">{v.dominio_nombre}</span></span>}
-                        {v.responsable && <span>Resp: <span className="text-zinc-300">{v.responsable}</span></span>}
+                        {item.tipo === 'vulnerabilidad' && item.severidad && (
+                          <span>Severidad: <span className="text-zinc-300">{item.severidad}</span></span>
+                        )}
+                        {item.tipo === 'vulnerabilidad' && item.nivel_riesgo && (
+                          <span>Nivel Riesgo: <span className="text-zinc-300">{item.nivel_riesgo}</span></span>
+                        )}
+                        {item.tipo === 'hallazgo' && item.riesgo_inherente && (
+                          <span>Riesgo: <span className="text-zinc-300">{item.riesgo_inherente}</span></span>
+                        )}
+                        {item.responsable && <span>Resp: <span className="text-zinc-300">{item.responsable}</span></span>}
                       </div>
                     </div>
                   </div>
                 </div>
               ))}
-              {(!heatmapDetailData?.vulnerabilidades || heatmapDetailData.vulnerabilidades.length === 0) && (
-                <p className="text-zinc-500 text-center py-8">No hay vulnerabilidades en este nivel de riesgo</p>
+              {(!heatmapDetailData?.items || heatmapDetailData.items.length === 0) && (
+                <p className="text-zinc-500 text-center py-8">No hay items en esta celda</p>
               )}
             </div>
           </ScrollArea>

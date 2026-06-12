@@ -264,6 +264,7 @@ export default function Vulnerabilidades() {
   const [filterResponsable, setFilterResponsable] = useState([]);
   const [filterDominio, setFilterDominio] = useState([]);
   const [filterControl, setFilterControl] = useState([]);
+  const [filterNivelRiesgo, setFilterNivelRiesgo] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showBulkEntryModal, setShowBulkEntryModal] = useState(false);
@@ -409,6 +410,7 @@ export default function Vulnerabilidades() {
       if (filterResponsable.length > 0) filterResponsable.forEach(v => params.append("responsable", v));
       if (filterDominio.length > 0) filterDominio.forEach(v => params.append("dominio", v));
       if (filterControl.length > 0) filterControl.forEach(v => params.append("control", v));
+      if (filterNivelRiesgo.length > 0) filterNivelRiesgo.forEach(v => params.append("nivel_riesgo", v));
 
       const response = await axios.get(`${API}/vulnerabilidades?${params.toString()}`);
       setVulnerabilidades(response.data);
@@ -419,7 +421,7 @@ export default function Vulnerabilidades() {
     } finally {
       setLoading(false);
     }
-  }, [search, filterSeveridad, filterEstatus, filterInstitucion, filterAño, filterAplicacion, filterInforme, filterResponsable, filterDominio, filterControl]);
+  }, [search, filterSeveridad, filterEstatus, filterInstitucion, filterAño, filterAplicacion, filterInforme, filterResponsable, filterDominio, filterControl, filterNivelRiesgo]);
 
   useEffect(() => {
     fetchOptions();
@@ -877,6 +879,16 @@ export default function Vulnerabilidades() {
                 searchPlaceholder="Buscar control..."
                 allLabel="Todos los controles"
                 data-testid="filter-control"
+              />
+
+              <MultiSelectFilter
+                options={NIVEL_RIESGO_OPTIONS}
+                selected={filterNivelRiesgo}
+                onChange={setFilterNivelRiesgo}
+                placeholder="Nivel Riesgo"
+                searchPlaceholder="Buscar nivel..."
+                allLabel="Todos los niveles"
+                data-testid="filter-nivel-riesgo"
               />
 
               {/* Import/Export */}

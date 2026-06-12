@@ -3,16 +3,19 @@
 ## Última Actualización: 2026-06-12
 
 ### Cambios Recientes
-- **Mapa de Calor GRC con Colores Rígidos (Junio 2026)**: Nuevo componente `RiskHeatmapGRC` en el Dashboard GRC que muestra vulnerabilidades agrupadas por `nivel_riesgo` (Alto, Medio Alto, Medio, Bajo) con colores sólidos Tailwind:
-  - Alto → `bg-red-500` (rojo)
-  - Medio Alto → `bg-orange-500` (naranja)
-  - Medio → `bg-yellow-500` (amarillo)
-  - Bajo → `bg-emerald-500` (verde)
-  - Contadores numéricos en cada celda
-  - Drill-down modal con lista de vulnerabilidades
-  - Sin gradientes ni interpolaciones - colores 100% rígidos
+- **Mapa de Calor GRC Unificado - Matriz Bidimensional (Junio 2026)**: Refactorización completa del Mapa de Calor:
+  - Matriz bidimensional real (Probabilidad × Impacto) que unifica Vulnerabilidades y Hallazgos de Auditoría
+  - Vulnerabilidades: Probabilidad SIEMPRE = 3 (Alta), Impacto basado en severidad/nivel_riesgo
+  - Hallazgos: Probabilidad e Impacto dinámicos según registro
+  - Colores rígidos Tailwind sin gradientes:
+    * Crítico (prob×imp ≥12) → `bg-red-500/600`
+    * Alto (prob×imp 8-11) → `bg-orange-500/600`
+    * Medio (prob×imp 4-7) → `bg-yellow-400/500`
+    * Bajo (prob×imp 1-3) → `bg-emerald-400/500`
+  - Drill-down modal muestra items de ambos tipos (V=Vulnerabilidad, H=Hallazgo)
+  - Totales diferenciados: Vulns, Hallazgos, Combinado
+- **Filtro nivel_riesgo en Vulnerabilidades (Junio 2026)**: Nuevo MultiSelectFilter para filtrar vulnerabilidades por nivel de riesgo GRC (Alto, Medio Alto, Medio, Bajo)
 - **Endpoint Bulk Associate GRC (Junio 2026)**: `/api/admin/bulk-associate-grc` para mapeo masivo de vulnerabilidades a riesgos GRC mediante archivo Excel
-- **Pipeline `mapa_calor_grc` (Junio 2026)**: Nuevo pipeline de agregación que agrupa vulnerabilidades por `nivel_riesgo` con lookup a catálogo de riesgos
 - **Homogeneización `nivel_riesgo` (Junio 2026)**: Valores estrictos limitados a: "Bajo", "Medio", "Medio Alto", "Alto" en todo el sistema (Pydantic, UI, imports, PDF parsers)
 - **Matriz 4×4 (Junio 2026)**: Conversión de matriz de riesgo de 5×5 a 4×4 para hallazgos de auditoría
 - **Dashboard de Mando Unificado GRC (Junio 2026)**: Nuevo dashboard tipo Tableau que combina vulnerabilidades técnicas y hallazgos de auditoría en una sola vista. Incluye:
@@ -97,8 +100,12 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - [x] Matriz de Riesgo 4×4 para Hallazgos de Auditoría (colores estáticos, contadores dinámicos)
 - [x] Drill-down en celdas de la matriz (modal con lista de hallazgos)
 - [x] Panel de Severidad para Vulnerabilidades (gráfico de barras horizontal)
-- [x] **Mapa de Calor GRC** - Vulnerabilidades por nivel_riesgo con colores rígidos (Alto=rojo, Medio Alto=naranja, Medio=amarillo, Bajo=verde)
-- [x] Drill-down en celdas del Mapa de Calor GRC (modal con lista de vulnerabilidades)
+- [x] **Mapa de Calor GRC Unificado** - Matriz bidimensional (Probabilidad × Impacto) que combina Vulnerabilidades + Hallazgos
+  - Vulnerabilidades: Probabilidad SIEMPRE Alta (fila 3-4), Impacto basado en severidad/nivel_riesgo
+  - Hallazgos: Probabilidad e Impacto dinámicos según registro
+  - Colores rígidos: Verde=Bajo, Amarillo=Medio, Naranja=Alto, Rojo=Crítico
+  - Indicadores V (Vuln) y H (Hallazgo) en cada celda
+- [x] Drill-down en celdas del Mapa de Calor GRC (modal con lista combinada de vulns y hallazgos)
 - [x] Top 5 Dominios con Carga Combinada (barras apiladas)
 - [x] 5 Filtros Globales Multi-select (Informes, Dominios, Responsables, Estado Vuln, Estado Hallazgo)
 - [x] Grupos de Informes con selector y conteo combinado
@@ -106,6 +113,11 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 - [x] Vistas públicas (visibles para todos) y privadas (solo el creador)
 - [x] Backend: `/api/dashboard/data`, `/api/dashboard/vistas` (GET/POST/DELETE)
 - [x] Frontend: `/dashboard-grc` con Recharts
+
+### Filtro nivel_riesgo en Vulnerabilidades (NUEVO - Junio 2026)
+- [x] MultiSelectFilter para filtrar por nivel de riesgo GRC
+- [x] Opciones: Alto, Medio Alto, Medio, Bajo
+- [x] Filtrado reactivo en cliente/servidor
 
 ### Dashboard (6 KPIs)
 - [x] Total Vulnerabilidades

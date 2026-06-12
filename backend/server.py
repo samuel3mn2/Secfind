@@ -2123,6 +2123,7 @@ async def get_vulnerabilidades(
     años = request.query_params.getlist("año")
     dominios_filter = request.query_params.getlist("dominio")
     controles_filter = request.query_params.getlist("control")
+    nivel_riesgo_filter = request.query_params.getlist("nivel_riesgo")
     
     query = {}
     if severidades:
@@ -2139,6 +2140,8 @@ async def get_vulnerabilidades(
         query["nombre_informe_pentest"] = {"$in": informes}
     if responsables:
         query["responsable"] = {"$in": responsables}
+    if nivel_riesgo_filter:
+        query["nivel_riesgo"] = {"$in": nivel_riesgo_filter}
     if años:
         # Multiple years - use $or with regex for each year
         year_conditions = [{"fecha_hallazgo": {"$regex": f"^{año}"}} for año in años]

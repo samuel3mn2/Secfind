@@ -666,38 +666,66 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
 
     async def _get_mapa_calor_grc(db, filtros: dict) -> dict:
         """
-        Mapa de Calor GRC Unificado.
-        Agrupa VULNERABILIDADES por nivel_riesgo (Alto, Medio Alto, Medio, Bajo).
-        Solo incluye vulnerabilidades que tengan riesgo_id asignado o nivel_riesgo.
+        Mapa de Calor GRC Unificado - Matriz Bidimensional (Probabilidad × Impacto).
+        
+        Combina Vulnerabilidades y Hallazgos de Auditoría en una sola matriz de riesgo.
+        
+        Reglas metodológicas:
+        - Vulnerabilidades: Probabilidad SIEMPRE = 3 (Alta), Impacto basado en severidad/nivel_riesgo
+        - Hallazgos: Probabilidad y Impacto dinámicos según registro
+        
+        Mapeo de Impacto:
+        - Critica / Alto -> Peso 4
+        - Alta / Medio Alto -> Peso 3
+        - Media / Medio -> Peso 2
+        - Baja / Bajo -> Peso 1
         
         Retorna:
-        - celdas: lista con {nivel_riesgo, count, vulnerabilidades[]}
-        - total_vulnerabilidades: total de vulns en el mapa
+        - celdas: lista con {probabilidad, impacto, count_vulns, count_hallazgos, items[]}
+        - totales: {vulnerabilidades, hallazgos, combinado}
         """
-        match_stage = {"estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]}}
+        
+        # === PIPELINE VULNERABILIDADES ===
+        vuln_match = {"estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]}}
         
         if filtros.get("informes_seleccionados"):
-            match_stage["nombre_informe_pentest"] = {"$in": filtros["informes_seleccionados"]}
+            vuln_match["nombre_informe_pentest"] = {"$in": filtros["informes_seleccionados"]}
         if filtros.get("estados_vulnerabilidad"):
-            match_stage["estatus"] = {"$in": filtros["estados_vulnerabilidad"]}
+            vuln_match["estatus"] = {"$in": filtros["estados_vulnerabilidad"]}
         if filtros.get("responsables"):
-            match_stage["responsable"] = {"$in": filtros["responsables"]}
+            vuln_match["responsable"] = {"$in": filtros["responsables"]}
         
-        pipeline = [
-            {"$match": match_stage},
-            # Agregar nivel_riesgo_computed con lógica condicional
+        vuln_pipeline = [
+            {"$match": vuln_match},
             NIVEL_RIESGO_COMPUTED_STAGE,
-            # Filtrar solo las que tengan nivel_riesgo_computed válido
+            # Calcular impacto basado en severidad O nivel_riesgo
             {
-                "$match": {
-                    "nivel_riesgo_computed": {"$in": ["Alto", "Medio Alto", "Medio", "Bajo"]}
+                "$addFields": {
+                    "probabilidad_calc": 3,  # SIEMPRE Alta para vulnerabilidades
+                    "impacto_calc": {
+                        "$switch": {
+                            "branches": [
+                                # Priorizar nivel_riesgo_computed si existe
+                                {"case": {"$eq": ["$nivel_riesgo_computed", "Alto"]}, "then": 4},
+                                {"case": {"$eq": ["$nivel_riesgo_computed", "Medio Alto"]}, "then": 3},
+                                {"case": {"$eq": ["$nivel_riesgo_computed", "Medio"]}, "then": 2},
+                                {"case": {"$eq": ["$nivel_riesgo_computed", "Bajo"]}, "then": 1},
+                                # Fallback a severidad técnica
+                                {"case": {"$eq": ["$severidad", "Critica"]}, "then": 4},
+                                {"case": {"$eq": ["$severidad", "Alta"]}, "then": 3},
+                                {"case": {"$eq": ["$severidad", "Media"]}, "then": 2},
+                                {"case": {"$eq": ["$severidad", "Baja"]}, "then": 1}
+                            ],
+                            "default": 2
+                        }
+                    }
                 }
             }
         ]
         
         # Lookup dominio si hay filtro
         if filtros.get("dominios"):
-            pipeline.extend([
+            vuln_pipeline.extend([
                 {
                     "$lookup": {
                         "from": "config_dominios",
@@ -720,88 +748,178 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
                 }
             ])
         
-        # Lookup riesgo info para mostrar en drill-down
-        pipeline.append({
-            "$lookup": {
-                "from": "catalogo_riesgos",
-                "localField": "riesgo_id",
-                "foreignField": "id",
-                "as": "riesgo_info"
-            }
-        })
-        pipeline.append({"$unwind": {"path": "$riesgo_info", "preserveNullAndEmptyArrays": True}})
-        
-        # Agrupar por nivel_riesgo
-        pipeline.append({
+        # Agrupar por celda (probabilidad, impacto)
+        vuln_pipeline.append({
             "$group": {
-                "_id": "$nivel_riesgo_computed",
+                "_id": {
+                    "probabilidad": "$probabilidad_calc",
+                    "impacto": "$impacto_calc"
+                },
                 "count": {"$sum": 1},
-                "vulnerabilidades": {
+                "items": {
                     "$push": {
+                        "tipo": "vulnerabilidad",
                         "id": "$id",
                         "codigo": "$codigo",
-                        "vulnerabilidad": {"$substrCP": [{"$ifNull": ["$vulnerabilidad", ""]}, 0, 100]},
+                        "descripcion": {"$substrCP": [{"$ifNull": ["$vulnerabilidad", ""]}, 0, 80]},
                         "severidad": "$severidad",
                         "nivel_riesgo": "$nivel_riesgo_computed",
                         "estatus": "$estatus",
-                        "responsable": "$responsable",
-                        "riesgo_nombre": "$riesgo_info.nombre",
-                        "dominio_nombre": {"$ifNull": ["$dominio_info.nombre_dominio", "Sin Dominio"]}
+                        "responsable": "$responsable"
                     }
                 }
             }
         })
         
-        pipeline.append({
+        vuln_pipeline.append({
             "$project": {
                 "_id": 0,
-                "nivel_riesgo": "$_id",
-                "count": 1,
-                "vulnerabilidades": {"$slice": ["$vulnerabilidades", 20]}
+                "probabilidad": "$_id.probabilidad",
+                "impacto": "$_id.impacto",
+                "count_vulns": "$count",
+                "count_hallazgos": {"$literal": 0},
+                "vuln_items": {"$slice": ["$items", 15]}
             }
         })
         
-        # Ordenar por nivel de riesgo (Alto primero)
-        pipeline.append({
-            "$addFields": {
-                "orden": {
-                    "$switch": {
-                        "branches": [
-                            {"case": {"$eq": ["$nivel_riesgo", "Alto"]}, "then": 1},
-                            {"case": {"$eq": ["$nivel_riesgo", "Medio Alto"]}, "then": 2},
-                            {"case": {"$eq": ["$nivel_riesgo", "Medio"]}, "then": 3},
-                            {"case": {"$eq": ["$nivel_riesgo", "Bajo"]}, "then": 4}
-                        ],
-                        "default": 5
+        vuln_results = await db.vulnerabilidades.aggregate(vuln_pipeline).to_list(20)
+        
+        # === PIPELINE HALLAZGOS ===
+        hall_match = {"estado": {"$nin": ["Cerrado"]}}
+        
+        if filtros.get("estados_hallazgo"):
+            hall_match["estado"] = {"$in": filtros["estados_hallazgo"]}
+        if filtros.get("responsables"):
+            hall_match["responsable"] = {"$in": filtros["responsables"]}
+        
+        hall_pipeline = [
+            {"$match": hall_match},
+            # Probabilidad e impacto ya vienen del registro (1-4)
+            {
+                "$addFields": {
+                    "probabilidad_calc": {"$ifNull": ["$probabilidad", 2]},
+                    "impacto_calc": {"$ifNull": ["$impacto", 2]}
+                }
+            }
+        ]
+        
+        # Lookup dominio si hay filtro
+        if filtros.get("dominios"):
+            hall_pipeline.extend([
+                {
+                    "$lookup": {
+                        "from": "config_controles",
+                        "localField": "control_id",
+                        "foreignField": "id",
+                        "as": "control"
+                    }
+                },
+                {"$unwind": {"path": "$control", "preserveNullAndEmptyArrays": True}},
+                {
+                    "$lookup": {
+                        "from": "config_dominios",
+                        "localField": "control.dominio_id",
+                        "foreignField": "id",
+                        "as": "dominio"
+                    }
+                },
+                {"$unwind": {"path": "$dominio", "preserveNullAndEmptyArrays": True}},
+                {
+                    "$match": {
+                        "$or": [
+                            {"dominio.nombre_dominio": {"$in": filtros["dominios"]}},
+                            {"$and": [
+                                {"dominio": None},
+                                {"$expr": {"$in": ["Sin Dominio", filtros["dominios"]]}}
+                            ]}
+                        ]
+                    }
+                }
+            ])
+        
+        # Agrupar por celda
+        hall_pipeline.append({
+            "$group": {
+                "_id": {
+                    "probabilidad": "$probabilidad_calc",
+                    "impacto": "$impacto_calc"
+                },
+                "count": {"$sum": 1},
+                "items": {
+                    "$push": {
+                        "tipo": "hallazgo",
+                        "id": "$id",
+                        "codigo": "$codigo",
+                        "descripcion": {"$substrCP": [{"$ifNull": ["$brecha", ""]}, 0, 80]},
+                        "riesgo_inherente": "$riesgo_inherente",
+                        "estado": "$estado",
+                        "responsable": "$responsable"
                     }
                 }
             }
         })
-        pipeline.append({"$sort": {"orden": 1}})
-        pipeline.append({"$project": {"orden": 0}})
         
-        results = await db.vulnerabilidades.aggregate(pipeline).to_list(10)
+        hall_pipeline.append({
+            "$project": {
+                "_id": 0,
+                "probabilidad": "$_id.probabilidad",
+                "impacto": "$_id.impacto",
+                "count_vulns": {"$literal": 0},
+                "count_hallazgos": "$count",
+                "hall_items": {"$slice": ["$items", 15]}
+            }
+        })
         
-        # Asegurar que existan todas las categorías
-        niveles_existentes = {r["nivel_riesgo"] for r in results}
-        for nivel in ["Alto", "Medio Alto", "Medio", "Bajo"]:
-            if nivel not in niveles_existentes:
-                results.append({
-                    "nivel_riesgo": nivel,
-                    "count": 0,
-                    "vulnerabilidades": []
-                })
+        hall_results = await db.hallazgos_auditoria.aggregate(hall_pipeline).to_list(20)
         
-        # Reordenar
-        orden_map = {"Alto": 1, "Medio Alto": 2, "Medio": 3, "Bajo": 4}
-        results.sort(key=lambda x: orden_map.get(x["nivel_riesgo"], 5))
+        # === COMBINAR RESULTADOS ===
+        # Crear mapa de celdas
+        celdas_map = {}
         
-        # Calcular total
-        total = sum(r.get("count", 0) for r in results)
+        # Inicializar todas las celdas de la matriz 4x4 (o 3x4 si probabilidad solo va de 1-3 para vulns)
+        for prob in [1, 2, 3, 4]:
+            for imp in [1, 2, 3, 4]:
+                key = f"{prob}-{imp}"
+                celdas_map[key] = {
+                    "probabilidad": prob,
+                    "impacto": imp,
+                    "count_vulns": 0,
+                    "count_hallazgos": 0,
+                    "items": []
+                }
+        
+        # Agregar vulnerabilidades
+        for v in vuln_results:
+            key = f"{v['probabilidad']}-{v['impacto']}"
+            if key in celdas_map:
+                celdas_map[key]["count_vulns"] = v.get("count_vulns", 0)
+                celdas_map[key]["items"].extend(v.get("vuln_items", []))
+        
+        # Agregar hallazgos
+        for h in hall_results:
+            key = f"{h['probabilidad']}-{h['impacto']}"
+            if key in celdas_map:
+                celdas_map[key]["count_hallazgos"] = h.get("count_hallazgos", 0)
+                celdas_map[key]["items"].extend(h.get("hall_items", []))
+        
+        # Convertir a lista y calcular totales
+        celdas = list(celdas_map.values())
+        
+        # Ordenar items por tipo (vulnerabilidades primero)
+        for celda in celdas:
+            celda["items"] = sorted(celda["items"], key=lambda x: x.get("tipo", "z"))[:20]
+            celda["count_total"] = celda["count_vulns"] + celda["count_hallazgos"]
+        
+        total_vulns = sum(c["count_vulns"] for c in celdas)
+        total_halls = sum(c["count_hallazgos"] for c in celdas)
         
         return {
-            "celdas": results,
-            "total_vulnerabilidades": total
+            "celdas": celdas,
+            "totales": {
+                "vulnerabilidades": total_vulns,
+                "hallazgos": total_halls,
+                "combinado": total_vulns + total_halls
+            }
         }
 
     async def _get_panel_severidad(db, filtros: dict) -> dict:
