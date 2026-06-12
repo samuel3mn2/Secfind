@@ -1885,6 +1885,158 @@ async def api_migrate_nivel_riesgo_all(current_user: Usuario = Depends(get_curre
         "total_procesados": len(vulns)
     }
 
+# ============ BULK ASSOCIATE GRC ============
+
+class BulkAssociateGRCItem(BaseModel):
+    """Estructura de cada item del mapeo GRC desde Excel"""
+    CodigoDeVulns: str
+    Dominio: str
+    Riesgo: str
+    Fuente: Optional[str] = None
+    Informes: Optional[str] = None
+
+class BulkAssociateGRCRequest(BaseModel):
+    """Request para asociación masiva GRC"""
+    items: List[BulkAssociateGRCItem]
+
+@api_router.post("/admin/bulk-associate-grc")
+async def bulk_associate_grc(
+    request: BulkAssociateGRCRequest,
+    current_user: Usuario = Depends(get_current_user)
+):
+    """
+    Endpoint de Asociación Masiva GRC.
+    Recibe un arreglo JSON con mapeo de vulnerabilidades a dominios y riesgos.
+    
+    Payload esperado:
+    {
+      "items": [
+        {
+          "CodigoDeVulns": "VULN_EA_CTCE_1",
+          "Dominio": "Seguridad de Aplicaciones",
+          "Riesgo": "Acceso a cuentas sin validación de identidad..."
+        },
+        ...
+      ]
+    }
+    
+    Lógica:
+    1. Busca vulnerabilidad por código exacto
+    2. Busca/crea dominio en config_dominios
+    3. Busca/crea riesgo en catalogo_riesgos
+    4. Actualiza vulnerabilidad con dominio_id y riesgo_id
+    """
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden ejecutar asociaciones masivas")
+    
+    stats = {
+        "procesados": 0,
+        "exitosos": 0,
+        "vulnerabilidad_no_encontrada": 0,
+        "dominio_creado": 0,
+        "riesgo_creado": 0,
+        "errores": []
+    }
+    
+    # Cache para dominios y riesgos (evitar múltiples queries)
+    dominios_cache = {}
+    riesgos_cache = {}
+    
+    for item in request.items:
+        stats["procesados"] += 1
+        
+        try:
+            # 1. Buscar vulnerabilidad por código
+            vuln = await db.vulnerabilidades.find_one({"codigo": item.CodigoDeVulns})
+            
+            if not vuln:
+                stats["vulnerabilidad_no_encontrada"] += 1
+                stats["errores"].append(f"Vulnerabilidad no encontrada: {item.CodigoDeVulns}")
+                continue
+            
+            update_fields = {}
+            
+            # 2. Buscar/crear dominio
+            dominio_nombre = item.Dominio.strip()
+            if dominio_nombre:
+                if dominio_nombre not in dominios_cache:
+                    dominio_doc = await db.config_dominios.find_one({"nombre_dominio": dominio_nombre})
+                    
+                    if not dominio_doc:
+                        # Crear dominio dinámicamente
+                        import uuid
+                        new_dominio_id = str(uuid.uuid4())
+                        await db.config_dominios.insert_one({
+                            "id": new_dominio_id,
+                            "nombre_dominio": dominio_nombre,
+                            "descripcion": f"Dominio creado automáticamente desde mapeo GRC",
+                            "created_at": datetime.now(timezone.utc).isoformat()
+                        })
+                        dominios_cache[dominio_nombre] = new_dominio_id
+                        stats["dominio_creado"] += 1
+                        logging.info(f"Dominio creado: {dominio_nombre}")
+                    else:
+                        dominios_cache[dominio_nombre] = dominio_doc.get("id")
+                
+                update_fields["dominio_id"] = dominios_cache[dominio_nombre]
+            
+            # 3. Buscar/crear riesgo
+            riesgo_descripcion = item.Riesgo.strip()
+            if riesgo_descripcion:
+                # Usar los primeros 100 caracteres como clave de cache
+                riesgo_key = riesgo_descripcion[:100]
+                
+                if riesgo_key not in riesgos_cache:
+                    # Buscar por descripción similar
+                    riesgo_doc = await db.catalogo_riesgos.find_one({
+                        "$or": [
+                            {"descripcion": {"$regex": riesgo_descripcion[:50], "$options": "i"}},
+                            {"nombre": {"$regex": riesgo_descripcion[:30], "$options": "i"}}
+                        ]
+                    })
+                    
+                    if not riesgo_doc:
+                        # Crear riesgo dinámicamente
+                        import uuid
+                        new_riesgo_id = str(uuid.uuid4())
+                        # Generar nombre corto desde la descripción
+                        nombre_corto = riesgo_descripcion.split('.')[0][:80] if '.' in riesgo_descripcion else riesgo_descripcion[:80]
+                        
+                        await db.catalogo_riesgos.insert_one({
+                            "id": new_riesgo_id,
+                            "nombre": nombre_corto,
+                            "descripcion": riesgo_descripcion,
+                            "categoria": "Operativo",  # Default
+                            "created_at": datetime.now(timezone.utc).isoformat()
+                        })
+                        riesgos_cache[riesgo_key] = new_riesgo_id
+                        stats["riesgo_creado"] += 1
+                        logging.info(f"Riesgo creado: {nombre_corto}")
+                    else:
+                        riesgos_cache[riesgo_key] = riesgo_doc.get("id")
+                
+                update_fields["riesgo_id"] = riesgos_cache[riesgo_key]
+            
+            # 4. Actualizar vulnerabilidad
+            if update_fields:
+                await db.vulnerabilidades.update_one(
+                    {"id": vuln["id"]},
+                    {"$set": update_fields}
+                )
+                stats["exitosos"] += 1
+            
+        except Exception as e:
+            stats["errores"].append(f"Error procesando {item.CodigoDeVulns}: {str(e)}")
+            logging.error(f"Error en bulk-associate-grc: {e}")
+    
+    # Limitar errores en respuesta
+    if len(stats["errores"]) > 20:
+        stats["errores"] = stats["errores"][:20] + [f"... y {len(stats['errores']) - 20} errores más"]
+    
+    logging.info(f"Bulk Associate GRC: {stats['exitosos']}/{stats['procesados']} exitosos")
+    
+    return stats
+
 @api_router.get("/dropdown-options", response_model=DropdownOptions)
 async def get_dropdown_options():
     instituciones_docs = await db.instituciones.find({"activo": True}, {"_id": 0}).to_list(1000)

@@ -323,6 +323,7 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
         # Ejecutar todas las agregaciones
         kpis = await _get_kpis(db, filtros)
         matriz = await _get_matriz_4x4(db, filtros)
+        mapa_calor_grc = await _get_mapa_calor_grc(db, filtros)
         panel_severidad = await _get_panel_severidad(db, filtros)
         top_dominios = await _get_top_dominios(db, filtros)
         
@@ -332,6 +333,7 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
         return {
             "kpis": kpis,
             "matriz_4x4": matriz,
+            "mapa_calor_grc": mapa_calor_grc,
             "panel_severidad": panel_severidad,
             "top_dominios": top_dominios,
             "filtros_aplicados": filtros,
@@ -660,6 +662,146 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
         return {
             "celdas": results,
             "total_hallazgos": total
+        }
+
+    async def _get_mapa_calor_grc(db, filtros: dict) -> dict:
+        """
+        Mapa de Calor GRC Unificado.
+        Agrupa VULNERABILIDADES por nivel_riesgo (Alto, Medio Alto, Medio, Bajo).
+        Solo incluye vulnerabilidades que tengan riesgo_id asignado o nivel_riesgo.
+        
+        Retorna:
+        - celdas: lista con {nivel_riesgo, count, vulnerabilidades[]}
+        - total_vulnerabilidades: total de vulns en el mapa
+        """
+        match_stage = {"estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]}}
+        
+        if filtros.get("informes_seleccionados"):
+            match_stage["nombre_informe_pentest"] = {"$in": filtros["informes_seleccionados"]}
+        if filtros.get("estados_vulnerabilidad"):
+            match_stage["estatus"] = {"$in": filtros["estados_vulnerabilidad"]}
+        if filtros.get("responsables"):
+            match_stage["responsable"] = {"$in": filtros["responsables"]}
+        
+        pipeline = [
+            {"$match": match_stage},
+            # Agregar nivel_riesgo_computed con lógica condicional
+            NIVEL_RIESGO_COMPUTED_STAGE,
+            # Filtrar solo las que tengan nivel_riesgo_computed válido
+            {
+                "$match": {
+                    "nivel_riesgo_computed": {"$in": ["Alto", "Medio Alto", "Medio", "Bajo"]}
+                }
+            }
+        ]
+        
+        # Lookup dominio si hay filtro
+        if filtros.get("dominios"):
+            pipeline.extend([
+                {
+                    "$lookup": {
+                        "from": "config_dominios",
+                        "localField": "dominio_id",
+                        "foreignField": "id",
+                        "as": "dominio_info"
+                    }
+                },
+                {"$unwind": {"path": "$dominio_info", "preserveNullAndEmptyArrays": True}},
+                {
+                    "$match": {
+                        "$or": [
+                            {"dominio_info.nombre_dominio": {"$in": filtros["dominios"]}},
+                            {"$and": [
+                                {"dominio_info": None},
+                                {"$expr": {"$in": ["Sin Dominio", filtros["dominios"]]}}
+                            ]}
+                        ]
+                    }
+                }
+            ])
+        
+        # Lookup riesgo info para mostrar en drill-down
+        pipeline.append({
+            "$lookup": {
+                "from": "catalogo_riesgos",
+                "localField": "riesgo_id",
+                "foreignField": "id",
+                "as": "riesgo_info"
+            }
+        })
+        pipeline.append({"$unwind": {"path": "$riesgo_info", "preserveNullAndEmptyArrays": True}})
+        
+        # Agrupar por nivel_riesgo
+        pipeline.append({
+            "$group": {
+                "_id": "$nivel_riesgo_computed",
+                "count": {"$sum": 1},
+                "vulnerabilidades": {
+                    "$push": {
+                        "id": "$id",
+                        "codigo": "$codigo",
+                        "vulnerabilidad": {"$substrCP": [{"$ifNull": ["$vulnerabilidad", ""]}, 0, 100]},
+                        "severidad": "$severidad",
+                        "nivel_riesgo": "$nivel_riesgo_computed",
+                        "estatus": "$estatus",
+                        "responsable": "$responsable",
+                        "riesgo_nombre": "$riesgo_info.nombre",
+                        "dominio_nombre": {"$ifNull": ["$dominio_info.nombre_dominio", "Sin Dominio"]}
+                    }
+                }
+            }
+        })
+        
+        pipeline.append({
+            "$project": {
+                "_id": 0,
+                "nivel_riesgo": "$_id",
+                "count": 1,
+                "vulnerabilidades": {"$slice": ["$vulnerabilidades", 20]}
+            }
+        })
+        
+        # Ordenar por nivel de riesgo (Alto primero)
+        pipeline.append({
+            "$addFields": {
+                "orden": {
+                    "$switch": {
+                        "branches": [
+                            {"case": {"$eq": ["$nivel_riesgo", "Alto"]}, "then": 1},
+                            {"case": {"$eq": ["$nivel_riesgo", "Medio Alto"]}, "then": 2},
+                            {"case": {"$eq": ["$nivel_riesgo", "Medio"]}, "then": 3},
+                            {"case": {"$eq": ["$nivel_riesgo", "Bajo"]}, "then": 4}
+                        ],
+                        "default": 5
+                    }
+                }
+            }
+        })
+        pipeline.append({"$sort": {"orden": 1}})
+        pipeline.append({"$project": {"orden": 0}})
+        
+        results = await db.vulnerabilidades.aggregate(pipeline).to_list(10)
+        
+        # Asegurar que existan todas las categorías
+        niveles_existentes = {r["nivel_riesgo"] for r in results}
+        for nivel in ["Alto", "Medio Alto", "Medio", "Bajo"]:
+            if nivel not in niveles_existentes:
+                results.append({
+                    "nivel_riesgo": nivel,
+                    "count": 0,
+                    "vulnerabilidades": []
+                })
+        
+        # Reordenar
+        orden_map = {"Alto": 1, "Medio Alto": 2, "Medio": 3, "Bajo": 4}
+        results.sort(key=lambda x: orden_map.get(x["nivel_riesgo"], 5))
+        
+        # Calcular total
+        total = sum(r.get("count", 0) for r in results)
+        
+        return {
+            "celdas": results,
+            "total_vulnerabilidades": total
         }
 
     async def _get_panel_severidad(db, filtros: dict) -> dict:

@@ -97,6 +97,14 @@ const RISK_LEVEL_LABELS = {
   "4": "Alto"
 };
 
+// Colores rígidos para Mapa de Calor GRC por nivel_riesgo
+const NIVEL_RIESGO_COLORS = {
+  "Alto": { bg: "bg-red-500", text: "text-white", hex: "#ef4444" },
+  "Medio Alto": { bg: "bg-orange-500", text: "text-white", hex: "#f97316" },
+  "Medio": { bg: "bg-yellow-500", text: "text-zinc-900", hex: "#eab308" },
+  "Bajo": { bg: "bg-emerald-500", text: "text-white", hex: "#10b981" },
+};
+
 // ============ COMPONENTS ============
 
 const CustomBarTooltip = ({ active, payload, label }) => {
@@ -170,6 +178,77 @@ const KPICard = ({ title, value, subtitle, icon: Icon, color = "indigo", trend, 
         )}
       </CardContent>
     </Card>
+  );
+};
+
+// Mapa de Calor GRC - Vulnerabilidades por Nivel de Riesgo (colores rígidos)
+const RiskHeatmapGRC = ({ data, onCellClick }) => {
+  const celdas = data?.celdas || [];
+  const total = data?.total_vulnerabilidades || 0;
+
+  // Orden fijo de niveles
+  const nivelesOrden = ["Alto", "Medio Alto", "Medio", "Bajo"];
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-zinc-500 font-medium uppercase tracking-wider">
+          Vulnerabilidades por Nivel de Riesgo GRC
+        </span>
+        <div className="text-xs text-zinc-500">
+          Total: <span className="text-white font-medium">{total}</span> vulnerabilidades
+        </div>
+      </div>
+
+      {/* Grid de celdas rígidas */}
+      <div className="grid grid-cols-4 gap-3">
+        {nivelesOrden.map(nivel => {
+          const celda = celdas.find(c => c.nivel_riesgo === nivel) || { nivel_riesgo: nivel, count: 0, vulnerabilidades: [] };
+          const colorConfig = NIVEL_RIESGO_COLORS[nivel];
+          const count = celda.count || 0;
+
+          return (
+            <TooltipProvider key={nivel}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className={`${colorConfig.bg} ${colorConfig.text} rounded-lg p-4 flex flex-col items-center justify-center transition-all hover:scale-105 hover:ring-2 hover:ring-white/40 min-h-[100px] shadow-lg`}
+                    onClick={() => count > 0 && onCellClick && onCellClick(celda)}
+                    data-testid={`heatmap-cell-${nivel.toLowerCase().replace(' ', '-')}`}
+                    disabled={count === 0}
+                  >
+                    <span className="text-3xl font-bold drop-shadow-md">
+                      {count}
+                    </span>
+                    <span className={`text-sm font-medium mt-1 ${colorConfig.text} opacity-90`}>
+                      {nivel}
+                    </span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-zinc-900 text-white border-zinc-700">
+                  <div className="text-sm">
+                    <p className="font-medium">{nivel}</p>
+                    <p className="text-zinc-400">Vulnerabilidades: {count}</p>
+                    {count > 0 && <p className="text-zinc-500 text-xs mt-1">Click para ver detalles</p>}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center justify-center gap-4 mt-3 pt-3 border-t border-zinc-800">
+        {nivelesOrden.map(nivel => (
+          <div key={nivel} className="flex items-center gap-1.5">
+            <div className={`w-3 h-3 rounded ${NIVEL_RIESGO_COLORS[nivel].bg}`}></div>
+            <span className="text-xs text-zinc-500">{nivel}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 };
 
@@ -413,6 +492,8 @@ export default function DashboardGRC() {
   const [matrixDetailData, setMatrixDetailData] = useState(null);
   const [showSeverityDetail, setShowSeverityDetail] = useState(false);
   const [severityDetailData, setSeverityDetailData] = useState(null);
+  const [showHeatmapDetail, setShowHeatmapDetail] = useState(false);
+  const [heatmapDetailData, setHeatmapDetailData] = useState(null);
   
   // Ref to track if initial load is done
   const isInitialMount = useRef(true);
@@ -658,6 +739,12 @@ export default function DashboardGRC() {
       setSeverityDetailData(severityData);
       setShowSeverityDetail(true);
     }
+  };
+
+  // Handle heatmap GRC cell click
+  const handleHeatmapCellClick = (cellData) => {
+    setHeatmapDetailData(cellData);
+    setShowHeatmapDetail(true);
   };
 
   if (loading) {
@@ -1032,6 +1119,34 @@ export default function DashboardGRC() {
         </CardContent>
       </Card>
 
+      {/* Mapa de Calor GRC - Vulnerabilidades por Nivel de Riesgo */}
+      <Card className="bg-zinc-900/50 border-zinc-800">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-white text-base flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+            Mapa de Calor GRC
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Info className="w-4 h-4 text-zinc-500" />
+                </TooltipTrigger>
+                <TooltipContent className="bg-zinc-800 text-white border-zinc-700 max-w-xs">
+                  Vulnerabilidades activas agrupadas por Nivel de Riesgo GRC (Alto, Medio Alto, Medio, Bajo).
+                  Los colores son fijos según la clasificación del riesgo corporativo.
+                  Click en una celda para ver las vulnerabilidades.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <RiskHeatmapGRC 
+            data={dashboardData?.mapa_calor_grc} 
+            onCellClick={handleHeatmapCellClick}
+          />
+        </CardContent>
+      </Card>
+
       {/* Save View Modal */}
       <Dialog open={showSaveModal} onOpenChange={setShowSaveModal}>
         <DialogContent className="bg-zinc-900 border-zinc-700 text-white max-w-md">
@@ -1186,6 +1301,63 @@ export default function DashboardGRC() {
               ))}
               {(!severityDetailData?.vulnerabilidades || severityDetailData.vulnerabilidades.length === 0) && (
                 <p className="text-zinc-500 text-center py-8">No hay vulnerabilidades de esta severidad</p>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Heatmap GRC Detail Modal */}
+      <Dialog open={showHeatmapDetail} onOpenChange={setShowHeatmapDetail}>
+        <DialogContent className="bg-zinc-900 border-zinc-700 text-white max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div 
+                className={`w-5 h-5 rounded ${NIVEL_RIESGO_COLORS[heatmapDetailData?.nivel_riesgo]?.bg || 'bg-zinc-600'}`}
+              ></div>
+              Vulnerabilidades - Nivel: {heatmapDetailData?.nivel_riesgo}
+              <Badge variant="outline" className="ml-2 border-zinc-600">
+                {heatmapDetailData?.count || 0} vulnerabilidades
+              </Badge>
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            <div className="space-y-3 pr-4">
+              {heatmapDetailData?.vulnerabilidades?.map((v, idx) => (
+                <div key={v.id || idx} className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        {v.codigo && <span className="text-indigo-400 font-mono text-xs">{v.codigo}</span>}
+                        <Badge 
+                          variant="outline" 
+                          className={`text-xs ${
+                            ['Cerrado', 'Corregido'].includes(v.estatus) ? 'border-green-500/50 text-green-400' :
+                            v.estatus === 'En Proceso' ? 'border-yellow-500/50 text-yellow-400' :
+                            'border-zinc-600 text-zinc-400'
+                          }`}
+                        >
+                          {v.estatus}
+                        </Badge>
+                        <Badge 
+                          className={`text-xs ${NIVEL_RIESGO_COLORS[v.nivel_riesgo]?.bg || 'bg-zinc-600'} ${NIVEL_RIESGO_COLORS[v.nivel_riesgo]?.text || 'text-white'}`}
+                        >
+                          {v.nivel_riesgo}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-zinc-300 line-clamp-2">{v.vulnerabilidad}</p>
+                      <div className="flex items-center gap-4 mt-2 text-xs text-zinc-500 flex-wrap">
+                        {v.severidad && <span>Severidad: <span className="text-zinc-300">{v.severidad}</span></span>}
+                        {v.riesgo_nombre && <span>Riesgo: <span className="text-zinc-300">{v.riesgo_nombre}</span></span>}
+                        {v.dominio_nombre && <span>Dominio: <span className="text-zinc-300">{v.dominio_nombre}</span></span>}
+                        {v.responsable && <span>Resp: <span className="text-zinc-300">{v.responsable}</span></span>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {(!heatmapDetailData?.vulnerabilidades || heatmapDetailData.vulnerabilidades.length === 0) && (
+                <p className="text-zinc-500 text-center py-8">No hay vulnerabilidades en este nivel de riesgo</p>
               )}
             </div>
           </ScrollArea>

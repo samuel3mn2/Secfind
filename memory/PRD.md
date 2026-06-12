@@ -1,8 +1,20 @@
 # SecFind - Sistema de Gestión de Vulnerabilidades
 
-## Última Actualización: 2026-06-09
+## Última Actualización: 2026-06-12
 
 ### Cambios Recientes
+- **Mapa de Calor GRC con Colores Rígidos (Junio 2026)**: Nuevo componente `RiskHeatmapGRC` en el Dashboard GRC que muestra vulnerabilidades agrupadas por `nivel_riesgo` (Alto, Medio Alto, Medio, Bajo) con colores sólidos Tailwind:
+  - Alto → `bg-red-500` (rojo)
+  - Medio Alto → `bg-orange-500` (naranja)
+  - Medio → `bg-yellow-500` (amarillo)
+  - Bajo → `bg-emerald-500` (verde)
+  - Contadores numéricos en cada celda
+  - Drill-down modal con lista de vulnerabilidades
+  - Sin gradientes ni interpolaciones - colores 100% rígidos
+- **Endpoint Bulk Associate GRC (Junio 2026)**: `/api/admin/bulk-associate-grc` para mapeo masivo de vulnerabilidades a riesgos GRC mediante archivo Excel
+- **Pipeline `mapa_calor_grc` (Junio 2026)**: Nuevo pipeline de agregación que agrupa vulnerabilidades por `nivel_riesgo` con lookup a catálogo de riesgos
+- **Homogeneización `nivel_riesgo` (Junio 2026)**: Valores estrictos limitados a: "Bajo", "Medio", "Medio Alto", "Alto" en todo el sistema (Pydantic, UI, imports, PDF parsers)
+- **Matriz 4×4 (Junio 2026)**: Conversión de matriz de riesgo de 5×5 a 4×4 para hallazgos de auditoría
 - **Dashboard de Mando Unificado GRC (Junio 2026)**: Nuevo dashboard tipo Tableau que combina vulnerabilidades técnicas y hallazgos de auditoría en una sola vista. Incluye:
   - 4 KPIs: Vulnerabilidades Activas, Hallazgos Abiertos, Índice de Exposición (score ponderado), Riesgo Total Hallazgos
   - Matriz de Riesgo 5×5 para Hallazgos (colores estáticos basados en metodología clásica, contadores dinámicos con drill-down)
@@ -81,12 +93,15 @@ REACT_APP_BACKEND_URL=http://localhost:8001
 ## Funcionalidades Implementadas
 
 ### Dashboard GRC Unificado (NUEVO - Junio 2026)
-- [x] 4 KPIs: Vulnerabilidades Activas, Hallazgos Abiertos, Índice de Exposición, Riesgo Total
-- [x] Matriz de Riesgo 5×5 para Hallazgos de Auditoría (colores estáticos, contadores dinámicos)
+- [x] 4 KPIs: Vulnerabilidades Activas, Hallazgos Abiertos, Índice de Exposición, Riesgo Promedio
+- [x] Matriz de Riesgo 4×4 para Hallazgos de Auditoría (colores estáticos, contadores dinámicos)
 - [x] Drill-down en celdas de la matriz (modal con lista de hallazgos)
 - [x] Panel de Severidad para Vulnerabilidades (gráfico de barras horizontal)
+- [x] **Mapa de Calor GRC** - Vulnerabilidades por nivel_riesgo con colores rígidos (Alto=rojo, Medio Alto=naranja, Medio=amarillo, Bajo=verde)
+- [x] Drill-down en celdas del Mapa de Calor GRC (modal con lista de vulnerabilidades)
 - [x] Top 5 Dominios con Carga Combinada (barras apiladas)
 - [x] 5 Filtros Globales Multi-select (Informes, Dominios, Responsables, Estado Vuln, Estado Hallazgo)
+- [x] Grupos de Informes con selector y conteo combinado
 - [x] Sistema de Vistas Guardadas (crear, aplicar, eliminar)
 - [x] Vistas públicas (visibles para todos) y privadas (solo el creador)
 - [x] Backend: `/api/dashboard/data`, `/api/dashboard/vistas` (GET/POST/DELETE)
