@@ -2157,6 +2157,7 @@ async def get_vulnerabilidades(
             query["$and"].append({"$or": year_conditions})
     if search:
         search_conditions = [
+            {"codigo": {"$regex": search, "$options": "i"}},
             {"vulnerabilidad": {"$regex": search, "$options": "i"}},
             {"aplicaciones": {"$regex": search, "$options": "i"}},
             {"responsable": {"$regex": search, "$options": "i"}},
@@ -3119,6 +3120,7 @@ async def export_csv(
         query["fecha_hallazgo"] = {"$regex": f"^{año}"}
     if search:
         query["$or"] = [
+            {"codigo": {"$regex": search, "$options": "i"}},
             {"vulnerabilidad": {"$regex": search, "$options": "i"}},
             {"aplicaciones": {"$regex": search, "$options": "i"}},
             {"responsables": {"$regex": search, "$options": "i"}},
@@ -3219,6 +3221,7 @@ async def export_excel(
         query["fecha_hallazgo"] = {"$regex": f"^{año}"}
     if search:
         query["$or"] = [
+            {"codigo": {"$regex": search, "$options": "i"}},
             {"vulnerabilidad": {"$regex": search, "$options": "i"}},
             {"aplicaciones": {"$regex": search, "$options": "i"}},
             {"responsables": {"$regex": search, "$options": "i"}},
