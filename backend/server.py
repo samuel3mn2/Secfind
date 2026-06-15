@@ -3132,9 +3132,10 @@ async def export_csv(
     if not vulnerabilidades:
         raise HTTPException(status_code=404, detail="No hay datos para exportar")
     
-    # Enrich with dominio and control names if needed
+    # Enrich with dominio, control and riesgo names if needed
     dominio_ids = list(set(v.get("dominio_id") for v in vulnerabilidades if v.get("dominio_id")))
     control_ids = list(set(v.get("control_id") for v in vulnerabilidades if v.get("control_id")))
+    riesgo_ids = list(set(v.get("riesgo_id") for v in vulnerabilidades if v.get("riesgo_id")))
     
     dominios_map = {}
     if dominio_ids:
@@ -3146,17 +3147,24 @@ async def export_csv(
         controles = await db.config_controles.find({"id": {"$in": control_ids}}, {"_id": 0}).to_list(100)
         controles_map = {c["id"]: c.get("codigo_control", "") for c in controles}
     
+    riesgos_map = {}
+    if riesgo_ids:
+        riesgos = await db.catalogo_riesgos.find({"id": {"$in": riesgo_ids}}, {"_id": 0}).to_list(200)
+        riesgos_map = {r["id"]: r.get("nombre_corto") or r.get("nombre") or r.get("descripcion_completa", "")[:80] for r in riesgos}
+    
     # Convert array fields and enrich data for CSV compatibility
     for vuln in vulnerabilidades:
         if isinstance(vuln.get("aplicaciones"), list):
             vuln["aplicaciones"] = " | ".join(vuln["aplicaciones"])
         if isinstance(vuln.get("responsables"), list):
             vuln["responsables"] = " | ".join(vuln["responsables"])
-        # Add dominio and control names
+        # Add dominio, control and riesgo names
         if vuln.get("dominio_id"):
             vuln["dominio_nombre"] = dominios_map.get(vuln["dominio_id"], "")
         if vuln.get("control_id"):
             vuln["control_codigo"] = controles_map.get(vuln["control_id"], "")
+        if vuln.get("riesgo_id"):
+            vuln["riesgo_catalogo"] = riesgos_map.get(vuln["riesgo_id"], "")
     
     df = pd.DataFrame(vulnerabilidades)
     
@@ -3191,6 +3199,7 @@ async def export_csv(
             "proveedor": "proveedor",
             "dominio": "dominio_nombre",
             "control_asociado": "control_codigo",
+            "riesgo_catalogo": "riesgo_catalogo",
         }
         cols_to_keep = [column_map.get(c, c) for c in selected_cols if column_map.get(c, c) in df.columns]
         if cols_to_keep:
@@ -3256,9 +3265,10 @@ async def export_excel(
     if not vulnerabilidades:
         raise HTTPException(status_code=404, detail="No hay datos para exportar")
     
-    # Enrich with dominio and control names if needed
+    # Enrich with dominio, control and riesgo names if needed
     dominio_ids = list(set(v.get("dominio_id") for v in vulnerabilidades if v.get("dominio_id")))
     control_ids = list(set(v.get("control_id") for v in vulnerabilidades if v.get("control_id")))
+    riesgo_ids = list(set(v.get("riesgo_id") for v in vulnerabilidades if v.get("riesgo_id")))
     
     dominios_map = {}
     if dominio_ids:
@@ -3270,17 +3280,24 @@ async def export_excel(
         controles = await db.config_controles.find({"id": {"$in": control_ids}}, {"_id": 0}).to_list(100)
         controles_map = {c["id"]: c.get("codigo_control", "") for c in controles}
     
+    riesgos_map = {}
+    if riesgo_ids:
+        riesgos = await db.catalogo_riesgos.find({"id": {"$in": riesgo_ids}}, {"_id": 0}).to_list(200)
+        riesgos_map = {r["id"]: r.get("nombre_corto") or r.get("nombre") or r.get("descripcion_completa", "")[:80] for r in riesgos}
+    
     # Convert array fields and enrich data
     for vuln in vulnerabilidades:
         if isinstance(vuln.get("aplicaciones"), list):
             vuln["aplicaciones"] = " | ".join(vuln["aplicaciones"])
         if isinstance(vuln.get("responsables"), list):
             vuln["responsables"] = " | ".join(vuln["responsables"])
-        # Add dominio and control names
+        # Add dominio, control and riesgo names
         if vuln.get("dominio_id"):
             vuln["dominio_nombre"] = dominios_map.get(vuln["dominio_id"], "")
         if vuln.get("control_id"):
             vuln["control_codigo"] = controles_map.get(vuln["control_id"], "")
+        if vuln.get("riesgo_id"):
+            vuln["riesgo_catalogo"] = riesgos_map.get(vuln["riesgo_id"], "")
     
     df = pd.DataFrame(vulnerabilidades)
     
@@ -3315,6 +3332,7 @@ async def export_excel(
             "proveedor": "proveedor",
             "dominio": "dominio_nombre",
             "control_asociado": "control_codigo",
+            "riesgo_catalogo": "riesgo_catalogo",
         }
         cols_to_keep = [column_map.get(c, c) for c in selected_cols if column_map.get(c, c) in df.columns]
         if cols_to_keep:

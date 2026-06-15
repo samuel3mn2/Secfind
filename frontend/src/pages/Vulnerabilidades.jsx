@@ -158,6 +158,7 @@ const ALL_COLUMNS = [
   { id: "fecha_compromiso", label: "Fecha Compromiso", default: false },
   { id: "dominio", label: "Dominio", default: false },
   { id: "control_asociado", label: "Control Asociado", default: false },
+  { id: "riesgo_catalogo", label: "Riesgo Catálogo", default: false },
   { id: "resultado_re_test", label: "Resultado Retest", default: false },
   { id: "veces_en_retest", label: "Veces Retest", default: false },
   { id: "nombre_informe_pentest", label: "Informe Pentest", default: false },
