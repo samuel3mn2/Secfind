@@ -150,6 +150,7 @@ const ALL_COLUMNS = [
   { id: "institucion", label: "Institución", default: true },
   { id: "aplicaciones", label: "Aplicaciones", default: true },
   { id: "vulnerabilidad", label: "Vulnerabilidad", default: true },
+  { id: "recomendaciones", label: "Recomendaciones", default: false },
   { id: "severidad", label: "Severidad", default: true },
   { id: "nivel_riesgo", label: "Nivel Riesgo", default: true },
   { id: "estatus", label: "Estatus", default: true },
@@ -1069,6 +1070,7 @@ export default function Vulnerabilidades() {
                   {isColumnVisible("institucion") && <TableHead className="text-zinc-400">Institución</TableHead>}
                   {isColumnVisible("aplicaciones") && <TableHead className="text-zinc-400">Aplicaciones</TableHead>}
                   {isColumnVisible("vulnerabilidad") && <TableHead className="text-zinc-400 min-w-[200px]">Vulnerabilidad</TableHead>}
+                  {isColumnVisible("recomendaciones") && <TableHead className="text-zinc-400 min-w-[200px]">Recomendaciones</TableHead>}
                   {isColumnVisible("severidad") && <TableHead className="text-zinc-400">Severidad</TableHead>}
                   {isColumnVisible("nivel_riesgo") && <TableHead className="text-zinc-400">Nivel Riesgo</TableHead>}
                   {isColumnVisible("estatus") && <TableHead className="text-zinc-400">Estatus</TableHead>}
@@ -1131,6 +1133,13 @@ export default function Vulnerabilidades() {
                         <TableCell className="text-zinc-100">
                           <span className="whitespace-normal break-words">
                             {vuln.vulnerabilidad || "-"}
+                          </span>
+                        </TableCell>
+                      )}
+                      {isColumnVisible("recomendaciones") && (
+                        <TableCell className="text-zinc-300">
+                          <span className="whitespace-normal break-words text-sm">
+                            {vuln.recomendaciones || "-"}
                           </span>
                         </TableCell>
                       )}

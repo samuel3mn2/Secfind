@@ -2,20 +2,28 @@
 
 ## Última Actualización: 2026-06-12
 
-### Cambios Recientes
-- **Mapa de Calor GRC Unificado - Matriz Bidimensional (Junio 2026)**: Refactorización completa del Mapa de Calor:
-  - Matriz bidimensional real (Probabilidad × Impacto) que unifica Vulnerabilidades y Hallazgos de Auditoría
-  - Vulnerabilidades: Probabilidad SIEMPRE = 3 (Alta), Impacto basado en severidad/nivel_riesgo
+### Cambios Recientes (Junio 2026)
+- **MATRIZ GRC 4x4 UNIFICADA (Según directiva gerencial)**:
+  - Eje Vertical (Probabilidad): Crítica (4), Alta (3), Media (2), Baja (1)
+  - Eje Horizontal (Impacto/Nivel de Riesgo): Bajo (1), Medio (2), Medio Alto (3), Alto (4)
+  - Vulnerabilidades: Probabilidad SIEMPRE = 3 (Alta) - forzadas en esa fila
   - Hallazgos: Probabilidad e Impacto dinámicos según registro
   - Colores rígidos Tailwind sin gradientes:
-    * Crítico (prob×imp ≥12) → `bg-red-500/600`
-    * Alto (prob×imp 8-11) → `bg-orange-500/600`
-    * Medio (prob×imp 4-7) → `bg-yellow-400/500`
-    * Bajo (prob×imp 1-3) → `bg-emerald-400/500`
-  - Drill-down modal muestra items de ambos tipos (V=Vulnerabilidad, H=Hallazgo)
-  - Totales diferenciados: Vulns, Hallazgos, Combinado
-- **Filtro nivel_riesgo en Vulnerabilidades (Junio 2026)**: Nuevo MultiSelectFilter para filtrar vulnerabilidades por nivel de riesgo GRC (Alto, Medio Alto, Medio, Bajo)
-- **Endpoint Bulk Associate GRC (Junio 2026)**: `/api/admin/bulk-associate-grc` para mapeo masivo de vulnerabilidades a riesgos GRC mediante archivo Excel
+    * Verde (`bg-emerald-500`): Bajo
+    * Amarillo (`bg-yellow-500`): Medio  
+    * Naranja (`bg-orange-500`): Medio Alto
+    * Rojo (`bg-red-500/600`): Alto/Crítico
+  - Indicadores v=Vulnerabilidad, h=Hallazgo en cada celda
+  
+- **SWITCH DE VISUALIZACIÓN**:
+  - [Combinado]: Muestra V + H combinados
+  - [Solo Vulns]: Filtra solo vulnerabilidades (concentradas en fila Alta)
+  - [Solo Hallazgos]: Muestra solo hallazgos distribuidos dinámicamente
+  - Totales actualizados según modo seleccionado
+  
+- **Filtro nivel_riesgo en Vulnerabilidades**: MultiSelectFilter para filtrar por nivel GRC (Alto, Medio Alto, Medio, Bajo)
+
+- **Endpoint Bulk Associate GRC**: `/api/admin/bulk-associate-grc` para mapeo masivo de vulnerabilidades a dominios y riesgos mediante JSON con campos (CodigoDeVulns, Dominio, Riesgo)
 - **Homogeneización `nivel_riesgo` (Junio 2026)**: Valores estrictos limitados a: "Bajo", "Medio", "Medio Alto", "Alto" en todo el sistema (Pydantic, UI, imports, PDF parsers)
 - **Matriz 4×4 (Junio 2026)**: Conversión de matriz de riesgo de 5×5 a 4×4 para hallazgos de auditoría
 - **Dashboard de Mando Unificado GRC (Junio 2026)**: Nuevo dashboard tipo Tableau que combina vulnerabilidades técnicas y hallazgos de auditoría en una sola vista. Incluye:
