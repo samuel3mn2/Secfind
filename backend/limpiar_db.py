@@ -63,11 +63,12 @@ async def limpiar_base_datos():
     print("  2. Vulnerabilidades + Aplicaciones + Auditoría")
     print("  3. TODO (reset completo, excepto usuarios)")
     print("  4. Solo logs de Auditoría")
-    print("  5. Cancelar\n")
+    print("  5. Solo catálogo de riesgos (riesgos creados por mapeo GRC)")
+    print("  6. Cancelar\n")
     
-    opcion = input("Selecciona una opción (1-5): ").strip()
+    opcion = input("Selecciona una opción (1-6): ").strip()
     
-    if opcion == "5" or opcion == "":
+    if opcion == "6" or opcion == "":
         print("\n❌ Operación cancelada.")
         client.close()
         return
@@ -90,6 +91,28 @@ async def limpiar_base_datos():
             print("  No se encontraron registros de auditoría")
         else:
             print(f"\n  Total logs de auditoría eliminados: {total}")
+    
+    # Opción 5: Solo catálogo de riesgos
+    if opcion == "5":
+        print("\n¿Qué riesgos deseas eliminar?\n")
+        print("  a. Solo riesgos creados por mapeo GRC (categoria='Operativo')")
+        print("  b. TODOS los riesgos del catálogo")
+        print("  c. Cancelar\n")
+        
+        sub_opcion = input("Selecciona (a/b/c): ").strip().lower()
+        
+        if sub_opcion == "a":
+            result = await db.catalogo_riesgos.delete_many({"categoria": "Operativo"})
+            print(f"  ✓ catalogo_riesgos (Operativo): {result.deleted_count} eliminados")
+        elif sub_opcion == "b":
+            confirmar = input("\n⚠️  ¿Estás seguro de eliminar TODOS los riesgos? (escribir 'SI'): ").strip()
+            if confirmar == "SI":
+                result = await db.catalogo_riesgos.delete_many({})
+                print(f"  ✓ catalogo_riesgos: {result.deleted_count} eliminados")
+            else:
+                print("  ❌ Operación cancelada")
+        else:
+            print("  ❌ Operación cancelada")
     
     # Opciones 1, 2, 3: Vulnerabilidades y auditoría
     if opcion in ["1", "2", "3"]:
