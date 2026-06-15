@@ -1999,19 +1999,24 @@ async def bulk_associate_grc(
                         # Crear riesgo dinámicamente
                         import uuid
                         new_riesgo_id = str(uuid.uuid4())
-                        # Generar nombre corto desde la descripción
+                        # Generar código y nombre corto desde la descripción
                         nombre_corto = riesgo_descripcion.split('.')[0][:80] if '.' in riesgo_descripcion else riesgo_descripcion[:80]
+                        # Generar código único
+                        codigo_riesgo = f"R-{stats['riesgo_creado'] + 1:04d}"
                         
                         await db.catalogo_riesgos.insert_one({
                             "id": new_riesgo_id,
-                            "nombre": nombre_corto,
-                            "descripcion": riesgo_descripcion,
-                            "categoria": "Operativo",  # Default
+                            "codigo_riesgo": codigo_riesgo,
+                            "nombre_corto": nombre_corto,
+                            "descripcion_completa": riesgo_descripcion,
+                            "nombre": nombre_corto,  # Compatibilidad
+                            "descripcion": riesgo_descripcion,  # Compatibilidad
+                            "categoria": "Operativo",
                             "created_at": datetime.now(timezone.utc).isoformat()
                         })
                         riesgos_cache[riesgo_key] = new_riesgo_id
                         stats["riesgo_creado"] += 1
-                        logging.info(f"Riesgo creado: {nombre_corto}")
+                        logging.info(f"Riesgo creado: {codigo_riesgo} - {nombre_corto}")
                     else:
                         riesgos_cache[riesgo_key] = riesgo_doc.get("id")
                 
