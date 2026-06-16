@@ -282,7 +282,7 @@ export default function Vulnerabilidades() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
-  const [bulkAction, setBulkAction] = useState({ estatus: "", responsable: "", fecha_compromiso: "" });
+  const [bulkAction, setBulkAction] = useState({ estatus: "", responsable: "", fecha_compromiso: "", incrementar_retest: "" });
   const [applyingBulk, setApplyingBulk] = useState(false);
 
   // Column visibility state
@@ -668,7 +668,7 @@ export default function Vulnerabilidades() {
     if (selectedIds.length === 0) return;
     
     // Check if at least one field is set
-    if (!bulkAction.estatus && bulkAction.responsable === undefined && bulkAction.fecha_compromiso === undefined) {
+    if (!bulkAction.estatus && bulkAction.responsable === undefined && bulkAction.fecha_compromiso === undefined && !bulkAction.incrementar_retest) {
       toast.error("Selecciona al menos un campo para actualizar");
       return;
     }
@@ -679,12 +679,15 @@ export default function Vulnerabilidades() {
       if (bulkAction.estatus) payload.estatus = bulkAction.estatus;
       if (bulkAction.responsable !== undefined && bulkAction.responsable !== "") payload.responsable = bulkAction.responsable;
       if (bulkAction.fecha_compromiso !== undefined && bulkAction.fecha_compromiso !== "") payload.fecha_compromiso = bulkAction.fecha_compromiso;
+      if (bulkAction.incrementar_retest && parseInt(bulkAction.incrementar_retest) > 0) {
+        payload.incrementar_retest = parseInt(bulkAction.incrementar_retest);
+      }
       
       const response = await axios.post(`${API}/vulnerabilidades/bulk-update`, payload);
       toast.success(response.data.message);
       setShowBulkModal(false);
       setSelectedIds([]);
-      setBulkAction({ estatus: "", responsable: "", fecha_compromiso: "" });
+      setBulkAction({ estatus: "", responsable: "", fecha_compromiso: "", incrementar_retest: "" });
       fetchVulnerabilidades();
     } catch (error) {
       console.error("Error in bulk update:", error);
@@ -1900,6 +1903,22 @@ export default function Vulnerabilidades() {
                   data-testid="bulk-fecha"
                 />
               </div>
+
+              {/* Incrementar Veces Retest */}
+              <div className="space-y-2">
+                <Label className="text-zinc-300">Incrementar Veces Retest (+)</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="99"
+                  placeholder="Ej: 1"
+                  value={bulkAction.incrementar_retest || ""}
+                  onChange={(e) => setBulkAction({...bulkAction, incrementar_retest: e.target.value})}
+                  className="bg-black/20 border-zinc-700 text-white"
+                  data-testid="bulk-retest"
+                />
+                <p className="text-xs text-zinc-500">Este valor se sumará al conteo actual de cada vulnerabilidad</p>
+              </div>
             </div>
 
             <div className="bg-amber-950/30 border border-amber-500/30 rounded-lg p-3 text-sm text-amber-300">
@@ -1911,7 +1930,7 @@ export default function Vulnerabilidades() {
               variant="outline"
               onClick={() => {
                 setShowBulkModal(false);
-                setBulkAction({ estatus: "", responsable: "", fecha_compromiso: "" });
+                setBulkAction({ estatus: "", responsable: "", fecha_compromiso: "", incrementar_retest: "" });
               }}
               className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
             >
@@ -1919,7 +1938,7 @@ export default function Vulnerabilidades() {
             </Button>
             <Button
               onClick={handleBulkUpdate}
-              disabled={applyingBulk || (!bulkAction.estatus && !bulkAction.responsable && !bulkAction.fecha_compromiso)}
+              disabled={applyingBulk || (!bulkAction.estatus && !bulkAction.responsable && !bulkAction.fecha_compromiso && !bulkAction.incrementar_retest)}
               className="bg-indigo-600 hover:bg-indigo-700 text-white"
               data-testid="apply-bulk-btn"
             >

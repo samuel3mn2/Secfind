@@ -2367,6 +2367,7 @@ class BulkUpdateRequest(BaseModel):
     estatus: Optional[str] = None
     responsable: Optional[str] = None
     fecha_compromiso: Optional[str] = None
+    incrementar_retest: Optional[int] = None
 
 @api_router.post("/vulnerabilidades/bulk-update")
 async def bulk_update_vulnerabilidades(
@@ -2389,15 +2390,23 @@ async def bulk_update_vulnerabilidades(
     if data.fecha_compromiso is not None:  # Allow empty string to clear
         update_dict["fecha_compromiso"] = data.fecha_compromiso
     
-    if not update_dict:
+    # Handle incrementar_retest separately (uses $inc)
+    has_retest_increment = data.incrementar_retest and data.incrementar_retest > 0
+    
+    if not update_dict and not has_retest_increment:
         raise HTTPException(status_code=400, detail="No se especificaron campos para actualizar")
     
     update_dict["updated_at"] = datetime.now(timezone.utc).isoformat()
     
+    # Build the update operation
+    update_operation = {"$set": update_dict}
+    if has_retest_increment:
+        update_operation["$inc"] = {"veces_en_retest": data.incrementar_retest}
+    
     # Update all matching documents
     result = await db.vulnerabilidades.update_many(
         {"id": {"$in": data.ids}},
-        {"$set": update_dict}
+        update_operation
     )
     
     # Build change description for audit log
@@ -2408,6 +2417,8 @@ async def bulk_update_vulnerabilidades(
         cambios.append({"campo": "responsable", "valor_anterior": "(múltiple)", "valor_nuevo": data.responsable or "(vacío)"})
     if data.fecha_compromiso is not None:
         cambios.append({"campo": "fecha_compromiso", "valor_anterior": "(múltiple)", "valor_nuevo": data.fecha_compromiso or "(vacío)"})
+    if has_retest_increment:
+        cambios.append({"campo": "veces_en_retest", "valor_anterior": "(múltiple)", "valor_nuevo": f"+{data.incrementar_retest}"})
     
     # Register in audit log
     await registrar_cambio(
