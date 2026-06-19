@@ -2841,19 +2841,21 @@ async def get_vista_comite(
     result = []
     today = datetime.now(timezone.utc).date()
     
-    for key in sorted(informe_data.keys()):
+    for key in informe_data.keys():
         data = informe_data[key]
         responsables_list = sorted(data["responsables"])
         informes_incluidos = sorted(data["informes_incluidos"])
         
         # Calculate tiempo activo in months
         tiempo_activo_meses = None
+        fecha_orden = "9999-12-31"  # Default for sorting (at the end if no date)
         if data["fecha_mas_antigua"]:
             try:
                 fecha_str = data["fecha_mas_antigua"]
                 fecha_date = datetime.strptime(fecha_str[:10], "%Y-%m-%d").date()
                 months_diff = (today.year - fecha_date.year) * 12 + (today.month - fecha_date.month)
                 tiempo_activo_meses = max(0, months_diff)
+                fecha_orden = fecha_str[:10]  # ISO date for sorting
             except:
                 tiempo_activo_meses = None
         
@@ -2872,8 +2874,12 @@ async def get_vista_comite(
             "responsable": " | ".join(responsables_list) if responsables_list else None,
             "total_pendientes": data["total_pendientes"],
             "total_hallazgos": data["total_hallazgos"],
-            "tiempo_activo_meses": tiempo_activo_meses
+            "tiempo_activo_meses": tiempo_activo_meses,
+            "fecha_orden": fecha_orden
         })
+    
+    # Sort by date: oldest first (ascending)
+    result.sort(key=lambda x: x["fecha_orden"])
     
     return result
 

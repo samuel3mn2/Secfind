@@ -406,7 +406,7 @@ def create_router(db, get_current_user, CurrentUser):
         result = []
         today = datetime.now(timezone.utc).date()
         
-        for key in sorted(informe_data.keys()):
+        for key in informe_data.keys():
             data = informe_data[key]
             
             # Calcular tiempo de retraso en meses
@@ -417,18 +417,19 @@ def create_router(db, get_current_user, CurrentUser):
                     fecha_date = datetime.strptime(fecha_str[:10], "%Y-%m-%d").date()
                     months_diff = (today.year - fecha_date.year) * 12 + (today.month - fecha_date.month)
                     tiempo_retraso_meses = max(0, months_diff)
-                except:
+                except (ValueError, TypeError):
                     pass
             
             # Formato fecha reporte (Mes Año) - Usar fecha de hallazgo más antigua como fecha del reporte
             fecha_reporte_fmt = "ND"
-            # Prioridad: 1) fecha del informe si existe, 2) fecha de hallazgo más antigua
             fecha_para_reporte = data["fecha_reporte"] or data["fecha_mas_antigua"]
+            fecha_orden = "9999-12-31"  # Fecha por defecto para ordenamiento (al final si no hay fecha)
             if fecha_para_reporte:
                 try:
                     fecha_dt = datetime.strptime(fecha_para_reporte[:10], "%Y-%m-%d")
                     meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
                     fecha_reporte_fmt = f"{meses[fecha_dt.month - 1]} {fecha_dt.year}"
+                    fecha_orden = fecha_para_reporte[:10]  # Guardar fecha ISO para ordenar
                 except (ValueError, TypeError):
                     pass
             
@@ -462,6 +463,7 @@ def create_router(db, get_current_user, CurrentUser):
             result.append({
                 "nombre_reporte": f"•{key}",
                 "fecha_reporte": fecha_reporte_fmt,
+                "fecha_orden": fecha_orden,  # Campo para ordenamiento
                 "criticas_pendientes": data["criticas_pendientes"],
                 "criticas_total": data["criticas_total"],
                 "altas_pendientes": data["altas_pendientes"],
@@ -472,6 +474,9 @@ def create_router(db, get_current_user, CurrentUser):
                 "fecha_compromiso": fecha_compromiso_fmt,
                 "tiempo_retraso_meses": tiempo_retraso_meses
             })
+        
+        # Ordenar por fecha de reporte: más antiguo primero (ascendente)
+        result.sort(key=lambda x: x["fecha_orden"])
         
         return result
     
