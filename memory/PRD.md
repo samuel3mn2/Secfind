@@ -1,8 +1,24 @@
 # SecFind - Sistema de Gestión de Vulnerabilidades
 
-## Última Actualización: 2026-06-12
+## Última Actualización: 2026-06-19
 
 ### Cambios Recientes (Junio 2026)
+- **VISTA COMITÉ - EXCEL EJECUTIVO (2026-06-19)**:
+  - Nuevo endpoint `PUT /api/vistas-comite/{id}` para actualizar vistas existentes sin crear duplicados
+  - Nuevo endpoint `GET /api/vistas-comite/{id}/exportar-excel` para exportación Excel con formato ejecutivo
+  - Excel generado con Openpyxl con 9 columnas exactas:
+    * Nombre de reporte, Fecha Reporte, Críticas (P/T), Altas (P/T)
+    * Total Vulns Altas, Estado remediación, Responsable
+    * Fecha de compromiso, Tiempo de retraso (meses)
+  - Estilos corporativos: Cabecera verde (`4A7C31`), texto blanco negrita, bordes finos
+  - Métricas P/T (Pendientes/Total) con color rojo/marrón para items pendientes
+  - Frontend con botón "Excel Ejecutivo" y dropdown de Vistas para guardar/cargar/eliminar
+  - Router modular en `/app/backend/routes/vista_comite.py`
+  - 13/13 tests backend pasados, frontend verificado al 100%
+
+- **BULK UPDATE VECES EN RETEST (2026-06-12)**:
+  - Endpoint POST `/api/vulnerabilidades/bulk-update` para incrementar campo `veces_en_retest` masivamente
+  - Soporta payload JSON con lista de códigos de vulnerabilidad
 - **MATRIZ GRC 4x4 UNIFICADA (Según directiva gerencial)**:
   - Eje Vertical (Probabilidad): Crítica (4), Alta (3), Media (2), Baja (1)
   - Eje Horizontal (Impacto/Nivel de Riesgo): Bajo (1), Medio (2), Medio Alto (3), Alto (4)
