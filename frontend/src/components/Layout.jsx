@@ -1,10 +1,16 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { Shield, LayoutDashboard, List, Menu, X, Settings, LogOut, User, CalendarClock, Users, Key, AlertTriangle, ClipboardCheck, BookOpen, Gauge } from "lucide-react";
+import { Shield, LayoutDashboard, List, Menu, X, Settings, LogOut, User, CalendarClock, Users, Key, AlertTriangle, ClipboardCheck, BookOpen, Gauge, ChevronLeft, ChevronRight, PanelLeftClose, PanelLeft } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,8 +32,16 @@ import axios from "axios";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+// Key for localStorage persistence
+const SIDEBAR_COLLAPSED_KEY = "secfind_sidebar_collapsed";
+
 export const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Sidebar collapsed state with localStorage persistence
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+    return stored === "true";
+  });
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showForcedPasswordModal, setShowForcedPasswordModal] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
@@ -46,6 +60,15 @@ export const Layout = () => {
       setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
     }
   }, [mustChangePassword]);
+
+  // Persist sidebar collapsed state to localStorage
+  useEffect(() => {
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, isSidebarCollapsed.toString());
+  }, [isSidebarCollapsed]);
+
+  const toggleSidebarCollapse = () => {
+    setIsSidebarCollapsed(prev => !prev);
+  };
 
   const handleLogout = () => {
     logout();
@@ -146,116 +169,195 @@ export const Layout = () => {
   ].filter(item => item.show);
 
   return (
-    <div className="flex min-h-screen bg-[#09090b]">
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+    <TooltipProvider delayDuration={100}>
+      <div className="flex min-h-screen bg-[#09090b]">
+        {/* Mobile sidebar overlay */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
 
-      {/* Sidebar */}
-      <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-[#18181b] border-r border-[#27272a] transform transition-transform duration-200 ease-in-out ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        }`}
-      >
-        <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="flex items-center gap-3 px-6 py-5 border-b border-[#27272a]">
-            <div className="p-2 rounded-lg bg-indigo-500/10">
-              <Shield className="w-6 h-6 text-indigo-500" />
-            </div>
-            <div>
-              <h1 className="font-semibold text-white tracking-tight">SecFind</h1>
-              <p className="text-xs text-zinc-500">Gestión de Vulnerabilidades</p>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden ml-auto"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <X className="w-5 h-5" />
-            </Button>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 px-3 py-4 space-y-1">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === "/"}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-indigo-500/10 text-indigo-400 border-r-2 border-indigo-500"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
-                  }`
-                }
+        {/* Sidebar */}
+        <aside
+          className={`fixed lg:static inset-y-0 left-0 z-50 bg-[#18181b] border-r border-[#27272a] transform transition-all duration-300 ease-in-out ${
+            isSidebarCollapsed ? "w-[72px]" : "w-64"
+          } ${
+            sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          }`}
+        >
+          <div className="flex flex-col h-full">
+            {/* Logo */}
+            <div className={`flex items-center gap-3 py-5 border-b border-[#27272a] transition-all duration-300 ${
+              isSidebarCollapsed ? "px-3 justify-center" : "px-6"
+            }`}>
+              <div className="p-2 rounded-lg bg-indigo-500/10 flex-shrink-0">
+                <Shield className="w-6 h-6 text-indigo-500" />
+              </div>
+              {!isSidebarCollapsed && (
+                <div className="overflow-hidden transition-all duration-300">
+                  <h1 className="font-semibold text-white tracking-tight">SecFind</h1>
+                  <p className="text-xs text-zinc-500">Gestión de Vulnerabilidades</p>
+                </div>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="lg:hidden ml-auto"
                 onClick={() => setSidebarOpen(false)}
-                data-testid={`nav-${item.label.toLowerCase()}`}
               >
-                <item.icon className="w-5 h-5" />
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
 
-          {/* User Section */}
-          <div className="px-3 py-4 border-t border-[#27272a]">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-left hover:bg-white/5 transition-colors">
-                  <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center">
-                    <User className="w-4 h-4 text-indigo-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">{user?.nombre}</p>
-                    <p className="text-xs text-zinc-500 truncate">
-                      {user?.es_admin ? "Administrador" : "Usuario"}
-                    </p>
-                  </div>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56 bg-zinc-900 border-zinc-700">
-                <DropdownMenuLabel className="text-zinc-400">
-                  {user?.username}
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-zinc-700" />
-                <DropdownMenuItem 
-                  className="text-zinc-300 focus:text-white focus:bg-white/10 cursor-pointer"
-                  onClick={openPasswordModal}
-                  data-testid="change-password-btn"
-                >
-                  <Key className="w-4 h-4 mr-2" />
-                  Cambiar Contraseña
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  className="text-red-400 focus:text-red-400 focus:bg-red-500/10 cursor-pointer"
-                  onClick={handleLogout}
-                  data-testid="logout-btn"
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Cerrar Sesión
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Collapse Toggle Button - Desktop Only */}
+            <div className={`hidden lg:flex items-center border-b border-[#27272a] ${
+              isSidebarCollapsed ? "justify-center py-2" : "justify-end px-3 py-2"
+            }`}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleSidebarCollapse}
+                    className="text-zinc-400 hover:text-white hover:bg-white/10 h-8 w-8 p-0"
+                    data-testid="toggle-sidebar-btn"
+                  >
+                    {isSidebarCollapsed ? (
+                      <PanelLeft className="w-4 h-4" />
+                    ) : (
+                      <PanelLeftClose className="w-4 h-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="bg-zinc-800 border-zinc-700">
+                  <p>{isSidebarCollapsed ? "Expandir menú" : "Contraer menú"}</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+
+            {/* Navigation */}
+            <nav className={`flex-1 py-4 space-y-1 transition-all duration-300 ${
+              isSidebarCollapsed ? "px-2" : "px-3"
+            }`}>
+              {navItems.map((item) => (
+                isSidebarCollapsed ? (
+                  <Tooltip key={item.to}>
+                    <TooltipTrigger asChild>
+                      <NavLink
+                        to={item.to}
+                        end={item.to === "/"}
+                        className={({ isActive }) =>
+                          `flex items-center justify-center p-2.5 rounded-lg text-sm font-medium transition-colors ${
+                            isActive
+                              ? "bg-indigo-500/10 text-indigo-400"
+                              : "text-zinc-400 hover:text-white hover:bg-white/5"
+                          }`
+                        }
+                        onClick={() => setSidebarOpen(false)}
+                        data-testid={`nav-${item.label.toLowerCase()}`}
+                      >
+                        <item.icon className="w-5 h-5" />
+                      </NavLink>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="bg-zinc-800 border-zinc-700">
+                      <p>{item.label}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.to === "/"}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                        isActive
+                          ? "bg-indigo-500/10 text-indigo-400 border-r-2 border-indigo-500"
+                          : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      }`
+                    }
+                    onClick={() => setSidebarOpen(false)}
+                    data-testid={`nav-${item.label.toLowerCase()}`}
+                  >
+                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                    <span className="truncate">{item.label}</span>
+                  </NavLink>
+                )
+              ))}
+            </nav>
+
+            {/* User Section */}
+            <div className={`py-4 border-t border-[#27272a] transition-all duration-300 ${
+              isSidebarCollapsed ? "px-2" : "px-3"
+            }`}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  {isSidebarCollapsed ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button className="flex items-center justify-center w-full p-2.5 rounded-lg hover:bg-white/5 transition-colors">
+                          <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center">
+                            <User className="w-4 h-4 text-indigo-400" />
+                          </div>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="bg-zinc-800 border-zinc-700">
+                        <p>{user?.nombre}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <button className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-left hover:bg-white/5 transition-colors">
+                      <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center flex-shrink-0">
+                        <User className="w-4 h-4 text-indigo-400" />
+                      </div>
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <p className="text-sm font-medium text-white truncate">{user?.nombre}</p>
+                        <p className="text-xs text-zinc-500 truncate">
+                          {user?.es_admin ? "Administrador" : "Usuario"}
+                        </p>
+                      </div>
+                    </button>
+                  )}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56 bg-zinc-900 border-zinc-700" side={isSidebarCollapsed ? "right" : "top"}>
+                  <DropdownMenuLabel className="text-zinc-400">
+                    {user?.username}
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-zinc-700" />
+                  <DropdownMenuItem 
+                    className="text-zinc-300 focus:text-white focus:bg-white/10 cursor-pointer"
+                    onClick={openPasswordModal}
+                    data-testid="change-password-btn"
+                  >
+                    <Key className="w-4 h-4 mr-2" />
+                    Cambiar Contraseña
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    className="text-red-400 focus:text-red-400 focus:bg-red-500/10 cursor-pointer"
+                    onClick={handleLogout}
+                    data-testid="logout-btn"
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Cerrar Sesión
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* Footer */}
+            <div className={`py-3 border-t border-[#27272a] transition-all duration-300 ${
+              isSidebarCollapsed ? "px-2 text-center" : "px-6"
+            }`}>
+              <p className="text-xs text-zinc-600">
+                {isSidebarCollapsed ? "v1.0" : "SecFind v1.0"}
+              </p>
+            </div>
           </div>
+        </aside>
 
-          {/* Footer */}
-          <div className="px-6 py-3 border-t border-[#27272a]">
-            <p className="text-xs text-zinc-600">
-              SecFind v1.0
-            </p>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0">
+        {/* Main content */}
+        <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300`}>
         {/* Mobile header */}
         <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-[#18181b] border-b border-[#27272a]">
           <Button
@@ -460,7 +562,8 @@ export const Layout = () => {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </TooltipProvider>
   );
 };
 

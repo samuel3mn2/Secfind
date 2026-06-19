@@ -3,6 +3,15 @@
 ## Última Actualización: 2026-06-19
 
 ### Cambios Recientes (Junio 2026)
+- **SIDEBAR COLAPSABLE (2026-06-19)**:
+  - Nueva funcionalidad para colapsar/expandir la barra lateral izquierda
+  - Botón toggle con iconos dinámicos (PanelLeftClose/PanelLeft)
+  - Estado persistido en localStorage (se mantiene al recargar)
+  - Sidebar colapsado muestra solo iconos centrados con tooltips
+  - Transiciones suaves con Tailwind (`transition-all duration-300`)
+  - Optimiza espacio para Vista Comité, Dashboard GRC y tablas densas
+  - Ancho expandido: 256px (w-64), Ancho colapsado: 72px (w-[72px])
+
 - **VISTA COMITÉ - EXCEL EJECUTIVO (2026-06-19)**:
   - Nuevo endpoint `PUT /api/vistas-comite/{id}` para actualizar vistas existentes sin crear duplicados
   - Nuevo endpoint `GET /api/vistas-comite/{id}/exportar-excel` para exportación Excel con formato ejecutivo
