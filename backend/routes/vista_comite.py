@@ -420,14 +420,16 @@ def create_router(db, get_current_user, CurrentUser):
                 except:
                     pass
             
-            # Formato fecha reporte (Mes Año)
+            # Formato fecha reporte (Mes Año) - Usar fecha de hallazgo más antigua como fecha del reporte
             fecha_reporte_fmt = "ND"
-            if data["fecha_reporte"]:
+            # Prioridad: 1) fecha del informe si existe, 2) fecha de hallazgo más antigua
+            fecha_para_reporte = data["fecha_reporte"] or data["fecha_mas_antigua"]
+            if fecha_para_reporte:
                 try:
-                    fecha_dt = datetime.strptime(data["fecha_reporte"][:10], "%Y-%m-%d")
+                    fecha_dt = datetime.strptime(fecha_para_reporte[:10], "%Y-%m-%d")
                     meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
                     fecha_reporte_fmt = f"{meses[fecha_dt.month - 1]} {fecha_dt.year}"
-                except:
+                except (ValueError, TypeError):
                     pass
             
             # Estado remediación (desglose)
