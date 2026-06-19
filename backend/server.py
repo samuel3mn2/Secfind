@@ -24,6 +24,7 @@ from routes.controles import create_controles_router
 from routes.catalogo_riesgos import create_catalogo_riesgos_router
 from routes.hallazgos_auditoria import create_hallazgos_router
 from routes.dashboard import create_dashboard_router
+from routes.vista_comite import create_router as create_vista_comite_router
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -4356,6 +4357,7 @@ def setup_grc_routers():
     catalogo_riesgos_router = create_catalogo_riesgos_router(db, get_current_user)
     hallazgos_router = create_hallazgos_router(db, get_current_user)
     dashboard_grc_router = create_dashboard_router(db, get_current_user)
+    vista_comite_router = create_vista_comite_router(db, get_current_user, CurrentUser)
     
     # Register routers with api_router
     api_router.include_router(dominios_router)
@@ -4363,6 +4365,7 @@ def setup_grc_routers():
     api_router.include_router(catalogo_riesgos_router)
     api_router.include_router(hallazgos_router)
     api_router.include_router(dashboard_grc_router)
+    api_router.include_router(vista_comite_router)
 
 setup_grc_routers()
 

@@ -1,0 +1,61 @@
+{
+  "summary": "Tested Vista Comité CRUD endpoints + Excel ejecutivo (Iteration 22). Created /app/backend/tests/test_vistas_comite_crud.py with 13 pytest tests covering POST/GET/PUT/DELETE /api/vistas-comite, duplicate-name validation on create AND update, Excel export (valid xlsx, 9 columns, corporate styles 4A7C31 green header + FFFFFF white bold font + thin borders), and 404 path. All 13 backend tests pass. Frontend UI verified: /vista-comite renders, 'Vistas' dropdown opens with 'Guardar vista actual' option and 'No hay vistas guardadas' empty state; 'Excel Ejecutivo' button visible/enabled; saving a vista persists via POST /api/vistas-comite, dropdown counter increments to '1' and the saved vista loads correctly; deleting via dropdown trash icon fires DELETE /api/vistas-comite/{id} and removes the entry. Toast 'Vista guardada exitosamente' shown on save.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT/DELETE /api/vistas-comite/{id}", "issue": "Access check uses 'creado_por != current_user.id and not current_user.es_admin' - works, but error 403 message differs from 404 leakage (acceptable). Consider explicit returning 404 to avoid revealing existence to non-owners."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Vista Comité", "issues": [
+        "Recharts warning: width(-1)/height(-1) console warnings repeated multiple times during initial render (cosmetic, charts render correctly afterwards). Same recurrent warning previously noted in iteration_21 for DashboardGRC."
+      ]}
+    ]
+  },
+  "passed_tests": [
+    "POST /api/vistas-comite creates vista with id, persists, excludes _id",
+    "POST /api/vistas-comite rejects duplicate name (400)",
+    "GET /api/vistas-comite returns list (200)",
+    "GET /api/vistas-comite/{id} returns vista (200) / 404 for missing",
+    "PUT /api/vistas-comite/{id} updates nombre/descripcion/informes_seleccionados in-place and does NOT create duplicate (list count unchanged)",
+    "PUT /api/vistas-comite/{id} rejects renaming to an existing vista name (400)",
+    "DELETE /api/vistas-comite/{id} removes vista (GET returns 404 after)",
+    "GET /api/vistas-comite/{id}/exportar-excel returns valid .xlsx with correct Content-Disposition and spreadsheetml content-type",
+    "Excel has 9 columns with expected headers (Nombre de reporte, Fecha Reporte, Críticas, Altas, Total Vulns Altas, Estado remediación, Responsable, Fecha de compromiso, Tiempo de retraso) and 10th column empty",
+    "Excel header row has corporate styles: fill 4A7C31 (verde), font color FFFFFF, bold=True, thin borders",
+    "GET /api/vistas-comite/non-existent/exportar-excel returns 404",
+    "Auth required (401/403) on /api/vistas-comite without token",
+    "Frontend /vista-comite page loads, 'Vistas' & 'Excel Ejecutivo' buttons render with data-testid",
+    "Frontend save view flow: dropdown -> 'Guardar vista actual' -> input name -> save -> POST /api/vistas-comite 200 -> toast 'Vista guardada exitosamente' -> dropdown counter becomes 1",
+    "Frontend load view applies vista (currentViewId set, 'Nueva vista (limpiar)' option appears)",
+    "Frontend delete view via trash icon fires DELETE /api/vistas-comite/{id} 200 and removes entry"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_vistas_comite_crud.py",
+    "/app/test_reports/pytest/pytest_vistas_comite_crud.xml"
+  ],
+  "action_items": [
+    "Optional: Suppress recurring Recharts 'width(-1)/height(-1)' warnings by giving ResponsiveContainer explicit min dimensions (cosmetic, non-blocking)",
+    "Optional: Consider returning 404 (instead of 403) on PUT/DELETE for non-owner to avoid existence leak"
+  ],
+  "critical_code_review_comments": [
+    "routes/vista_comite.py uniqueness check via regex on user-provided 'nombre' is not escaped - special regex characters (e.g. '.', '*', '(', ')') in a vista name will alter the regex semantics. Use re.escape() or {'$eq': nombre} with collation for case-insensitive comparison.",
+    "PUT endpoint does not validate empty/whitespace-only 'nombre' after stripping. POST also lacks this check. Add: if data.nombre is not None and not data.nombre.strip(): raise 400.",
+    "_obtener_datos_comite: bare 'except:' (3 occurrences) silently swallows all exceptions including KeyboardInterrupt/SystemExit. Use 'except (ValueError, TypeError):' to be specific.",
+    "VistaComite.jsx is 1692 lines - exceeds 700-line guideline; consider extracting the SavedViews dropdown, Filters panel, KPI cards, and Table into separate components for maintainability.",
+    "Excel export hardcodes column widths and styles; consider extracting to module-level constants for reuse and easier modification.",
+    "Two parallel endpoints exist for Excel: /api/vistas-comite/{id}/exportar-excel and /api/vista-comite/exportar-excel (note plural vs singular). Naming inconsistency may confuse API consumers."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_vistas_comite_crud.py (NEW - 13 pytest tests for CRUD + Excel export)"
+  ],
+  "success_rate": {"backend": "100% (13/13 pytest tests passed)", "frontend": "100% (save/load/delete + Excel button verified)"},
+  "test_credentials": {"user": "admin", "password": "admin123"},
+  "seed_data_creation": "Each test creates TEST_VC_* prefixed vistas and cleans them up via DELETE in fixture teardown or inline. UI test created TEST_UI_VC_5438 and deleted it via UI trash icon.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Vista Comité CRUD (PUT/DELETE) and Excel export are fully functional. New test file: /app/backend/tests/test_vistas_comite_crud.py uses BASE_URL with fallback that reads from /app/frontend/.env when REACT_APP_BACKEND_URL env is not set. Note: /app/memory/test_credentials.md does NOT exist - admin/admin123 was used from the review request. data-testids on VistaComite page: vista-comite-page, saved-views-btn, refresh-btn, export-csv-btn, export-excel-btn, export-image-btn, input-view-name, btn-save-view, filter-informes, filter-grupos, toggle-agrupar, comite-row-{idx}. Frontend uses confirm modal for delete view (button 'Eliminar')."
+}

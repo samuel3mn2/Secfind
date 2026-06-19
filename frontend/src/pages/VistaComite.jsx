@@ -82,6 +82,8 @@ import {
   BookmarkCheck,
   Trash2,
   MoreHorizontal,
+  FileSpreadsheet,
+  PlusCircle,
 } from "lucide-react";
 import html2canvas from "html2canvas";
 
@@ -158,8 +160,11 @@ export default function VistaComite() {
   const [saveViewModalOpen, setSaveViewModalOpen] = useState(false);
   const [newViewName, setNewViewName] = useState("");
   const [newViewDescription, setNewViewDescription] = useState("");
+  const [newViewPublic, setNewViewPublic] = useState(false);
   const [savingView, setSavingView] = useState(false);
   const [deleteViewConfirm, setDeleteViewConfirm] = useState(null);
+  const [currentViewId, setCurrentViewId] = useState(null); // Track loaded view for updates
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   const canViewModule = isAdmin || canView("vulnerabilidades");
 
@@ -214,7 +219,7 @@ export default function VistaComite() {
         axios.get(`${API}/dropdown-options`, { headers }),
         axios.get(`${API}/config/grupos-informes`, { headers }),
         axios.get(`${API}/config/informes-sin-grupo`, { headers }),
-        axios.get(`${API}/vistas-guardadas`, { headers }),
+        axios.get(`${API}/vistas-comite`, { headers }),
       ]);
       
       setOptions(optionsRes.data);
@@ -414,25 +419,34 @@ export default function VistaComite() {
     setSavingView(true);
     try {
       const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      
       const viewData = {
         nombre: newViewName.trim(),
         descripcion: newViewDescription.trim() || null,
-        agrupar_por_grupo: agruparPorGrupo,
-        grupos_ids: selectedGrupos,
+        es_publica: newViewPublic,
+        agrupar_por: agruparPorGrupo ? "grupo" : "informe",
+        grupos_seleccionados: selectedGrupos,
         informes_adicionales: selectedInformesSinGrupo,
-        informes_individuales: selectedInformes,
+        informes_seleccionados: agruparPorGrupo ? [] : selectedInformes,
         severidades: selectedSeveridades,
       };
       
-      const response = await axios.post(`${API}/vistas-guardadas`, viewData, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      let response;
+      if (currentViewId) {
+        // Update existing view
+        response = await axios.put(`${API}/vistas-comite/${currentViewId}`, viewData, { headers });
+        setVistasGuardadas(prev => prev.map(v => v.id === currentViewId ? response.data : v));
+        toast.success("Vista actualizada exitosamente");
+      } else {
+        // Create new view
+        response = await axios.post(`${API}/vistas-comite`, viewData, { headers });
+        setVistasGuardadas(prev => [...prev, response.data].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+        setCurrentViewId(response.data.id);
+        toast.success("Vista guardada exitosamente");
+      }
       
-      setVistasGuardadas(prev => [...prev, response.data].sort((a, b) => a.nombre.localeCompare(b.nombre)));
-      toast.success("Vista guardada exitosamente");
       setSaveViewModalOpen(false);
-      setNewViewName("");
-      setNewViewDescription("");
     } catch (error) {
       console.error("Error saving view:", error);
       toast.error(error.response?.data?.detail || "Error al guardar la vista");
@@ -443,14 +457,20 @@ export default function VistaComite() {
 
   const handleLoadView = (vista) => {
     // Apply the saved view configuration
-    setAgruparPorGrupo(vista.agrupar_por_grupo);
+    setCurrentViewId(vista.id);
+    setNewViewName(vista.nombre);
+    setNewViewDescription(vista.descripcion || "");
+    setNewViewPublic(vista.es_publica || false);
+    
+    const isGroupMode = vista.agrupar_por === "grupo";
+    setAgruparPorGrupo(isGroupMode);
     setSelectedSeveridades(vista.severidades || ["Critica", "Alta", "Media", "Baja"]);
     
-    if (vista.agrupar_por_grupo) {
-      setSelectedGrupos(vista.grupos_ids || []);
+    if (isGroupMode) {
+      setSelectedGrupos(vista.grupos_seleccionados || []);
       setSelectedInformesSinGrupo(vista.informes_adicionales || []);
     } else {
-      setSelectedInformes(vista.informes_individuales || []);
+      setSelectedInformes(vista.informes_seleccionados || []);
     }
     
     setLoading(true);
@@ -460,17 +480,82 @@ export default function VistaComite() {
   const handleDeleteView = async (vista) => {
     try {
       const token = localStorage.getItem("token");
-      await axios.delete(`${API}/vistas-guardadas/${vista.id}`, {
+      await axios.delete(`${API}/vistas-comite/${vista.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       
       setVistasGuardadas(prev => prev.filter(v => v.id !== vista.id));
+      if (currentViewId === vista.id) {
+        setCurrentViewId(null);
+        setNewViewName("");
+        setNewViewDescription("");
+      }
       setDeleteViewConfirm(null);
       toast.success("Vista eliminada");
     } catch (error) {
       console.error("Error deleting view:", error);
       toast.error("Error al eliminar la vista");
     }
+  };
+
+  // Export Excel Ejecutivo
+  const handleExportExcelEjecutivo = async () => {
+    setExportingExcel(true);
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      let url;
+      if (currentViewId) {
+        // Export from saved view
+        url = `${API}/vistas-comite/${currentViewId}/exportar-excel`;
+      } else {
+        // Export with current parameters
+        const params = new URLSearchParams();
+        if (agruparPorGrupo) {
+          selectedGrupos.forEach(g => params.append("grupos", g));
+          selectedInformesSinGrupo.forEach(i => params.append("informes_adicionales", i));
+          params.append("agrupar_por", "grupo");
+        } else {
+          selectedInformes.forEach(i => params.append("informes", i));
+          params.append("agrupar_por", "informe");
+        }
+        url = `${API}/vista-comite/exportar-excel?${params.toString()}`;
+      }
+      
+      const response = await axios.get(url, {
+        headers,
+        responseType: 'blob'
+      });
+      
+      // Download file
+      const blob = new Blob([response.data], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `Vista_Comite_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+      
+      toast.success("Excel exportado exitosamente");
+    } catch (error) {
+      console.error("Error exporting Excel:", error);
+      toast.error("Error al exportar Excel");
+    } finally {
+      setExportingExcel(false);
+    }
+  };
+
+  // Reset view (new)
+  const handleNewView = () => {
+    setCurrentViewId(null);
+    setNewViewName("");
+    setNewViewDescription("");
+    setNewViewPublic(false);
   };
 
   const handleSeveridadToggle = (severidad) => {
@@ -678,24 +763,37 @@ export default function VistaComite() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-64 bg-zinc-900 border-zinc-700">
+              {currentViewId && (
+                <DropdownMenuItem
+                  onClick={handleNewView}
+                  className="text-blue-400 focus:text-blue-300 focus:bg-blue-500/10 cursor-pointer"
+                >
+                  <PlusCircle className="w-4 h-4 mr-2" />
+                  Nueva vista (limpiar)
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 onClick={() => setSaveViewModalOpen(true)}
                 className="text-green-400 focus:text-green-300 focus:bg-green-500/10 cursor-pointer"
               >
                 <Save className="w-4 h-4 mr-2" />
-                Guardar vista actual
+                {currentViewId ? "Actualizar vista actual" : "Guardar vista actual"}
               </DropdownMenuItem>
               {vistasGuardadas.length > 0 && (
                 <>
                   <DropdownMenuSeparator className="bg-zinc-700" />
+                  <div className="px-2 py-1 text-xs text-zinc-500 font-medium">Vistas guardadas</div>
                   {vistasGuardadas.map((vista) => (
                     <div key={vista.id} className="flex items-center group">
                       <DropdownMenuItem
                         onClick={() => handleLoadView(vista)}
-                        className="flex-1 text-zinc-300 focus:text-white focus:bg-white/10 cursor-pointer pr-2"
+                        className={`flex-1 text-zinc-300 focus:text-white focus:bg-white/10 cursor-pointer pr-2 ${
+                          currentViewId === vista.id ? "bg-indigo-500/20 text-indigo-300" : ""
+                        }`}
                       >
-                        <BookmarkCheck className="w-4 h-4 mr-2 text-indigo-400" />
+                        <BookmarkCheck className={`w-4 h-4 mr-2 ${currentViewId === vista.id ? "text-indigo-400" : "text-zinc-500"}`} />
                         <span className="truncate">{vista.nombre}</span>
+                        {vista.es_publica && <Eye className="w-3 h-3 ml-1 text-zinc-500" />}
                       </DropdownMenuItem>
                       <button
                         onClick={(e) => {
@@ -736,6 +834,16 @@ export default function VistaComite() {
           >
             <Download className="w-4 h-4 mr-2" />
             CSV
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleExportExcelEjecutivo}
+            disabled={data.length === 0 || exportingExcel}
+            className="border-emerald-700 text-emerald-300 hover:bg-emerald-900/30"
+            data-testid="export-excel-btn"
+          >
+            <FileSpreadsheet className="w-4 h-4 mr-2" />
+            {exportingExcel ? "Exportando..." : "Excel Ejecutivo"}
           </Button>
           <Button
             variant="outline"
@@ -1475,7 +1583,7 @@ export default function VistaComite() {
           <DialogHeader>
             <DialogTitle className="text-white flex items-center gap-2">
               <Save className="w-5 h-5 text-green-400" />
-              Guardar Vista Actual
+              {currentViewId ? "Actualizar Vista" : "Guardar Vista Nueva"}
             </DialogTitle>
           </DialogHeader>
           
@@ -1500,6 +1608,17 @@ export default function VistaComite() {
                 className="bg-zinc-800 border-zinc-700 text-white"
               />
             </div>
+
+            <div className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-lg">
+              <div>
+                <Label className="text-zinc-300">Vista pública</Label>
+                <p className="text-xs text-zinc-500">Visible para todos los usuarios</p>
+              </div>
+              <Switch
+                checked={newViewPublic}
+                onCheckedChange={setNewViewPublic}
+              />
+            </div>
             
             <div className="text-xs text-zinc-500 bg-zinc-800/50 p-3 rounded-lg space-y-1">
               <p className="font-medium text-zinc-400">Se guardará:</p>
@@ -1521,8 +1640,6 @@ export default function VistaComite() {
               variant="outline"
               onClick={() => {
                 setSaveViewModalOpen(false);
-                setNewViewName("");
-                setNewViewDescription("");
               }}
               className="border-zinc-700 text-zinc-300"
             >
@@ -1539,7 +1656,7 @@ export default function VistaComite() {
               ) : (
                 <Save className="w-4 h-4 mr-2" />
               )}
-              Guardar
+              {currentViewId ? "Actualizar" : "Guardar"}
             </Button>
           </div>
         </DialogContent>
