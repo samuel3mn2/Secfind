@@ -214,8 +214,11 @@ class EntradaBitacoraSeguimiento(BaseModel):
     fecha_compromiso_asignada: Optional[str] = None  # Nueva fecha de compromiso (YYYY-MM-DD)
     notas_impedimento: Optional[str] = None  # Texto libre para detallar bloqueos
 
+# Tipo estricto para resultado de retest
+ResultadoRetestLiteral = Literal["Corregido", "Pendiente", "Impedimento", "Vulnerable", "Desestimado"]
+
 class RegistroSeguimientoRequest(BaseModel):
-    resultado_retest: str
+    resultado_retest: ResultadoRetestLiteral
     fecha_compromiso_asignada: Optional[str] = None
     notas_impedimento: Optional[str] = None
 
@@ -3134,12 +3137,18 @@ async def registrar_seguimiento(
     if not existing:
         raise HTTPException(status_code=404, detail="Vulnerabilidad no encontrada")
     
+    # Determinar si es un estado de cierre (no requiere fecha de compromiso)
+    es_estado_cierre = data.resultado_retest in ["Corregido", "Desestimado"]
+    
+    # Para estados de cierre, forzar fecha_compromiso_asignada a null
+    fecha_para_bitacora = None if es_estado_cierre else data.fecha_compromiso_asignada
+    
     # Crear entrada de bitácora
     entrada_bitacora = {
         "id_accion": str(uuid.uuid4()),
         "fecha_registro_nota": datetime.now(timezone.utc).isoformat(),
         "resultado_retest": data.resultado_retest,
-        "fecha_compromiso_asignada": data.fecha_compromiso_asignada,
+        "fecha_compromiso_asignada": fecha_para_bitacora,
         "notas_impedimento": data.notas_impedimento or "",
         "usuario_registro": current_user.nombre or current_user.username
     }
@@ -3160,21 +3169,34 @@ async def registrar_seguimiento(
         }
     }
     
-    # Verificar si la fecha de compromiso cambió
+    # Inicializar $inc si se va a usar
+    inc_ops = {}
+    
+    # Control de incremento de veces_en_retest según resultado técnico:
+    # - Incrementa SOLO si resultado es ["Corregido", "Desestimado", "Pendiente", "Vulnerable"]
+    # - NO incrementa si es "Impedimento" (la validación técnica no pudo ejecutarse)
+    if data.resultado_retest in ["Corregido", "Desestimado", "Pendiente", "Vulnerable"]:
+        inc_ops["veces_en_retest"] = 1
+    
+    # Verificar si la fecha de compromiso cambió (SOLO para estados NO de cierre)
     fecha_actual = existing.get("fecha_compromiso", "")
-    fecha_nueva = data.fecha_compromiso_asignada or ""
+    fecha_nueva = fecha_para_bitacora or ""
     fecha_cambio = False
     
-    if fecha_nueva and fecha_nueva != fecha_actual:
+    # Solo procesar cambio de fecha si NO es estado de cierre
+    if not es_estado_cierre and fecha_nueva and fecha_nueva != fecha_actual:
         update_ops["$set"]["fecha_compromiso"] = fecha_nueva
-        update_ops["$inc"] = {"veces_cambiada_fecha": 1}
+        inc_ops["veces_cambiada_fecha"] = 1
         fecha_cambio = True
     
+    # Si hay operaciones de incremento, agregarlas
+    if inc_ops:
+        update_ops["$inc"] = inc_ops
+    
     # Sincronizar estatus basado en resultado de retest (lógica existente)
-    resultado_lower = data.resultado_retest.strip().lower()
-    if resultado_lower in ["corregido", "desestimado"]:
+    if es_estado_cierre:
         update_ops["$set"]["estatus"] = "Cerrado"
-    elif resultado_lower in ["vulnerable", "impedimento", "pendiente"]:
+    elif data.resultado_retest in ["Vulnerable", "Impedimento", "Pendiente"]:
         update_ops["$set"]["estatus"] = "Pendiente"
     
     # Ejecutar actualización

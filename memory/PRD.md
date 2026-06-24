@@ -3,6 +3,14 @@
 ## Última Actualización: 2026-06-19
 
 ### Cambios Recientes (Junio 2026)
+- **AJUSTES REGLAS DE NEGOCIO - SEGUIMIENTO (2026-06-24)**:
+  - Validación Pydantic Literal para `resultado_retest`: Solo acepta ["Corregido", "Pendiente", "Impedimento", "Vulnerable", "Desestimado"]
+  - Estados de cierre (Corregido/Desestimado): fecha_compromiso forzada a null, NO incrementa veces_cambiada_fecha
+  - Impedimento: NO incrementa veces_en_retest (la validación técnica no pudo ejecutarse)
+  - Vulnerable/Pendiente/Corregido/Desestimado: SÍ incrementan veces_en_retest
+  - Frontend: Campo fecha deshabilitado automáticamente al seleccionar estados de cierre
+  - Mensaje visual "(No aplica para cierre)" cuando corresponde
+
 - **SUBMÓDULO BITÁCORA E IMPEDIMENTOS - SEGUIMIENTO (2026-06-24)**:
   - Nuevo campo `veces_cambiada_fecha` - Contador de veces que se reprograma la fecha de compromiso
   - Nuevo campo `historial_impedimentos_seguimiento` - Array de entradas de bitácora con:

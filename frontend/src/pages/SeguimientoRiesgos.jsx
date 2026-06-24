@@ -1127,7 +1127,15 @@ export default function SeguimientoRiesgos() {
                               <Label className="text-zinc-400">Resultado Retest *</Label>
                               <Select
                                 value={seguimientoForm.resultado_retest}
-                                onValueChange={(v) => setSeguimientoForm(prev => ({ ...prev, resultado_retest: v }))}
+                                onValueChange={(v) => {
+                                  // Si es estado de cierre, limpiar la fecha
+                                  const esEstadoCierre = v === "Corregido" || v === "Desestimado";
+                                  setSeguimientoForm(prev => ({ 
+                                    ...prev, 
+                                    resultado_retest: v,
+                                    fecha_compromiso_asignada: esEstadoCierre ? "" : prev.fecha_compromiso_asignada
+                                  }));
+                                }}
                               >
                                 <SelectTrigger className="bg-zinc-900 border-zinc-700" data-testid="select-resultado-retest">
                                   <SelectValue placeholder="Seleccionar resultado" />
@@ -1143,15 +1151,32 @@ export default function SeguimientoRiesgos() {
                             </div>
                             
                             <div className="space-y-2">
-                              <Label className="text-zinc-400">Nueva Fecha Compromiso</Label>
+                              <Label className={`${
+                                (seguimientoForm.resultado_retest === "Corregido" || seguimientoForm.resultado_retest === "Desestimado")
+                                  ? "text-zinc-600" 
+                                  : "text-zinc-400"
+                              }`}>
+                                Nueva Fecha Compromiso
+                                {(seguimientoForm.resultado_retest === "Corregido" || seguimientoForm.resultado_retest === "Desestimado") && (
+                                  <span className="text-xs text-zinc-500 ml-2">(No aplica para cierre)</span>
+                                )}
+                              </Label>
                               <Input
                                 type="date"
                                 value={seguimientoForm.fecha_compromiso_asignada}
                                 onChange={(e) => setSeguimientoForm(prev => ({ ...prev, fecha_compromiso_asignada: e.target.value }))}
-                                className="bg-zinc-900 border-zinc-700"
+                                className={`bg-zinc-900 border-zinc-700 ${
+                                  (seguimientoForm.resultado_retest === "Corregido" || seguimientoForm.resultado_retest === "Desestimado")
+                                    ? "opacity-50 cursor-not-allowed" 
+                                    : ""
+                                }`}
+                                disabled={seguimientoForm.resultado_retest === "Corregido" || seguimientoForm.resultado_retest === "Desestimado"}
                                 data-testid="input-fecha-compromiso"
                               />
-                              {seguimientoForm.fecha_compromiso_asignada && seguimientoForm.fecha_compromiso_asignada !== viewingItem.fecha_compromiso && (
+                              {seguimientoForm.fecha_compromiso_asignada && 
+                               seguimientoForm.fecha_compromiso_asignada !== viewingItem.fecha_compromiso &&
+                               seguimientoForm.resultado_retest !== "Corregido" && 
+                               seguimientoForm.resultado_retest !== "Desestimado" && (
                                 <p className="text-xs text-amber-400">⚠️ Se incrementará el contador de reprogramaciones</p>
                               )}
                             </div>
