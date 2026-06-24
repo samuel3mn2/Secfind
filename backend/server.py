@@ -2956,6 +2956,8 @@ async def get_seguimiento_riesgos(
     mes: Optional[str] = None,  # "01" to "12"
     año_compromiso: Optional[str] = None,  # "2024", "2025", etc.
     tipo_fecha: Optional[str] = "con_fecha",  # "con_fecha", "sin_fecha", "todas"
+    incluir_cerradas: bool = False,  # True para mostrar histórico cerrado (auditoría)
+    busqueda: Optional[str] = None,  # Búsqueda por código o nombre de vulnerabilidad
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """
@@ -2964,6 +2966,8 @@ async def get_seguimiento_riesgos(
     - vencidas: past due date, not resolved
     - proximas: due within next 30 days
     - mes/año_compromiso: filter by specific month/year of fecha_compromiso
+    - incluir_cerradas: True para mostrar vulnerabilidades cerradas (histórico de auditoría)
+    - busqueda: texto libre para filtrar por código o nombre de vulnerabilidad
     """
     if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
         raise HTTPException(status_code=403, detail="No tiene permisos para ver el seguimiento de riesgos")
@@ -2977,41 +2981,62 @@ async def get_seguimiento_riesgos(
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     future_30 = (datetime.now(timezone.utc) + timedelta(days=30)).strftime("%Y-%m-%d")
     
-    # Base query: not resolved
-    query = {
-        "estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]}
-    }
+    # Base query: depends on incluir_cerradas flag
+    if incluir_cerradas:
+        # Modo auditoría: solo mostrar cerradas
+        query = {
+            "estatus": {"$in": ["Cerrado", "Corregido", "Desestimado"]}
+        }
+    else:
+        # Modo normal: excluir cerradas
+        query = {
+            "estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]}
+        }
     
-    # Filter by tipo_fecha
-    if tipo_fecha == "sin_fecha":
+    # Filtro de búsqueda por código o nombre de vulnerabilidad
+    if busqueda and busqueda.strip():
+        busqueda_regex = {"$regex": busqueda.strip(), "$options": "i"}
         query["$or"] = [
-            {"fecha_compromiso": {"$exists": False}},
-            {"fecha_compromiso": None},
-            {"fecha_compromiso": ""}
+            {"codigo": busqueda_regex},
+            {"vulnerabilidad": busqueda_regex}
         ]
-    elif tipo_fecha == "con_fecha":
-        query["fecha_compromiso"] = {"$exists": True, "$nin": [None, ""]}
-    # tipo_fecha == "todas" - no fecha_compromiso filter
     
-    # Filter by month/year of fecha_compromiso (only applies when tipo_fecha is "con_fecha" or "todas")
-    if tipo_fecha != "sin_fecha":
-        if mes and mes != "all" and año_compromiso and año_compromiso != "all":
-            # Filter by specific month and year (YYYY-MM format)
-            prefix = f"{año_compromiso}-{mes}"
-            query["fecha_compromiso"] = {"$regex": f"^{prefix}"}
-        elif año_compromiso and año_compromiso != "all":
-            # Filter by year only
-            query["fecha_compromiso"] = {"$regex": f"^{año_compromiso}"}
-        elif mes and mes != "all":
-            # Filter by month only (any year)
-            query["fecha_compromiso"] = {"$regex": f"^\\d{{4}}-{mes}"}
-        elif filtro == "vencidas":
-            query["fecha_compromiso"] = {"$lt": today, "$nin": [None, ""]}
-        elif filtro == "proximas":
-            query["$and"] = [
-                {"fecha_compromiso": {"$gte": today}},
-                {"fecha_compromiso": {"$lte": future_30}}
-            ]
+    # Filter by tipo_fecha (solo aplica si NO estamos en modo cerradas)
+    if not incluir_cerradas:
+        if tipo_fecha == "sin_fecha":
+            query_fecha = {"$or": [
+                {"fecha_compromiso": {"$exists": False}},
+                {"fecha_compromiso": None},
+                {"fecha_compromiso": ""}
+            ]}
+            # Merge with existing query
+            if "$or" in query:
+                query["$and"] = [{"$or": query.pop("$or")}, query_fecha]
+            else:
+                query.update(query_fecha)
+        elif tipo_fecha == "con_fecha":
+            query["fecha_compromiso"] = {"$exists": True, "$nin": [None, ""]}
+        # tipo_fecha == "todas" - no fecha_compromiso filter
+        
+        # Filter by month/year of fecha_compromiso (only applies when tipo_fecha is "con_fecha" or "todas")
+        if tipo_fecha != "sin_fecha":
+            if mes and mes != "all" and año_compromiso and año_compromiso != "all":
+                # Filter by specific month and year (YYYY-MM format)
+                prefix = f"{año_compromiso}-{mes}"
+                query["fecha_compromiso"] = {"$regex": f"^{prefix}"}
+            elif año_compromiso and año_compromiso != "all":
+                # Filter by year only
+                query["fecha_compromiso"] = {"$regex": f"^{año_compromiso}"}
+            elif mes and mes != "all":
+                # Filter by month only (any year)
+                query["fecha_compromiso"] = {"$regex": f"^\\d{{4}}-{mes}"}
+            elif filtro == "vencidas":
+                query["fecha_compromiso"] = {"$lt": today, "$nin": [None, ""]}
+            elif filtro == "proximas":
+                query["$and"] = query.get("$and", []) + [
+                    {"fecha_compromiso": {"$gte": today}},
+                    {"fecha_compromiso": {"$lte": future_30}}
+                ]
     
     if severidades:
         query["severidad"] = {"$in": severidades}

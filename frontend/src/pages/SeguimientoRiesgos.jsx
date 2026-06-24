@@ -55,6 +55,9 @@ import {
   Ban,
   CheckCheck,
   XCircle,
+  Search,
+  Archive,
+  ListChecks,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -388,6 +391,11 @@ export default function SeguimientoRiesgos() {
   const [filterInforme, setFilterInforme] = useState([]);
   const [filterAplicacion, setFilterAplicacion] = useState([]);
   
+  // Modo auditoría (histórico cerrado) y búsqueda
+  const [modoAuditoria, setModoAuditoria] = useState(false);  // false = Activas, true = Cerradas
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  
   // Modal state
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingItem, setViewingItem] = useState(null);
@@ -513,15 +521,31 @@ export default function SeguimientoRiesgos() {
   const fetchVulnerabilidades = useCallback(async () => {
     try {
       const params = new URLSearchParams();
-      if (filterEstado && filterEstado !== "all") params.append("filtro", filterEstado);
+      
+      // Solo aplicar filtros de fecha si NO estamos en modo auditoría
+      if (!modoAuditoria) {
+        if (filterEstado && filterEstado !== "all") params.append("filtro", filterEstado);
+        if (filterMes && filterMes !== "all") params.append("mes", filterMes);
+        if (filterAño && filterAño !== "all") params.append("año_compromiso", filterAño);
+        if (filterTipoFecha) params.append("tipo_fecha", filterTipoFecha);
+      }
+      
+      // Filtros comunes
       if (filterSeveridad.length > 0) filterSeveridad.forEach(v => params.append("severidad", v));
       if (filterInstitucion.length > 0) filterInstitucion.forEach(v => params.append("institucion", v));
       if (filterInforme.length > 0) filterInforme.forEach(v => params.append("informe_pentest", v));
       if (filterAplicacion.length > 0) filterAplicacion.forEach(v => params.append("aplicacion", v));
       if (filterResponsable.length > 0) filterResponsable.forEach(v => params.append("responsable", v));
-      if (filterMes && filterMes !== "all") params.append("mes", filterMes);
-      if (filterAño && filterAño !== "all") params.append("año_compromiso", filterAño);
-      if (filterTipoFecha) params.append("tipo_fecha", filterTipoFecha);
+      
+      // Modo auditoría (histórico cerrado)
+      if (modoAuditoria) {
+        params.append("incluir_cerradas", "true");
+      }
+      
+      // Búsqueda por código o nombre
+      if (debouncedSearch && debouncedSearch.trim()) {
+        params.append("busqueda", debouncedSearch.trim());
+      }
 
       const response = await axios.get(`${API}/seguimiento-riesgos?${params.toString()}`);
       setVulnerabilidades(response.data);
@@ -529,7 +553,7 @@ export default function SeguimientoRiesgos() {
       console.error("Error fetching vulnerabilidades:", error);
       toast.error("Error al cargar vulnerabilidades");
     }
-  }, [filterEstado, filterSeveridad, filterInstitucion, filterInforme, filterAplicacion, filterResponsable, filterMes, filterAño, filterTipoFecha]);
+  }, [filterEstado, filterSeveridad, filterInstitucion, filterInforme, filterAplicacion, filterResponsable, filterMes, filterAño, filterTipoFecha, modoAuditoria, debouncedSearch]);
 
   const fetchResumenVulns = async () => {
     try {
@@ -576,6 +600,19 @@ export default function SeguimientoRiesgos() {
   useEffect(() => {
     fetchOptions();
   }, []);
+
+  // Debounce para búsqueda
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Reset página al cambiar búsqueda o modo auditoría
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, modoAuditoria]);
 
   useEffect(() => {
     setLoading(true);
@@ -716,8 +753,8 @@ export default function SeguimientoRiesgos() {
           </TabsTrigger>
         </TabsList>
 
-        {/* KPI Cards - Shared */}
-        {currentResumen && (
+        {/* KPI Cards - Solo mostrar si NO estamos en modo auditoría */}
+        {currentResumen && !modoAuditoria && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card 
               className={`bg-[#18181b] border-[#27272a] cursor-pointer transition-all hover:border-red-500/50 ${filterEstado === "vencidas" ? "border-red-500" : ""}`}
@@ -793,21 +830,112 @@ export default function SeguimientoRiesgos() {
           </div>
         )}
 
+        {/* Modo Auditoría Toggle y Barra de Búsqueda */}
+        <Card className="bg-[#18181b] border-[#27272a]">
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+              {/* Tabs de Modo: Activas vs Histórico Cerrado */}
+              <div className="flex items-center gap-2 bg-zinc-900 p-1 rounded-lg border border-zinc-700">
+                <button
+                  onClick={() => {
+                    setModoAuditoria(false);
+                    setSearchQuery("");
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                    !modoAuditoria 
+                      ? "bg-indigo-600 text-white shadow-lg" 
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                  }`}
+                  data-testid="tab-activas"
+                >
+                  <ListChecks className="w-4 h-4" />
+                  Vulnerabilidades Activas
+                </button>
+                <button
+                  onClick={() => {
+                    setModoAuditoria(true);
+                    setFilterEstado("all");
+                    setSearchQuery("");
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                    modoAuditoria 
+                      ? "bg-emerald-600 text-white shadow-lg" 
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                  }`}
+                  data-testid="tab-historico"
+                >
+                  <Archive className="w-4 h-4" />
+                  Histórico Cerrado
+                </button>
+              </div>
+
+              {/* Barra de Búsqueda */}
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar por código o nombre de vulnerabilidad..."
+                  className="w-full pl-10 pr-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
+                  data-testid="search-vulnerabilidades"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-zinc-500 hover:text-white"
+                  >
+                    <XCircle className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Indicador de modo actual */}
+            {modoAuditoria && (
+              <div className="mt-3 p-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                <p className="text-sm text-emerald-400 flex items-center gap-2">
+                  <Archive className="w-4 h-4" />
+                  <span><strong>Modo Auditoría:</strong> Mostrando vulnerabilidades con estatus Cerrado, Corregido o Desestimado</span>
+                </p>
+              </div>
+            )}
+            
+            {/* Indicador de búsqueda activa */}
+            {debouncedSearch && (
+              <div className="mt-3 p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg flex items-center justify-between">
+                <p className="text-sm text-cyan-400 flex items-center gap-2">
+                  <Search className="w-4 h-4" />
+                  <span>Buscando: <strong>&quot;{debouncedSearch}&quot;</strong> - {vulnerabilidades.length} resultado(s)</span>
+                </p>
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="text-cyan-400 hover:text-cyan-300 text-sm underline"
+                >
+                  Limpiar
+                </button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Filters */}
         <Card className="bg-[#18181b] border-[#27272a]">
           <CardContent className="p-4">
             <div className="flex flex-wrap gap-4">
-              {/* Tipo Fecha Filter */}
-              <Select value={filterTipoFecha} onValueChange={setFilterTipoFecha}>
-                <SelectTrigger className="w-[150px] bg-zinc-900 border-zinc-700 text-white" data-testid="filter-tipo-fecha">
-                  <SelectValue placeholder="Tipo fecha" />
-                </SelectTrigger>
-                <SelectContent className="bg-zinc-900 border-zinc-700">
-                  <SelectItem value="todas">Todas</SelectItem>
-                  <SelectItem value="con_fecha">Con fecha</SelectItem>
-                  <SelectItem value="sin_fecha">Sin fecha</SelectItem>
-                </SelectContent>
-              </Select>
+              {/* Tipo Fecha Filter - Solo mostrar si NO estamos en modo auditoría */}
+              {!modoAuditoria && (
+                <Select value={filterTipoFecha} onValueChange={setFilterTipoFecha}>
+                  <SelectTrigger className="w-[150px] bg-zinc-900 border-zinc-700 text-white" data-testid="filter-tipo-fecha">
+                    <SelectValue placeholder="Tipo fecha" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-zinc-900 border-zinc-700">
+                    <SelectItem value="todas">Todas</SelectItem>
+                    <SelectItem value="con_fecha">Con fecha</SelectItem>
+                    <SelectItem value="sin_fecha">Sin fecha</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
 
               {/* Vulnerabilidades-specific filters */}
               {activeTab === "vulnerabilidades" && (
@@ -864,31 +992,35 @@ export default function SeguimientoRiesgos() {
                 data-testid="filter-responsable"
               />
 
-              {/* Month Filter */}
-              <Select value={filterMes} onValueChange={setFilterMes}>
-                <SelectTrigger className="w-[140px] bg-zinc-900 border-zinc-700 text-white" data-testid="filter-mes">
-                  <SelectValue placeholder="Mes" />
-                </SelectTrigger>
-                <SelectContent className="bg-zinc-900 border-zinc-700">
-                  <SelectItem value="all">Todos los meses</SelectItem>
-                  {monthOptions.map((month) => (
-                    <SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Month Filter - Solo mostrar si NO estamos en modo auditoría */}
+              {!modoAuditoria && (
+                <Select value={filterMes} onValueChange={setFilterMes}>
+                  <SelectTrigger className="w-[140px] bg-zinc-900 border-zinc-700 text-white" data-testid="filter-mes">
+                    <SelectValue placeholder="Mes" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-zinc-900 border-zinc-700">
+                    <SelectItem value="all">Todos los meses</SelectItem>
+                    {monthOptions.map((month) => (
+                      <SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
 
-              {/* Year Filter */}
-              <Select value={filterAño} onValueChange={setFilterAño}>
-                <SelectTrigger className="w-[120px] bg-zinc-900 border-zinc-700 text-white" data-testid="filter-año">
-                  <SelectValue placeholder="Año" />
-                </SelectTrigger>
-                <SelectContent className="bg-zinc-900 border-zinc-700">
-                  <SelectItem value="all">Todos los años</SelectItem>
-                  {yearOptions.map((year) => (
-                    <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Year Filter - Solo mostrar si NO estamos en modo auditoría */}
+              {!modoAuditoria && (
+                <Select value={filterAño} onValueChange={setFilterAño}>
+                  <SelectTrigger className="w-[120px] bg-zinc-900 border-zinc-700 text-white" data-testid="filter-año">
+                    <SelectValue placeholder="Año" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-zinc-900 border-zinc-700">
+                    <SelectItem value="all">Todos los años</SelectItem>
+                    {yearOptions.map((year) => (
+                      <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
 
               {(filterEstado !== "all" || filterSeveridad.length > 0 || filterInstitucion.length > 0 || filterInforme.length > 0 || filterAplicacion.length > 0 || filterResponsable.length > 0) && (
                 <Button

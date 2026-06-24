@@ -3,6 +3,15 @@
 ## Última Actualización: 2026-06-19
 
 ### Cambios Recientes (Junio 2026)
+- **MODO AUDITORÍA Y BÚSQUEDA - SEGUIMIENTO (2026-06-24)**:
+  - Backend: Parámetro `incluir_cerradas=true` para mostrar histórico de cerradas
+  - Backend: Parámetro `busqueda` para filtrar por código o nombre de vulnerabilidad
+  - Frontend: Tabs de alternancia "Vulnerabilidades Activas" / "Histórico Cerrado"
+  - Frontend: Barra de búsqueda con debounce (300ms) e indicador de resultados
+  - Modo Auditoría oculta KPIs y filtros de fecha (no aplican para cerradas)
+  - Indicador visual de modo activo con mensaje explicativo
+  - Botón "Limpiar" para resetear búsqueda
+
 - **INDICADORES VISUALES TIPO DE REGISTRO - SEGUIMIENTO (2026-06-24)**:
   - Timeline muestra tipo de registro para cada entrada:
     * **Retest Técnico** (cyan): Pendiente sin cambio de fecha
