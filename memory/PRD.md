@@ -3,6 +3,20 @@
 ## Última Actualización: 2026-06-19
 
 ### Cambios Recientes (Junio 2026)
+- **SUBMÓDULO BITÁCORA E IMPEDIMENTOS - SEGUIMIENTO (2026-06-24)**:
+  - Nuevo campo `veces_cambiada_fecha` - Contador de veces que se reprograma la fecha de compromiso
+  - Nuevo campo `historial_impedimentos_seguimiento` - Array de entradas de bitácora con:
+    * id_accion, fecha_registro_nota, resultado_retest, fecha_compromiso_asignada
+    * notas_impedimento (crítico para documentar bloqueos)
+    * usuario_registro
+  - Endpoint `POST /api/seguimiento/{vuln_id}/registrar` - Registra entrada de bitácora
+  - Endpoint `GET /api/seguimiento/{vuln_id}/historial` - Obtiene historial ordenado cronológicamente
+  - Frontend: Badge `⚠️ VENCIDA` animado en tabla de seguimiento
+  - Frontend: Modal con tabs Info/Bitácora y formulario de registro
+  - Frontend: Timeline visual con estados coloreados y notas de impedimento
+  - Lógica automática: Incrementa contador solo si fecha cambia, sincroniza estatus
+  - 14/14 tests backend pasados, frontend E2E verificado
+
 - **SIDEBAR COLAPSABLE (2026-06-19)**:
   - Nueva funcionalidad para colapsar/expandir la barra lateral izquierda
   - Botón toggle con iconos dinámicos (PanelLeftClose/PanelLeft)

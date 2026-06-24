@@ -206,7 +206,7 @@ class VulnerabilidadBase(BaseModel):
     control_id: Optional[str] = None  # Reference to config_controles
     riesgo_id: Optional[str] = None  # Reference to catalogo_riesgos
     # Bitácora de impedimentos y seguimientos
-    historial_impedimentos_seguimiento: Optional[List[dict]] = None
+    historial_impedimentos_seguimiento: List[dict] = Field(default_factory=list)
 
 # Modelo para entrada de bitácora de seguimiento
 class EntradaBitacoraSeguimiento(BaseModel):
@@ -3144,6 +3144,13 @@ async def registrar_seguimiento(
         "usuario_registro": current_user.nombre or current_user.username
     }
     
+    # Si el campo historial_impedimentos_seguimiento es null, inicializarlo primero
+    if existing.get("historial_impedimentos_seguimiento") is None:
+        await db.vulnerabilidades.update_one(
+            {"id": vuln_id},
+            {"$set": {"historial_impedimentos_seguimiento": []}}
+        )
+    
     # Preparar operación de actualización
     update_ops = {
         "$push": {"historial_impedimentos_seguimiento": entrada_bitacora},
@@ -3218,7 +3225,8 @@ async def get_historial_seguimiento(
     if not vuln:
         raise HTTPException(status_code=404, detail="Vulnerabilidad no encontrada")
     
-    historial = vuln.get("historial_impedimentos_seguimiento", [])
+    # Manejar caso donde el campo es None (bug de null en MongoDB)
+    historial = vuln.get("historial_impedimentos_seguimiento") or []
     
     # Ordenar por fecha de registro (más reciente primero)
     historial_ordenado = sorted(
