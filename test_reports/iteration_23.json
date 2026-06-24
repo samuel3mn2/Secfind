@@ -1,0 +1,67 @@
+{
+  "summary": "Tested Seguimiento Bitácora & Impedimentos submodule (Iteration 23). Created /app/backend/tests/test_seguimiento_bitacora.py with 14 pytest tests (all PASS). Backend tests cover: auth required (401/403), 404 missing vuln, initial empty historial, POST registrar with same/different fechas, counter veces_cambiada_fecha increment logic, estatus sync (Corregido/Desestimado -> Cerrado; Pendiente/Vulnerable/Impedimento -> Pendiente), desc-ordering of historial. ALSO documented a CRITICAL null-array bug: when a vulnerability is created via POST /api/vulnerabilidades WITHOUT explicitly providing historial_impedimentos_seguimiento=[], the field is stored as null in MongoDB and BOTH endpoints crash with 500. Frontend Playwright end-to-end flow PASSED: login -> /seguimiento-riesgos -> VENCIDA badges visible (15 in page, KPI=29) -> open vuln modal -> Tabs 'Información' & 'Bitácora (0)' -> click 'Registrar Seguimiento / Impedimento' -> select Resultado=Pendiente, fecha=2026-12-15, notas -> warning 'Se incrementará el contador de reprogramaciones' shown -> Guardar Registro -> POST /api/seguimiento/{id}/registrar 200 -> GET historial 200 -> tab auto-switches to Bitácora and counter becomes (1) -> timeline entry rendered with 'Pendiente | 24 jun 2026 | Nueva fecha: 2026-12-15 | Administrador | TEST_UI nota' and '1x reprogramada' badge in header.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/seguimiento/{vuln_id}/historial", "issue": "Returns 500 (TypeError: 'NoneType' object is not iterable at server.py:3224) when vulnerability has historial_impedimentos_seguimiento=null. vuln.get('historial_impedimentos_seguimiento', []) returns None because the KEY exists with value None (default in VulnerabilidadBase is Optional[List[dict]]=None). Fix: use 'historial = vuln.get(\"historial_impedimentos_seguimiento\") or []'.", "priority": "HIGH"},
+      {"endpoint": "POST /api/seguimiento/{vuln_id}/registrar", "issue": "Returns 500 (pymongo WriteError code 2: 'The field historial_impedimentos_seguimiento must be an array but is of type null') when the field is null. $push fails on null fields in MongoDB. Fix: use $setOnInsert to initialize, or normalize via update_one with $set when null, or change default to [] in VulnerabilidadBase.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/seguimiento/{vuln_id}/registrar", "issue": "data.resultado_retest is not validated as enum - any free-text value is accepted (only normalized via lower() for status sync). Recommend Pydantic Literal['Pendiente','Vulnerable','Impedimento','Corregido','Desestimado']."},
+      {"endpoint": "POST /api/seguimiento/{vuln_id}/registrar", "issue": "data.fecha_compromiso_asignada is Optional[str] with no date format validation - invalid date strings could be saved."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Seguimiento de Riesgos - Modal", "issues": ["Form 'Nueva fecha compromiso' uses browser default date picker (input type=date) instead of shadcn Calendar component - inconsistent with rest of app."]}
+    ]
+  },
+  "passed_tests": [
+    "Backend: POST /api/seguimiento/{id}/registrar requires auth (401/403 without token)",
+    "Backend: GET /api/seguimiento/{id}/historial requires auth",
+    "Backend: Both endpoints return 404 for non-existent vuln_id",
+    "Backend: GET /historial returns empty list, total_registros=0, veces_cambiada_fecha=0 for fresh vuln (with array pre-initialized)",
+    "Backend: POST registrar with same fecha_compromiso -> fecha_cambiada=false, counter unchanged",
+    "Backend: POST registrar with new fecha -> fecha_cambiada=true, veces_cambiada_fecha increments by 1, fecha_compromiso updated",
+    "Backend: Estatus sync - Pendiente/Vulnerable/Impedimento -> estatus='Pendiente'",
+    "Backend: Estatus sync - Corregido/Desestimado -> estatus='Cerrado'",
+    "Backend: historial entry contains required fields (id_accion uuid, fecha_registro_nota ISO, resultado_retest, fecha_compromiso_asignada, notas_impedimento, usuario_registro)",
+    "Backend: GET /historial returns entries sorted descending by fecha_registro_nota",
+    "Backend: GET /historial returns veces_cambiada_fecha, veces_en_retest, estatus_actual, resultado_retest_actual",
+    "Frontend: /seguimiento-riesgos loads with KPI vencidas=29 and 15 '⚠️ VENCIDA' badges rendered in first page",
+    "Frontend: Modal opens with tabs 'Información' (data-state=active) and 'Bitácora (N)' showing entry count",
+    "Frontend: 'Registrar Seguimiento / Impedimento' button visible from Información tab, opens form",
+    "Frontend: Form fields select-resultado-retest, input-fecha-compromiso, textarea-notas-impedimento work; 'Se incrementará el contador de reprogramaciones' warning appears when date changes",
+    "Frontend: btn-guardar-seguimiento POSTs to /api/seguimiento/{id}/registrar (200), refetches /historial (200), switches active tab to Bitácora, updates count to (1), renders timeline entry with notas/usuario/fecha",
+    "Frontend: Header badges update after save - 'Sin fecha'/'1x reprogramada' shown reflecting new state"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_seguimiento_bitacora.py",
+    "/app/test_reports/pytest/pytest_seguimiento_bitacora.xml"
+  ],
+  "action_items": [
+    "FIX HIGH: GET /api/seguimiento/{id}/historial - change line 3221 to: historial = vuln.get('historial_impedimentos_seguimiento') or []  (handle None case)",
+    "FIX HIGH: POST /api/seguimiento/{id}/registrar - normalize field before $push. Either (a) change default in VulnerabilidadBase to default_factory=list, (b) run a one-time migration: db.vulnerabilidades.updateMany({historial_impedimentos_seguimiento:null},{$set:{historial_impedimentos_seguimiento:[]}}), or (c) do a pre-update $set when null then $push.",
+    "Add Pydantic enum validation for resultado_retest field (Literal of allowed values)",
+    "Add date format validation for fecha_compromiso_asignada (YYYY-MM-DD)",
+    "Replace browser-default date input with shadcn Calendar component for consistency"
+  ],
+  "critical_code_review_comments": [
+    "server.py line 3224 uses sorted(vuln.get('historial_impedimentos_seguimiento', [])) - the .get() default is bypassed when the key exists with value None. Use 'or []' pattern.",
+    "server.py line 3149 $push on historial_impedimentos_seguimiento will fail in Mongo when field is null. The Pydantic default Optional[List[dict]]=None lets nulls persist on creation.",
+    "server.py line 3183: f-string slice 'data.notas_impedimento[:100] + ...' could break on multi-byte chars and the ternary returns full string truncated to first 100 chars when len>100 - logic ok but consider repr-safe truncation.",
+    "SeguimientoRiesgos.jsx 1291 lines - exceeds 700-line guideline; consider extracting TimelineImpedimentos, AlertaVencidaBadge, StatusBadge, registration form modal into separate components.",
+    "POST /seguimiento/.../registrar mutates resultado_re_test on the vulnerabilidad doc even when payload was Impedimento/Pendiente etc - this is the intended sync per spec but worth documenting as semantics ('resultado_re_test' field is always overwritten with latest registro)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_seguimiento_bitacora.py (NEW - 14 pytest tests: auth/404/CRUD flow + null-array regression)"
+  ],
+  "success_rate": {"backend": "100% (14/14 pytest tests pass; 2 of those document the documented null-array bug as expected 500)", "frontend": "100% (full end-to-end save + auto-switch tab verified via Playwright with POST/GET 200)"},
+  "test_credentials": {"user": "admin", "password": "admin123"},
+  "seed_data_creation": "Test fixture creates one TEST_SEG_{ts} vuln (with historial_impedimentos_seguimiento=[] workaround) and one TEST_SEG_NULL_{ts} vuln (without) for the bug-regression tests, both cleaned up via DELETE in fixture teardown. Frontend test wrote a 'TEST_UI playwright iter23 - nota desde QA' bitacora entry on first-row vuln a4300dbf-e61d-42b8-8205-5890035278ab (not auto-cleaned).",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "After main agent fixes the null-array bug (either change default to [] in VulnerabilidadBase OR fix server.py:3221 with 'or []' AND fix $push with pre-normalization), the TestSeguimientoNullArrayBug class in test_seguimiento_bitacora.py will FAIL (it currently asserts status_code==500). Main agent should flip those asserts to 200 (and validate empty historial / proper push). Test file uses BASE_URL with fallback that reads from /app/frontend/.env. Login endpoint is POST /api/auth/login with {username, password} returning {access_token}. Existing vuln fd3a3238-98e1-44b9-8c0d-cdbf4cf4642d may or may not be present depending on environment - use [data-testid^='view-vuln-btn-'].first as a fallback selector. Frontend works in /seguimiento-riesgos route (NOT /seguimiento). Sidebar link text is 'Seguimiento'.",
+  "rca_of_the_issue": "ROOT CAUSE of 500 bugs: VulnerabilidadBase (server.py line 209) declares 'historial_impedimentos_seguimiento: Optional[List[dict]] = None'. When Mongo persists a doc with this field as null, two things fail: (1) GET /historial calls sorted(None) -> TypeError; (2) POST /registrar uses $push on null which Mongo rejects with WriteError code 2. REPRODUCTION: POST /api/vulnerabilidades with payload that omits historial_impedimentos_seguimiento -> field becomes null -> any subsequent GET/POST seguimiento on this vuln crashes. MITIGATION (recommended combo): (a) change default to default_factory=list in Pydantic model, (b) one-time migration: db.vulnerabilidades.update_many({'historial_impedimentos_seguimiento': None}, {'$set': {'historial_impedimentos_seguimiento': []}}), (c) hardening at endpoint: change line 3221 to 'historial = vuln.get(\"historial_impedimentos_seguimiento\") or []' and in registrar prepend an $set normalization step before $push."
+}

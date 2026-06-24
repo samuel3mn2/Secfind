@@ -30,6 +30,9 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   AlertTriangle,
   Clock,
@@ -41,8 +44,15 @@ import {
   RefreshCw,
   ShieldAlert,
   ClipboardCheck,
+  History,
+  FileText,
+  CalendarX,
+  Save,
+  User,
+  MessageSquare,
 } from "lucide-react";
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -121,6 +131,119 @@ const StatusBadge = ({ estado, diasRestantes }) => {
   );
 };
 
+// Badge de alerta para fechas vencidas
+const AlertaVencidaBadge = ({ estado }) => {
+  if (estado !== "vencida") return null;
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-500/20 border border-red-500/50 rounded text-red-400 text-xs font-bold animate-pulse">
+      <AlertTriangle className="w-3 h-3" />
+      ⚠️ VENCIDA
+    </span>
+  );
+};
+
+// Componente Timeline para historial de impedimentos
+const TimelineImpedimentos = ({ historial, veces_cambiada_fecha }) => {
+  if (!historial || historial.length === 0) {
+    return (
+      <div className="text-center py-8 text-zinc-500">
+        <History className="w-12 h-12 mx-auto mb-3 opacity-50" />
+        <p>No hay registros de seguimiento aún</p>
+      </div>
+    );
+  }
+
+  const getResultadoColor = (resultado) => {
+    const r = resultado?.toLowerCase() || "";
+    if (r === "corregido") return "bg-green-500";
+    if (r === "impedimento") return "bg-red-500";
+    if (r === "vulnerable") return "bg-orange-500";
+    if (r === "pendiente") return "bg-yellow-500";
+    if (r === "desestimado") return "bg-zinc-500";
+    return "bg-blue-500";
+  };
+
+  const getResultadoBadgeClass = (resultado) => {
+    const r = resultado?.toLowerCase() || "";
+    if (r === "corregido") return "bg-green-500/20 text-green-400 border-green-500/30";
+    if (r === "impedimento") return "bg-red-500/20 text-red-400 border-red-500/30";
+    if (r === "vulnerable") return "bg-orange-500/20 text-orange-400 border-orange-500/30";
+    if (r === "pendiente") return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
+    if (r === "desestimado") return "bg-zinc-500/20 text-zinc-400 border-zinc-500/30";
+    return "bg-blue-500/20 text-blue-400 border-blue-500/30";
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Header con contador */}
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+          <History className="w-4 h-4" />
+          Bitácora de Seguimientos ({historial.length})
+        </h4>
+        {veces_cambiada_fecha > 0 && (
+          <Badge variant="outline" className="border-amber-500/50 text-amber-400">
+            <CalendarX className="w-3 h-3 mr-1" />
+            Fecha reprogramada {veces_cambiada_fecha}x
+          </Badge>
+        )}
+      </div>
+
+      {/* Timeline */}
+      <div className="relative">
+        {/* Línea vertical */}
+        <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-zinc-700" />
+
+        {historial.map((entry, index) => (
+          <div key={entry.id_accion || index} className="relative pl-10 pb-6 last:pb-0">
+            {/* Punto del timeline */}
+            <div className={`absolute left-2.5 w-3 h-3 rounded-full ${getResultadoColor(entry.resultado_retest)} ring-4 ring-zinc-900`} />
+            
+            {/* Contenido */}
+            <div className="bg-zinc-800/50 rounded-lg p-4 border border-zinc-700/50">
+              {/* Header de la entrada */}
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getResultadoBadgeClass(entry.resultado_retest)}`}>
+                  {entry.resultado_retest}
+                </span>
+                <span className="text-xs text-zinc-500 flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {entry.fecha_registro_nota ? 
+                    format(new Date(entry.fecha_registro_nota), "dd MMM yyyy, HH:mm", { locale: es }) : 
+                    "Sin fecha"}
+                </span>
+                {entry.fecha_compromiso_asignada && (
+                  <span className="text-xs text-cyan-400 flex items-center gap-1">
+                    <CalendarClock className="w-3 h-3" />
+                    Nueva fecha: {entry.fecha_compromiso_asignada}
+                  </span>
+                )}
+              </div>
+
+              {/* Usuario */}
+              <div className="text-xs text-zinc-400 mb-2 flex items-center gap-1">
+                <User className="w-3 h-3" />
+                {entry.usuario_registro || "Sistema"}
+              </div>
+
+              {/* Notas de impedimento */}
+              {entry.notas_impedimento && (
+                <div className="mt-2 p-3 bg-zinc-900/50 rounded border-l-2 border-amber-500/50">
+                  <p className="text-xs text-zinc-500 mb-1 flex items-center gap-1">
+                    <MessageSquare className="w-3 h-3" />
+                    Notas / Impedimento:
+                  </p>
+                  <p className="text-sm text-zinc-300 whitespace-pre-wrap">{entry.notas_impedimento}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export default function SeguimientoRiesgos() {
   const { isAdmin, canView } = useAuth();
   const [activeTab, setActiveTab] = useState("vulnerabilidades");
@@ -154,6 +277,18 @@ export default function SeguimientoRiesgos() {
   const [viewingItem, setViewingItem] = useState(null);
   const [viewingType, setViewingType] = useState("vulnerabilidad");
   
+  // Seguimiento/Bitácora state
+  const [historialSeguimiento, setHistorialSeguimiento] = useState([]);
+  const [loadingHistorial, setLoadingHistorial] = useState(false);
+  const [showSeguimientoForm, setShowSeguimientoForm] = useState(false);
+  const [seguimientoForm, setSeguimientoForm] = useState({
+    resultado_retest: "",
+    fecha_compromiso_asignada: "",
+    notas_impedimento: ""
+  });
+  const [savingSeguimiento, setSavingSeguimiento] = useState(false);
+  const [activeDetailTab, setActiveDetailTab] = useState("info");
+  
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
@@ -185,6 +320,77 @@ export default function SeguimientoRiesgos() {
     } catch (error) {
       console.error("Error fetching options:", error);
     }
+  };
+
+  // Fetch historial de seguimiento para una vulnerabilidad
+  const fetchHistorialSeguimiento = async (vulnId) => {
+    setLoadingHistorial(true);
+    try {
+      const response = await axios.get(`${API}/seguimiento/${vulnId}/historial`);
+      setHistorialSeguimiento(response.data.historial || []);
+      // Actualizar también los contadores en viewingItem
+      if (viewingItem && viewingItem.id === vulnId) {
+        setViewingItem(prev => ({
+          ...prev,
+          veces_cambiada_fecha: response.data.veces_cambiada_fecha || 0,
+          veces_en_retest: response.data.veces_en_retest || 0
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching historial:", error);
+      setHistorialSeguimiento([]);
+    } finally {
+      setLoadingHistorial(false);
+    }
+  };
+
+  // Registrar seguimiento
+  const handleRegistrarSeguimiento = async () => {
+    if (!seguimientoForm.resultado_retest) {
+      toast.error("Selecciona un resultado de retest");
+      return;
+    }
+    
+    setSavingSeguimiento(true);
+    try {
+      const response = await axios.post(`${API}/seguimiento/${viewingItem.id}/registrar`, seguimientoForm);
+      toast.success("Seguimiento registrado exitosamente");
+      
+      // Actualizar viewingItem con los nuevos datos
+      setViewingItem(response.data.vulnerabilidad);
+      
+      // Recargar historial
+      await fetchHistorialSeguimiento(viewingItem.id);
+      
+      // Recargar lista de vulnerabilidades
+      fetchVulnerabilidades();
+      
+      // Limpiar formulario
+      setSeguimientoForm({
+        resultado_retest: "",
+        fecha_compromiso_asignada: "",
+        notas_impedimento: ""
+      });
+      setShowSeguimientoForm(false);
+      
+      // Cambiar a pestaña de bitácora
+      setActiveDetailTab("bitacora");
+    } catch (error) {
+      console.error("Error registrando seguimiento:", error);
+      toast.error(error.response?.data?.detail || "Error al registrar seguimiento");
+    } finally {
+      setSavingSeguimiento(false);
+    }
+  };
+
+  // Al abrir el modal de vista, cargar historial
+  const handleViewVulnerabilidad = (vuln) => {
+    setViewingItem(vuln);
+    setViewingType("vulnerabilidad");
+    setShowViewModal(true);
+    setActiveDetailTab("info");
+    setHistorialSeguimiento([]);
+    fetchHistorialSeguimiento(vuln.id);
   };
 
   // Fetch Vulnerabilidades
@@ -273,6 +479,13 @@ export default function SeguimientoRiesgos() {
     setViewingItem(item);
     setViewingType(type);
     setShowViewModal(true);
+    setActiveDetailTab("info");
+    setHistorialSeguimiento([]);
+    
+    // Si es vulnerabilidad, cargar historial de seguimiento
+    if (type === "vulnerabilidad" && item.id) {
+      fetchHistorialSeguimiento(item.id);
+    }
   };
 
   const handleRefresh = () => {
@@ -611,10 +824,15 @@ export default function SeguimientoRiesgos() {
                           data-testid={`vuln-row-${vuln.id}`}
                         >
                           <TableCell>
-                            <StatusBadge 
-                              estado={vuln.estado_seguimiento} 
-                              diasRestantes={vuln.dias_restantes} 
-                            />
+                            <div className="flex flex-col gap-1">
+                              <StatusBadge 
+                                estado={vuln.estado_seguimiento} 
+                                diasRestantes={vuln.dias_restantes} 
+                              />
+                              {vuln.estado_seguimiento === "vencida" && (
+                                <AlertaVencidaBadge estado="vencida" />
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-zinc-300 font-mono text-sm">
                             {vuln.fecha_compromiso || "-"}
@@ -769,14 +987,23 @@ export default function SeguimientoRiesgos() {
       )}
 
       {/* View Modal */}
-      <Dialog open={showViewModal} onOpenChange={setShowViewModal}>
-        <DialogContent className="bg-[#18181b] border-[#27272a] text-white max-w-3xl max-h-[90vh]">
+      <Dialog open={showViewModal} onOpenChange={(open) => {
+        setShowViewModal(open);
+        if (!open) {
+          setShowSeguimientoForm(false);
+          setSeguimientoForm({ resultado_retest: "", fecha_compromiso_asignada: "", notas_impedimento: "" });
+        }
+      }}>
+        <DialogContent className="bg-[#18181b] border-[#27272a] text-white max-w-4xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="text-xl flex items-center gap-2">
               {viewingType === "vulnerabilidad" ? (
                 <>
                   <ShieldAlert className="w-5 h-5 text-cyan-500" />
                   Detalle de Vulnerabilidad
+                  {viewingItem?.estado_seguimiento === "vencida" && (
+                    <AlertaVencidaBadge estado="vencida" />
+                  )}
                 </>
               ) : (
                 <>
@@ -799,47 +1026,188 @@ export default function SeguimientoRiesgos() {
                   <Badge variant="outline" className="border-zinc-600 text-zinc-300">
                     {viewingItem.estatus}
                   </Badge>
+                  {viewingItem.veces_cambiada_fecha > 0 && (
+                    <Badge variant="outline" className="border-amber-500/50 text-amber-400">
+                      <CalendarX className="w-3 h-3 mr-1" />
+                      {viewingItem.veces_cambiada_fecha}x reprogramada
+                    </Badge>
+                  )}
+                  {viewingItem.veces_en_retest > 0 && (
+                    <Badge variant="outline" className="border-blue-500/50 text-blue-400">
+                      <RefreshCw className="w-3 h-3 mr-1" />
+                      {viewingItem.veces_en_retest}x retest
+                    </Badge>
+                  )}
                 </div>
 
-                {/* Grid Info */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Fecha Compromiso</p>
-                    <p className="text-white font-mono text-lg">{viewingItem.fecha_compromiso || "-"}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Días Restantes</p>
-                    <p className={`text-lg font-bold ${
-                      viewingItem.dias_restantes < 0 ? "text-red-500" :
-                      viewingItem.dias_restantes <= 7 ? "text-orange-500" :
-                      viewingItem.dias_restantes <= 30 ? "text-yellow-500" : "text-green-500"
-                    }`}>
-                      {viewingItem.dias_restantes !== null ? viewingItem.dias_restantes : "-"}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Institución</p>
-                    <p className="text-white">{viewingItem.institucion || "-"}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Responsable</p>
-                    <p className="text-white">{viewingItem.responsable || "-"}</p>
-                  </div>
-                </div>
+                {/* Tabs for Info/Bitácora */}
+                <Tabs value={activeDetailTab} onValueChange={setActiveDetailTab} className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 bg-zinc-800">
+                    <TabsTrigger value="info" className="data-[state=active]:bg-zinc-700">
+                      <FileText className="w-4 h-4 mr-2" />
+                      Información
+                    </TabsTrigger>
+                    <TabsTrigger value="bitacora" className="data-[state=active]:bg-zinc-700">
+                      <History className="w-4 h-4 mr-2" />
+                      Bitácora ({historialSeguimiento.length})
+                    </TabsTrigger>
+                  </TabsList>
 
-                <div className="space-y-1">
-                  <p className="text-xs text-zinc-500 uppercase tracking-wide">Vulnerabilidad</p>
-                  <p className="text-white whitespace-pre-wrap bg-zinc-800/50 p-3 rounded-lg">
-                    {viewingItem.vulnerabilidad || "-"}
-                  </p>
-                </div>
+                  <TabsContent value="info" className="mt-4 space-y-4">
+                    {/* Grid Info */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <p className="text-xs text-zinc-500 uppercase tracking-wide">Fecha Compromiso</p>
+                        <p className={`font-mono text-lg ${viewingItem.estado_seguimiento === "vencida" ? "text-red-400" : "text-white"}`}>
+                          {viewingItem.fecha_compromiso || "-"}
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-zinc-500 uppercase tracking-wide">Días Restantes</p>
+                        <p className={`text-lg font-bold ${
+                          viewingItem.dias_restantes < 0 ? "text-red-500" :
+                          viewingItem.dias_restantes <= 7 ? "text-orange-500" :
+                          viewingItem.dias_restantes <= 30 ? "text-yellow-500" : "text-green-500"
+                        }`}>
+                          {viewingItem.dias_restantes !== null ? viewingItem.dias_restantes : "-"}
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-zinc-500 uppercase tracking-wide">Institución</p>
+                        <p className="text-white">{viewingItem.institucion || "-"}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-zinc-500 uppercase tracking-wide">Responsable</p>
+                        <p className="text-white">{viewingItem.responsable || "-"}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-zinc-500 uppercase tracking-wide">Código</p>
+                        <p className="text-cyan-400 font-mono">{viewingItem.codigo || "-"}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-zinc-500 uppercase tracking-wide">Resultado Retest</p>
+                        <p className="text-white">{viewingItem.resultado_re_test || "-"}</p>
+                      </div>
+                    </div>
 
-                <div className="space-y-1">
-                  <p className="text-xs text-zinc-500 uppercase tracking-wide">Recomendaciones</p>
-                  <p className="text-white whitespace-pre-wrap bg-zinc-800/50 p-3 rounded-lg">
-                    {viewingItem.recomendaciones || "-"}
-                  </p>
-                </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-zinc-500 uppercase tracking-wide">Vulnerabilidad</p>
+                      <p className="text-white whitespace-pre-wrap bg-zinc-800/50 p-3 rounded-lg">
+                        {viewingItem.vulnerabilidad || "-"}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-xs text-zinc-500 uppercase tracking-wide">Recomendaciones</p>
+                      <p className="text-white whitespace-pre-wrap bg-zinc-800/50 p-3 rounded-lg">
+                        {viewingItem.recomendaciones || "-"}
+                      </p>
+                    </div>
+
+                    {/* Formulario de Registro de Seguimiento */}
+                    <div className="border-t border-zinc-700 pt-4">
+                      {!showSeguimientoForm ? (
+                        <Button
+                          onClick={() => setShowSeguimientoForm(true)}
+                          className="w-full bg-indigo-600 hover:bg-indigo-700"
+                          data-testid="btn-registrar-seguimiento"
+                        >
+                          <FileText className="w-4 h-4 mr-2" />
+                          Registrar Seguimiento / Impedimento
+                        </Button>
+                      ) : (
+                        <div className="space-y-4 bg-zinc-800/50 p-4 rounded-lg border border-zinc-700">
+                          <h4 className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+                            <FileText className="w-4 h-4" />
+                            Nuevo Registro de Seguimiento
+                          </h4>
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label className="text-zinc-400">Resultado Retest *</Label>
+                              <Select
+                                value={seguimientoForm.resultado_retest}
+                                onValueChange={(v) => setSeguimientoForm(prev => ({ ...prev, resultado_retest: v }))}
+                              >
+                                <SelectTrigger className="bg-zinc-900 border-zinc-700" data-testid="select-resultado-retest">
+                                  <SelectValue placeholder="Seleccionar resultado" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-zinc-900 border-zinc-700">
+                                  <SelectItem value="Corregido">Corregido</SelectItem>
+                                  <SelectItem value="Pendiente">Pendiente</SelectItem>
+                                  <SelectItem value="Impedimento">Impedimento</SelectItem>
+                                  <SelectItem value="Vulnerable">Vulnerable</SelectItem>
+                                  <SelectItem value="Desestimado">Desestimado</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label className="text-zinc-400">Nueva Fecha Compromiso</Label>
+                              <Input
+                                type="date"
+                                value={seguimientoForm.fecha_compromiso_asignada}
+                                onChange={(e) => setSeguimientoForm(prev => ({ ...prev, fecha_compromiso_asignada: e.target.value }))}
+                                className="bg-zinc-900 border-zinc-700"
+                                data-testid="input-fecha-compromiso"
+                              />
+                              {seguimientoForm.fecha_compromiso_asignada && seguimientoForm.fecha_compromiso_asignada !== viewingItem.fecha_compromiso && (
+                                <p className="text-xs text-amber-400">⚠️ Se incrementará el contador de reprogramaciones</p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-zinc-400">Notas / Detalle del Impedimento</Label>
+                            <Textarea
+                              value={seguimientoForm.notas_impedimento}
+                              onChange={(e) => setSeguimientoForm(prev => ({ ...prev, notas_impedimento: e.target.value }))}
+                              placeholder="Describe el impedimento, bloqueo o notas relevantes de esta interacción..."
+                              className="bg-zinc-900 border-zinc-700 min-h-[100px]"
+                              data-testid="textarea-notas-impedimento"
+                            />
+                          </div>
+
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={handleRegistrarSeguimiento}
+                              disabled={savingSeguimiento || !seguimientoForm.resultado_retest}
+                              className="bg-green-600 hover:bg-green-700"
+                              data-testid="btn-guardar-seguimiento"
+                            >
+                              <Save className="w-4 h-4 mr-2" />
+                              {savingSeguimiento ? "Guardando..." : "Guardar Registro"}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => {
+                                setShowSeguimientoForm(false);
+                                setSeguimientoForm({ resultado_retest: "", fecha_compromiso_asignada: "", notas_impedimento: "" });
+                              }}
+                              className="border-zinc-600"
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="bitacora" className="mt-4">
+                    {loadingHistorial ? (
+                      <div className="text-center py-8">
+                        <RefreshCw className="w-8 h-8 animate-spin mx-auto text-zinc-500" />
+                        <p className="text-zinc-500 mt-2">Cargando historial...</p>
+                      </div>
+                    ) : (
+                      <TimelineImpedimentos 
+                        historial={historialSeguimiento} 
+                        veces_cambiada_fecha={viewingItem?.veces_cambiada_fecha || 0}
+                      />
+                    )}
+                  </TabsContent>
+                </Tabs>
               </div>
             )}
 

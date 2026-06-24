@@ -199,11 +199,25 @@ class VulnerabilidadBase(BaseModel):
     estatus: Optional[str] = None
     resultado_re_test: Optional[str] = None
     veces_en_retest: Optional[int] = 0
+    veces_cambiada_fecha: Optional[int] = 0  # Contador de veces que se ha reprogramado la fecha
     nombre_informe_pentest: Optional[str] = None
     proveedor: Optional[str] = None
     # GRC Integration fields
     control_id: Optional[str] = None  # Reference to config_controles
     riesgo_id: Optional[str] = None  # Reference to catalogo_riesgos
+    # Bitácora de impedimentos y seguimientos
+    historial_impedimentos_seguimiento: Optional[List[dict]] = None
+
+# Modelo para entrada de bitácora de seguimiento
+class EntradaBitacoraSeguimiento(BaseModel):
+    resultado_retest: str  # Corregido, Pendiente, Impedimento, Vulnerable, Desestimado
+    fecha_compromiso_asignada: Optional[str] = None  # Nueva fecha de compromiso (YYYY-MM-DD)
+    notas_impedimento: Optional[str] = None  # Texto libre para detallar bloqueos
+
+class RegistroSeguimientoRequest(BaseModel):
+    resultado_retest: str
+    fecha_compromiso_asignada: Optional[str] = None
+    notas_impedimento: Optional[str] = None
 
 class VulnerabilidadCreate(VulnerabilidadBase):
     pass
@@ -3100,7 +3114,131 @@ async def get_seguimiento_resumen(current_user: CurrentUser = Depends(get_curren
         "total_pendientes": total_pendientes
     }
 
-@api_router.get("/export/csv")
+@api_router.post("/seguimiento/{vuln_id}/registrar")
+async def registrar_seguimiento(
+    vuln_id: str,
+    data: RegistroSeguimientoRequest,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Registrar una entrada de seguimiento/bitácora para una vulnerabilidad.
+    - Añade entrada al historial de impedimentos
+    - Incrementa contador de cambios de fecha si la fecha fue modificada
+    - Actualiza estatus basado en resultado de retest
+    """
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.editar:
+        raise HTTPException(status_code=403, detail="No tiene permisos para registrar seguimiento")
+    
+    # Obtener vulnerabilidad existente
+    existing = await db.vulnerabilidades.find_one({"id": vuln_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Vulnerabilidad no encontrada")
+    
+    # Crear entrada de bitácora
+    entrada_bitacora = {
+        "id_accion": str(uuid.uuid4()),
+        "fecha_registro_nota": datetime.now(timezone.utc).isoformat(),
+        "resultado_retest": data.resultado_retest,
+        "fecha_compromiso_asignada": data.fecha_compromiso_asignada,
+        "notas_impedimento": data.notas_impedimento or "",
+        "usuario_registro": current_user.nombre or current_user.username
+    }
+    
+    # Preparar operación de actualización
+    update_ops = {
+        "$push": {"historial_impedimentos_seguimiento": entrada_bitacora},
+        "$set": {
+            "resultado_re_test": data.resultado_retest,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+    }
+    
+    # Verificar si la fecha de compromiso cambió
+    fecha_actual = existing.get("fecha_compromiso", "")
+    fecha_nueva = data.fecha_compromiso_asignada or ""
+    fecha_cambio = False
+    
+    if fecha_nueva and fecha_nueva != fecha_actual:
+        update_ops["$set"]["fecha_compromiso"] = fecha_nueva
+        update_ops["$inc"] = {"veces_cambiada_fecha": 1}
+        fecha_cambio = True
+    
+    # Sincronizar estatus basado en resultado de retest (lógica existente)
+    resultado_lower = data.resultado_retest.strip().lower()
+    if resultado_lower in ["corregido", "desestimado"]:
+        update_ops["$set"]["estatus"] = "Cerrado"
+    elif resultado_lower in ["vulnerable", "impedimento", "pendiente"]:
+        update_ops["$set"]["estatus"] = "Pendiente"
+    
+    # Ejecutar actualización
+    await db.vulnerabilidades.update_one({"id": vuln_id}, update_ops)
+    
+    # Registrar en historial de cambios
+    cambios = [
+        {"campo": "resultado_re_test", "valor_anterior": existing.get("resultado_re_test"), "valor_nuevo": data.resultado_retest}
+    ]
+    if fecha_cambio:
+        cambios.append({"campo": "fecha_compromiso", "valor_anterior": fecha_actual, "valor_nuevo": fecha_nueva})
+    if data.notas_impedimento:
+        cambios.append({"campo": "notas_impedimento", "valor_anterior": None, "valor_nuevo": data.notas_impedimento[:100] + "..." if len(data.notas_impedimento) > 100 else data.notas_impedimento})
+    
+    await registrar_cambio(
+        entidad="vulnerabilidad",
+        entidad_id=vuln_id,
+        entidad_nombre=existing.get("vulnerabilidad", "")[:50],
+        accion="seguimiento",
+        usuario_id=current_user.id,
+        usuario_nombre=current_user.username,
+        cambios=cambios
+    )
+    
+    # Obtener documento actualizado
+    updated = await db.vulnerabilidades.find_one({"id": vuln_id}, {"_id": 0})
+    
+    return {
+        "message": "Seguimiento registrado exitosamente",
+        "entrada_bitacora": entrada_bitacora,
+        "fecha_cambiada": fecha_cambio,
+        "veces_cambiada_fecha": updated.get("veces_cambiada_fecha", 0),
+        "vulnerabilidad": updated
+    }
+
+@api_router.get("/seguimiento/{vuln_id}/historial")
+async def get_historial_seguimiento(
+    vuln_id: str,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Obtener el historial completo de seguimientos e impedimentos de una vulnerabilidad.
+    """
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos para ver el historial")
+    
+    vuln = await db.vulnerabilidades.find_one({"id": vuln_id}, {"_id": 0})
+    if not vuln:
+        raise HTTPException(status_code=404, detail="Vulnerabilidad no encontrada")
+    
+    historial = vuln.get("historial_impedimentos_seguimiento", [])
+    
+    # Ordenar por fecha de registro (más reciente primero)
+    historial_ordenado = sorted(
+        historial,
+        key=lambda x: x.get("fecha_registro_nota", ""),
+        reverse=True
+    )
+    
+    return {
+        "vulnerabilidad_id": vuln_id,
+        "codigo": vuln.get("codigo"),
+        "vulnerabilidad": vuln.get("vulnerabilidad"),
+        "veces_cambiada_fecha": vuln.get("veces_cambiada_fecha", 0),
+        "veces_en_retest": vuln.get("veces_en_retest", 0),
+        "fecha_compromiso_actual": vuln.get("fecha_compromiso"),
+        "estatus_actual": vuln.get("estatus"),
+        "resultado_retest_actual": vuln.get("resultado_re_test"),
+        "historial": historial_ordenado,
+        "total_registros": len(historial_ordenado)
+    }
 async def export_csv(
     request: Request,
     search: Optional[str] = None,
