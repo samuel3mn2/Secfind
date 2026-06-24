@@ -3,6 +3,16 @@
 ## Última Actualización: 2026-06-19
 
 ### Cambios Recientes (Junio 2026)
+- **INDICADORES VISUALES TIPO DE REGISTRO - SEGUIMIENTO (2026-06-24)**:
+  - Timeline muestra tipo de registro para cada entrada:
+    * **Retest Técnico** (cyan): Pendiente sin cambio de fecha
+    * **Prórroga Administrativa** (púrpura): Pendiente con nueva fecha
+    * **Validación Técnica** (verde/naranja): Corregido, Vulnerable, Desestimado
+    * **Bloqueo Operativo** (rojo): Impedimento
+  - Leyenda visual de tipos en la cabecera de la bitácora
+  - Subtipo descriptivo para cada entrada (ej: "Remediación exitosa", "Reprogramación de fecha")
+  - Iconos diferenciados: TestTube2, ArrowRightLeft, CheckCheck, Ban, XCircle
+
 - **REGLA EXCLUSIÓN MUTUA PENDIENTE - SEGUIMIENTO (2026-06-24)**:
   - CASO A (Prórroga): Pendiente + fecha_nueva != fecha_actual
     * SÍ incrementa veces_cambiada_fecha
