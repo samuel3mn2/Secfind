@@ -3,6 +3,16 @@
 ## Última Actualización: 2026-06-19
 
 ### Cambios Recientes (Junio 2026)
+- **REGLA EXCLUSIÓN MUTUA PENDIENTE - SEGUIMIENTO (2026-06-24)**:
+  - CASO A (Prórroga): Pendiente + fecha_nueva != fecha_actual
+    * SÍ incrementa veces_cambiada_fecha
+    * NO incrementa veces_en_retest (solo se movió el calendario)
+  - CASO B (Retest fallido): Pendiente + fecha_nueva == fecha_actual (o sin fecha)
+    * SÍ incrementa veces_en_retest (se validó técnicamente)
+    * NO incrementa veces_cambiada_fecha
+  - Suite de pruebas actualizada: `/app/backend/tests/test_seguimiento_bitacora.py` (20 tests)
+  - Clase `TestPendienteExclusionLogic` con 6 tests específicos
+
 - **AJUSTES REGLAS DE NEGOCIO - SEGUIMIENTO (2026-06-24)**:
   - Validación Pydantic Literal para `resultado_retest`: Solo acepta ["Corregido", "Pendiente", "Impedimento", "Vulnerable", "Desestimado"]
   - Estados de cierre (Corregido/Desestimado): fecha_compromiso forzada a null, NO incrementa veces_cambiada_fecha

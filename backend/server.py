@@ -3172,14 +3172,8 @@ async def registrar_seguimiento(
     # Inicializar $inc si se va a usar
     inc_ops = {}
     
-    # Control de incremento de veces_en_retest según resultado técnico:
-    # - Incrementa SOLO si resultado es ["Corregido", "Desestimado", "Pendiente", "Vulnerable"]
-    # - NO incrementa si es "Impedimento" (la validación técnica no pudo ejecutarse)
-    if data.resultado_retest in ["Corregido", "Desestimado", "Pendiente", "Vulnerable"]:
-        inc_ops["veces_en_retest"] = 1
-    
     # Verificar si la fecha de compromiso cambió (SOLO para estados NO de cierre)
-    fecha_actual = existing.get("fecha_compromiso", "")
+    fecha_actual = existing.get("fecha_compromiso", "") or ""
     fecha_nueva = fecha_para_bitacora or ""
     fecha_cambio = False
     
@@ -3188,6 +3182,49 @@ async def registrar_seguimiento(
         update_ops["$set"]["fecha_compromiso"] = fecha_nueva
         inc_ops["veces_cambiada_fecha"] = 1
         fecha_cambio = True
+    
+    # ==========================================================================
+    # CONTROL DE INCREMENTO DE CONTADORES SEGÚN RESULTADO Y CAMBIO DE FECHA
+    # ==========================================================================
+    # 
+    # Reglas de negocio para veces_en_retest:
+    # 
+    # 1. CORREGIDO / DESESTIMADO / VULNERABLE: 
+    #    SIEMPRE incrementa veces_en_retest (son resultados de validación técnica)
+    #
+    # 2. PENDIENTE (caso especial con exclusión mutua):
+    #    - CASO A (Prórroga/Reprogramación): Si fecha_nueva != fecha_actual
+    #      → SÍ incrementa veces_cambiada_fecha
+    #      → NO incrementa veces_en_retest (solo se movió el calendario)
+    #    - CASO B (Retest fallido): Si fecha_nueva == fecha_actual o no hay fecha
+    #      → SÍ incrementa veces_en_retest (se probó en fecha pactada)
+    #      → NO incrementa veces_cambiada_fecha
+    #
+    # 3. IMPEDIMENTO:
+    #    NUNCA incrementa veces_en_retest (validación técnica no pudo ejecutarse)
+    #    SÍ puede incrementar veces_cambiada_fecha si hay reprogramación
+    # ==========================================================================
+    
+    if data.resultado_retest in ["Corregido", "Desestimado", "Vulnerable"]:
+        # Estados de validación técnica: SIEMPRE incrementan veces_en_retest
+        inc_ops["veces_en_retest"] = 1
+        
+    elif data.resultado_retest == "Pendiente":
+        # CASO ESPECIAL: Exclusión mutua entre prórroga y retest fallido
+        if fecha_cambio:
+            # CASO A: Prórroga/Reprogramación administrativa
+            # La fecha ya se marcó para incrementar veces_cambiada_fecha arriba
+            # NO incrementamos veces_en_retest porque no hubo validación técnica
+            pass
+        else:
+            # CASO B: Retest técnico fallido (misma fecha o sin fecha nueva)
+            # SÍ incrementamos veces_en_retest porque se validó técnicamente
+            inc_ops["veces_en_retest"] = 1
+            
+    elif data.resultado_retest == "Impedimento":
+        # Impedimento: NO incrementa veces_en_retest
+        # El incremento de veces_cambiada_fecha ya se maneja arriba si hay fecha_cambio
+        pass
     
     # Si hay operaciones de incremento, agregarlas
     if inc_ops:
