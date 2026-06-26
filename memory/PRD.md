@@ -1,8 +1,32 @@
 # SecFind - Sistema de Gestión de Vulnerabilidades
 
-## Última Actualización: 2026-06-19
+## Última Actualización: 2026-06-26
 
 ### Cambios Recientes (Junio 2026)
+- **CONSOLIDACIÓN MASTER MÓDULO SEGUIMIENTO (2026-06-26)**:
+  - **Backend - 7 Estados Literal**: Validación Pydantic estricta con:
+    * Corregido, Pendiente, Impedimento, Vulnerable, Desestimado, Para Re Test, Nota de Seguimiento
+  - **Backend - 6 Casos de Ciclo de Vida (A-F)**:
+    * CASO A (Cierre): Corregido/Desestimado → estatus=Cerrado, +veces_en_retest, fecha=null
+    * CASO B (Impedimento): Bloqueo operativo, fecha reprogramable, NO +veces_en_retest
+    * CASO C (Vulnerable): Persiste, +veces_en_retest, puede limpiar fecha
+    * CASO D (Para Re Test): Congela fecha y contadores, estatus=Pendiente
+    * CASO E (Pendiente): Exclusión mutua prórroga vs retest fallido
+    * CASO F (Nota de Seguimiento): Comentario puro, sin impacto en contadores
+  - **Frontend - 4 Pestañas de Vista** en SeguimientoRiesgos:
+    * Activas con Fecha: Vulnerabilidades abiertas con calendario activo
+    * En Análisis: Sin fecha, último estado Vulnerable/Impedimento
+    * En Retest: Estado "Para Re Test" en validación con proveedor
+    * Histórico Cerrado: Corregido/Desestimado
+  - **Frontend - Badges Dinámicos**:
+    * `[ 🧪 En Retest ]` cyan para estado Para Re Test
+    * `[ ⏳ En Análisis ]` amber para vulnerabilidades sin fecha
+    * `[ ⚠️ VENCIDA ]` rojo para vulnerabilidades con fecha vencida
+  - **Frontend - Formulario con 7 estados**: Dropdown con descripciones claras
+  - **Frontend - Fecha deshabilitada** para: Corregido, Desestimado, Para Re Test, Nota de Seguimiento
+  - **Frontend - Timeline en Vulnerabilidades**: Componente reutilizado en modo solo lectura
+  - **Tests**: 28/28 tests pasados en test_seguimiento_bitacora.py
+
 - **MODO AUDITORÍA Y BÚSQUEDA - SEGUIMIENTO (2026-06-24)**:
   - Backend: Parámetro `incluir_cerradas=true` para mostrar histórico de cerradas
   - Backend: Parámetro `busqueda` para filtrar por código o nombre de vulnerabilidad
@@ -29,16 +53,20 @@
   - CASO B (Retest fallido): Pendiente + fecha_nueva == fecha_actual (o sin fecha)
     * SÍ incrementa veces_en_retest (se validó técnicamente)
     * NO incrementa veces_cambiada_fecha
-  - Suite de pruebas actualizada: `/app/backend/tests/test_seguimiento_bitacora.py` (20 tests)
+  - Suite de pruebas actualizada: `/app/backend/tests/test_seguimiento_bitacora.py` (28 tests)
   - Clase `TestPendienteExclusionLogic` con 6 tests específicos
+  - Clase `TestNewStates` con 3 tests para Para Re Test y Nota de Seguimiento
+  - Clase `TestSeguimientoRiesgosVista` con 5 tests para el parámetro vista
 
 - **AJUSTES REGLAS DE NEGOCIO - SEGUIMIENTO (2026-06-24)**:
-  - Validación Pydantic Literal para `resultado_retest`: Solo acepta ["Corregido", "Pendiente", "Impedimento", "Vulnerable", "Desestimado"]
+  - Validación Pydantic Literal para `resultado_retest`: Solo acepta ["Corregido", "Pendiente", "Impedimento", "Vulnerable", "Desestimado", "Para Re Test", "Nota de Seguimiento"]
   - Estados de cierre (Corregido/Desestimado): fecha_compromiso forzada a null, NO incrementa veces_cambiada_fecha
   - Impedimento: NO incrementa veces_en_retest (la validación técnica no pudo ejecutarse)
+  - Para Re Test: Congela fecha y todos los contadores (en validación con proveedor)
+  - Nota de Seguimiento: Comentario puro, no altera ningún contador ni fecha
   - Vulnerable/Pendiente/Corregido/Desestimado: SÍ incrementan veces_en_retest
-  - Frontend: Campo fecha deshabilitado automáticamente al seleccionar estados de cierre
-  - Mensaje visual "(No aplica para cierre)" cuando corresponde
+  - Frontend: Campo fecha deshabilitado automáticamente al seleccionar estados que no permiten fecha
+  - Mensaje visual según estado: "(No aplica para cierre)", "(Se congela fecha - En validación)", "(No altera fecha)"
 
 - **SUBMÓDULO BITÁCORA E IMPEDIMENTOS - SEGUIMIENTO (2026-06-24)**:
   - Nuevo campo `veces_cambiada_fecha` - Contador de veces que se reprograma la fecha de compromiso

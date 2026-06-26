@@ -3319,12 +3319,11 @@ async def registrar_seguimiento(
             
     elif es_para_retest:
         # CASO D: Para Re Test
-        # - FUERZA fecha_compromiso global a null (congelar tiempos de expiración)
+        # - CONSERVA fecha_compromiso actual (se congela - no se modifica)
         # - NO incrementa veces_en_retest ni veces_cambiada_fecha
         # - Mantiene estatus "Pendiente"
         update_ops["$set"]["estatus"] = "Pendiente"
-        update_ops["$set"]["fecha_compromiso"] = None
-        fecha_limpiada = True
+        # NO modificar fecha_compromiso - se conserva la actual
         
     elif es_pendiente:
         # CASO E: Pendiente (Prórroga o Transición)
