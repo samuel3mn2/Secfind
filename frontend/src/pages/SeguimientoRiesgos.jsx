@@ -391,8 +391,8 @@ export default function SeguimientoRiesgos() {
   const [filterInforme, setFilterInforme] = useState([]);
   const [filterAplicacion, setFilterAplicacion] = useState([]);
   
-  // Modo auditoría (histórico cerrado) y búsqueda
-  const [modoAuditoria, setModoAuditoria] = useState(false);  // false = Activas, true = Cerradas
+  // Vista de seguimiento (4 pestañas)
+  const [vistaActiva, setVistaActiva] = useState("activas_con_fecha"); // activas_con_fecha | en_analisis | en_retest | historico
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   
@@ -522,8 +522,11 @@ export default function SeguimientoRiesgos() {
     try {
       const params = new URLSearchParams();
       
-      // Solo aplicar filtros de fecha si NO estamos en modo auditoría
-      if (!modoAuditoria) {
+      // Enviar la vista activa (4 tabs)
+      params.append("vista", vistaActiva);
+      
+      // Solo aplicar filtros de fecha si estamos en "activas_con_fecha"
+      if (vistaActiva === "activas_con_fecha") {
         if (filterEstado && filterEstado !== "all") params.append("filtro", filterEstado);
         if (filterMes && filterMes !== "all") params.append("mes", filterMes);
         if (filterAño && filterAño !== "all") params.append("año_compromiso", filterAño);
@@ -537,11 +540,6 @@ export default function SeguimientoRiesgos() {
       if (filterAplicacion.length > 0) filterAplicacion.forEach(v => params.append("aplicacion", v));
       if (filterResponsable.length > 0) filterResponsable.forEach(v => params.append("responsable", v));
       
-      // Modo auditoría (histórico cerrado)
-      if (modoAuditoria) {
-        params.append("incluir_cerradas", "true");
-      }
-      
       // Búsqueda por código o nombre
       if (debouncedSearch && debouncedSearch.trim()) {
         params.append("busqueda", debouncedSearch.trim());
@@ -553,7 +551,7 @@ export default function SeguimientoRiesgos() {
       console.error("Error fetching vulnerabilidades:", error);
       toast.error("Error al cargar vulnerabilidades");
     }
-  }, [filterEstado, filterSeveridad, filterInstitucion, filterInforme, filterAplicacion, filterResponsable, filterMes, filterAño, filterTipoFecha, modoAuditoria, debouncedSearch]);
+  }, [filterEstado, filterSeveridad, filterInstitucion, filterInforme, filterAplicacion, filterResponsable, filterMes, filterAño, filterTipoFecha, vistaActiva, debouncedSearch]);
 
   const fetchResumenVulns = async () => {
     try {
@@ -609,10 +607,10 @@ export default function SeguimientoRiesgos() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Reset página al cambiar búsqueda o modo auditoría
+  // Reset página al cambiar búsqueda o vista
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch, modoAuditoria]);
+  }, [debouncedSearch, vistaActiva]);
 
   useEffect(() => {
     setLoading(true);
@@ -753,8 +751,8 @@ export default function SeguimientoRiesgos() {
           </TabsTrigger>
         </TabsList>
 
-        {/* KPI Cards - Solo mostrar si NO estamos en modo auditoría */}
-        {currentResumen && !modoAuditoria && (
+        {/* KPI Cards - Solo mostrar en vista "Activas con Fecha" */}
+        {currentResumen && vistaActiva === "activas_con_fecha" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card 
               className={`bg-[#18181b] border-[#27272a] cursor-pointer transition-all hover:border-red-500/50 ${filterEstado === "vencidas" ? "border-red-500" : ""}`}
@@ -830,35 +828,68 @@ export default function SeguimientoRiesgos() {
           </div>
         )}
 
-        {/* Modo Auditoría Toggle y Barra de Búsqueda */}
+        {/* 4 Pestañas de Vista y Barra de Búsqueda */}
         <Card className="bg-[#18181b] border-[#27272a]">
           <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              {/* Tabs de Modo: Activas vs Histórico Cerrado */}
-              <div className="flex items-center gap-2 bg-zinc-900 p-1 rounded-lg border border-zinc-700">
+            <div className="flex flex-col gap-4">
+              {/* 4 Tabs de Vista del Ciclo de Vida */}
+              <div className="flex flex-wrap items-center gap-2 bg-zinc-900 p-1 rounded-lg border border-zinc-700">
                 <button
                   onClick={() => {
-                    setModoAuditoria(false);
+                    setVistaActiva("activas_con_fecha");
                     setSearchQuery("");
+                    setFilterEstado("all");
                   }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                    !modoAuditoria 
+                  className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all ${
+                    vistaActiva === "activas_con_fecha" 
                       ? "bg-indigo-600 text-white shadow-lg" 
                       : "text-zinc-400 hover:text-white hover:bg-zinc-800"
                   }`}
-                  data-testid="tab-activas"
+                  data-testid="tab-activas-con-fecha"
                 >
-                  <ListChecks className="w-4 h-4" />
-                  Vulnerabilidades Activas
+                  <CalendarClock className="w-4 h-4" />
+                  Activas con Fecha
                 </button>
                 <button
                   onClick={() => {
-                    setModoAuditoria(true);
-                    setFilterEstado("all");
+                    setVistaActiva("en_analisis");
                     setSearchQuery("");
+                    setFilterEstado("all");
                   }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                    modoAuditoria 
+                  className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all ${
+                    vistaActiva === "en_analisis" 
+                      ? "bg-amber-600 text-white shadow-lg" 
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                  }`}
+                  data-testid="tab-en-analisis"
+                >
+                  <Clock className="w-4 h-4" />
+                  En Análisis
+                </button>
+                <button
+                  onClick={() => {
+                    setVistaActiva("en_retest");
+                    setSearchQuery("");
+                    setFilterEstado("all");
+                  }}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all ${
+                    vistaActiva === "en_retest" 
+                      ? "bg-cyan-600 text-white shadow-lg" 
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                  }`}
+                  data-testid="tab-en-retest"
+                >
+                  <TestTube2 className="w-4 h-4" />
+                  En Retest
+                </button>
+                <button
+                  onClick={() => {
+                    setVistaActiva("historico");
+                    setSearchQuery("");
+                    setFilterEstado("all");
+                  }}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all ${
+                    vistaActiva === "historico" 
                       ? "bg-emerald-600 text-white shadow-lg" 
                       : "text-zinc-400 hover:text-white hover:bg-zinc-800"
                   }`}
@@ -870,7 +901,7 @@ export default function SeguimientoRiesgos() {
               </div>
 
               {/* Barra de Búsqueda */}
-              <div className="relative flex-1 max-w-md">
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-zinc-500" />
                 <input
                   type="text"
@@ -891,15 +922,44 @@ export default function SeguimientoRiesgos() {
               </div>
             </div>
 
-            {/* Indicador de modo actual */}
-            {modoAuditoria && (
-              <div className="mt-3 p-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
-                <p className="text-sm text-emerald-400 flex items-center gap-2">
-                  <Archive className="w-4 h-4" />
-                  <span><strong>Modo Auditoría:</strong> Mostrando vulnerabilidades con estatus Cerrado, Corregido o Desestimado</span>
+            {/* Indicador de vista activa */}
+            <div className="mt-3 p-2 rounded-lg flex items-center gap-2 text-sm" style={{
+              backgroundColor: vistaActiva === "activas_con_fecha" ? "rgba(99, 102, 241, 0.1)" :
+                              vistaActiva === "en_analisis" ? "rgba(245, 158, 11, 0.1)" :
+                              vistaActiva === "en_retest" ? "rgba(6, 182, 212, 0.1)" :
+                              "rgba(16, 185, 129, 0.1)",
+              borderWidth: "1px",
+              borderStyle: "solid",
+              borderColor: vistaActiva === "activas_con_fecha" ? "rgba(99, 102, 241, 0.3)" :
+                           vistaActiva === "en_analisis" ? "rgba(245, 158, 11, 0.3)" :
+                           vistaActiva === "en_retest" ? "rgba(6, 182, 212, 0.3)" :
+                           "rgba(16, 185, 129, 0.3)"
+            }}>
+              {vistaActiva === "activas_con_fecha" && (
+                <p className="text-indigo-400 flex items-center gap-2">
+                  <CalendarClock className="w-4 h-4" />
+                  <span><strong>Activas con Fecha:</strong> Vulnerabilidades abiertas con calendario activo</span>
                 </p>
-              </div>
-            )}
+              )}
+              {vistaActiva === "en_analisis" && (
+                <p className="text-amber-400 flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  <span><strong>En Análisis:</strong> Sin fecha asignada, último estado Vulnerable o Impedimento</span>
+                </p>
+              )}
+              {vistaActiva === "en_retest" && (
+                <p className="text-cyan-400 flex items-center gap-2">
+                  <TestTube2 className="w-4 h-4" />
+                  <span><strong>En Retest:</strong> En proceso de validación técnica con proveedor</span>
+                </p>
+              )}
+              {vistaActiva === "historico" && (
+                <p className="text-emerald-400 flex items-center gap-2">
+                  <Archive className="w-4 h-4" />
+                  <span><strong>Histórico Cerrado:</strong> Vulnerabilidades Corregidas o Desestimadas</span>
+                </p>
+              )}
+            </div>
             
             {/* Indicador de búsqueda activa */}
             {debouncedSearch && (
@@ -919,12 +979,12 @@ export default function SeguimientoRiesgos() {
           </CardContent>
         </Card>
 
-        {/* Filters */}
+        {/* Filters - Solo mostrar filtros de fecha en vista "Activas con Fecha" */}
         <Card className="bg-[#18181b] border-[#27272a]">
           <CardContent className="p-4">
             <div className="flex flex-wrap gap-4">
-              {/* Tipo Fecha Filter - Solo mostrar si NO estamos en modo auditoría */}
-              {!modoAuditoria && (
+              {/* Tipo Fecha Filter - Solo mostrar en vista "Activas con Fecha" */}
+              {vistaActiva === "activas_con_fecha" && (
                 <Select value={filterTipoFecha} onValueChange={setFilterTipoFecha}>
                   <SelectTrigger className="w-[150px] bg-zinc-900 border-zinc-700 text-white" data-testid="filter-tipo-fecha">
                     <SelectValue placeholder="Tipo fecha" />
@@ -992,8 +1052,8 @@ export default function SeguimientoRiesgos() {
                 data-testid="filter-responsable"
               />
 
-              {/* Month Filter - Solo mostrar si NO estamos en modo auditoría */}
-              {!modoAuditoria && (
+              {/* Month Filter - Solo mostrar en vista "Activas con Fecha" */}
+              {vistaActiva === "activas_con_fecha" && (
                 <Select value={filterMes} onValueChange={setFilterMes}>
                   <SelectTrigger className="w-[140px] bg-zinc-900 border-zinc-700 text-white" data-testid="filter-mes">
                     <SelectValue placeholder="Mes" />
@@ -1007,8 +1067,8 @@ export default function SeguimientoRiesgos() {
                 </Select>
               )}
 
-              {/* Year Filter - Solo mostrar si NO estamos en modo auditoría */}
-              {!modoAuditoria && (
+              {/* Year Filter - Solo mostrar en vista "Activas con Fecha" */}
+              {vistaActiva === "activas_con_fecha" && (
                 <Select value={filterAño} onValueChange={setFilterAño}>
                   <SelectTrigger className="w-[120px] bg-zinc-900 border-zinc-700 text-white" data-testid="filter-año">
                     <SelectValue placeholder="Año" />
@@ -1073,12 +1133,48 @@ export default function SeguimientoRiesgos() {
                         >
                           <TableCell>
                             <div className="flex flex-col gap-1">
-                              <StatusBadge 
-                                estado={vuln.estado_seguimiento} 
-                                diasRestantes={vuln.dias_restantes} 
-                              />
-                              {vuln.estado_seguimiento === "vencida" && (
-                                <AlertaVencidaBadge estado="vencida" />
+                              {/* Badge principal según vista */}
+                              {vistaActiva === "en_retest" && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-cyan-500/20 border border-cyan-500/50 rounded text-cyan-400 text-xs font-bold">
+                                  <TestTube2 className="w-3 h-3" />
+                                  🧪 En Retest
+                                </span>
+                              )}
+                              {vistaActiva === "en_analisis" && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-500/20 border border-amber-500/50 rounded text-amber-400 text-xs font-bold">
+                                  <Clock className="w-3 h-3" />
+                                  ⏳ En Análisis
+                                </span>
+                              )}
+                              {vistaActiva === "activas_con_fecha" && (
+                                <>
+                                  <StatusBadge 
+                                    estado={vuln.estado_seguimiento} 
+                                    diasRestantes={vuln.dias_restantes} 
+                                  />
+                                  {vuln.estado_seguimiento === "vencida" && (
+                                    <AlertaVencidaBadge estado="vencida" />
+                                  )}
+                                </>
+                              )}
+                              {vistaActiva === "historico" && (
+                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-bold ${
+                                  vuln.resultado_re_test === "Corregido" 
+                                    ? "bg-green-500/20 border border-green-500/50 text-green-400"
+                                    : "bg-zinc-500/20 border border-zinc-500/50 text-zinc-400"
+                                }`}>
+                                  {vuln.resultado_re_test === "Corregido" ? (
+                                    <><CheckCircle2 className="w-3 h-3" /> Corregido</>
+                                  ) : (
+                                    <><XCircle className="w-3 h-3" /> Desestimado</>
+                                  )}
+                                </span>
+                              )}
+                              {/* Mostrar resultado_re_test como badge secundario si existe */}
+                              {vistaActiva !== "historico" && vuln.resultado_re_test && (
+                                <span className="text-[10px] text-zinc-500">
+                                  Últ: {vuln.resultado_re_test}
+                                </span>
                               )}
                             </div>
                           </TableCell>
@@ -1376,12 +1472,13 @@ export default function SeguimientoRiesgos() {
                               <Select
                                 value={seguimientoForm.resultado_retest}
                                 onValueChange={(v) => {
-                                  // Si es estado de cierre, limpiar la fecha
-                                  const esEstadoCierre = v === "Corregido" || v === "Desestimado";
+                                  // Estados que fuerzan limpieza de fecha
+                                  const estadosSinFecha = ["Corregido", "Desestimado", "Para Re Test", "Nota de Seguimiento"];
+                                  const limpiarFecha = estadosSinFecha.includes(v);
                                   setSeguimientoForm(prev => ({ 
                                     ...prev, 
                                     resultado_retest: v,
-                                    fecha_compromiso_asignada: esEstadoCierre ? "" : prev.fecha_compromiso_asignada
+                                    fecha_compromiso_asignada: limpiarFecha ? "" : prev.fecha_compromiso_asignada
                                   }));
                                 }}
                               >
@@ -1389,44 +1486,52 @@ export default function SeguimientoRiesgos() {
                                   <SelectValue placeholder="Seleccionar resultado" />
                                 </SelectTrigger>
                                 <SelectContent className="bg-zinc-900 border-zinc-700">
-                                  <SelectItem value="Corregido">Corregido</SelectItem>
-                                  <SelectItem value="Pendiente">Pendiente</SelectItem>
-                                  <SelectItem value="Impedimento">Impedimento</SelectItem>
-                                  <SelectItem value="Vulnerable">Vulnerable</SelectItem>
-                                  <SelectItem value="Desestimado">Desestimado</SelectItem>
+                                  <SelectItem value="Corregido">Corregido - Remediación exitosa</SelectItem>
+                                  <SelectItem value="Pendiente">Pendiente - Prórroga o retest fallido</SelectItem>
+                                  <SelectItem value="Impedimento">Impedimento - Bloqueo operativo</SelectItem>
+                                  <SelectItem value="Vulnerable">Vulnerable - Persiste tras validación</SelectItem>
+                                  <SelectItem value="Desestimado">Desestimado - Falso positivo / Riesgo aceptado</SelectItem>
+                                  <SelectItem value="Para Re Test">Para Re Test - En validación con proveedor</SelectItem>
+                                  <SelectItem value="Nota de Seguimiento">Nota de Seguimiento - Comentario</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
                             
                             <div className="space-y-2">
-                              <Label className={`${
-                                (seguimientoForm.resultado_retest === "Corregido" || seguimientoForm.resultado_retest === "Desestimado")
-                                  ? "text-zinc-600" 
-                                  : "text-zinc-400"
-                              }`}>
-                                Nueva Fecha Compromiso
-                                {(seguimientoForm.resultado_retest === "Corregido" || seguimientoForm.resultado_retest === "Desestimado") && (
-                                  <span className="text-xs text-zinc-500 ml-2">(No aplica para cierre)</span>
-                                )}
-                              </Label>
-                              <Input
-                                type="date"
-                                value={seguimientoForm.fecha_compromiso_asignada}
-                                onChange={(e) => setSeguimientoForm(prev => ({ ...prev, fecha_compromiso_asignada: e.target.value }))}
-                                className={`bg-zinc-900 border-zinc-700 ${
-                                  (seguimientoForm.resultado_retest === "Corregido" || seguimientoForm.resultado_retest === "Desestimado")
-                                    ? "opacity-50 cursor-not-allowed" 
-                                    : ""
-                                }`}
-                                disabled={seguimientoForm.resultado_retest === "Corregido" || seguimientoForm.resultado_retest === "Desestimado"}
-                                data-testid="input-fecha-compromiso"
-                              />
-                              {seguimientoForm.fecha_compromiso_asignada && 
-                               seguimientoForm.fecha_compromiso_asignada !== viewingItem.fecha_compromiso &&
-                               seguimientoForm.resultado_retest !== "Corregido" && 
-                               seguimientoForm.resultado_retest !== "Desestimado" && (
-                                <p className="text-xs text-amber-400">⚠️ Se incrementará el contador de reprogramaciones</p>
-                              )}
+                              {(() => {
+                                const estadosSinFecha = ["Corregido", "Desestimado", "Para Re Test", "Nota de Seguimiento"];
+                                const deshabilitarFecha = estadosSinFecha.includes(seguimientoForm.resultado_retest);
+                                const mensajeEstado = seguimientoForm.resultado_retest === "Corregido" || seguimientoForm.resultado_retest === "Desestimado"
+                                  ? "(No aplica para cierre)"
+                                  : seguimientoForm.resultado_retest === "Para Re Test"
+                                    ? "(Se congela fecha - En validación)"
+                                    : seguimientoForm.resultado_retest === "Nota de Seguimiento"
+                                      ? "(No altera fecha)"
+                                      : "";
+                                return (
+                                  <>
+                                    <Label className={deshabilitarFecha ? "text-zinc-600" : "text-zinc-400"}>
+                                      Nueva Fecha Compromiso
+                                      {deshabilitarFecha && (
+                                        <span className="text-xs text-zinc-500 ml-2">{mensajeEstado}</span>
+                                      )}
+                                    </Label>
+                                    <Input
+                                      type="date"
+                                      value={seguimientoForm.fecha_compromiso_asignada}
+                                      onChange={(e) => setSeguimientoForm(prev => ({ ...prev, fecha_compromiso_asignada: e.target.value }))}
+                                      className={`bg-zinc-900 border-zinc-700 ${deshabilitarFecha ? "opacity-50 cursor-not-allowed" : ""}`}
+                                      disabled={deshabilitarFecha}
+                                      data-testid="input-fecha-compromiso"
+                                    />
+                                    {seguimientoForm.fecha_compromiso_asignada && 
+                                     seguimientoForm.fecha_compromiso_asignada !== viewingItem.fecha_compromiso &&
+                                     !deshabilitarFecha && (
+                                      <p className="text-xs text-amber-400">⚠️ Se incrementará el contador de reprogramaciones</p>
+                                    )}
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
 

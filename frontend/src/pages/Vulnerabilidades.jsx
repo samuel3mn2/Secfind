@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -78,9 +79,11 @@ import {
   Settings2,
   AlertTriangle,
   Shield,
+  History,
 } from "lucide-react";
 import ImportarPDF from "@/pages/ImportarPDF";
 import BulkEntryModal from "@/components/BulkEntryModal";
+import { TimelineSeguimiento } from "@/components/TimelineSeguimiento";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -301,6 +304,9 @@ export default function Vulnerabilidades() {
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [duplicatesFound, setDuplicatesFound] = useState([]);
   const [pendingFormData, setPendingFormData] = useState(null);
+  
+  // Tab de detalle de vulnerabilidad
+  const [activeDetailTab, setActiveDetailTab] = useState("info");
 
   // Toggle column visibility
   const toggleColumn = (columnId) => {
@@ -1266,7 +1272,12 @@ export default function Vulnerabilidades() {
       </Card>
 
       {/* View Modal */}
-      <Dialog open={showViewModal} onOpenChange={setShowViewModal}>
+      <Dialog open={showViewModal} onOpenChange={(open) => {
+        setShowViewModal(open);
+        if (!open) {
+          setActiveDetailTab("info");
+        }
+      }}>
         <DialogContent className="bg-[#18181b] border-[#27272a] text-white max-w-3xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="text-xl flex items-center gap-2">
@@ -1284,115 +1295,136 @@ export default function Vulnerabilidades() {
                   <StatusBadge status={viewingVuln.estatus} />
                 </div>
 
-                {/* Grid Info */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Fecha Hallazgo</p>
-                    <p className="text-white font-mono">{viewingVuln.fecha_hallazgo || "-"}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Institución</p>
-                    <p className="text-white">{viewingVuln.institucion || "-"}</p>
-                  </div>
-                  <div className="space-y-1 col-span-2">
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Aplicaciones</p>
-                    <div className="flex flex-wrap gap-1">
-                      {(viewingVuln.aplicaciones || []).length > 0 ? (
-                        viewingVuln.aplicaciones.map((app) => (
-                          <Badge key={app} variant="secondary" className="bg-indigo-500/20 text-indigo-300">
-                            {app}
-                          </Badge>
-                        ))
-                      ) : (
-                        <p className="text-white">{viewingVuln.aplicacion || "-"}</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Responsable</p>
-                    <p className="text-white">{viewingVuln.responsable || "-"}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Fecha Compromiso</p>
-                    <p className="text-white font-mono">{viewingVuln.fecha_compromiso || "-"}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Resultado Re Test</p>
-                    <p className="text-white">{viewingVuln.resultado_re_test || "-"}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Veces en Retest</p>
-                    <p className="text-white font-mono">{viewingVuln.veces_en_retest || 0}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-zinc-500 uppercase tracking-wide">Proveedor</p>
-                    <p className="text-white">{viewingVuln.proveedor || "-"}</p>
-                  </div>
-                </div>
+                {/* Tabs para Info/Bitácora */}
+                <Tabs value={activeDetailTab} onValueChange={setActiveDetailTab} className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 bg-zinc-800">
+                    <TabsTrigger value="info" className="data-[state=active]:bg-zinc-700">
+                      <FileText className="w-4 h-4 mr-2" />
+                      Información
+                    </TabsTrigger>
+                    <TabsTrigger value="bitacora" className="data-[state=active]:bg-zinc-700">
+                      <History className="w-4 h-4 mr-2" />
+                      Bitácora de Seguimiento
+                    </TabsTrigger>
+                  </TabsList>
 
-                {/* GRC Section */}
-                {(viewingVuln.control_id || viewingVuln.riesgo_id) && (
-                  <div className="p-3 bg-cyan-500/5 rounded-lg border border-cyan-500/20">
-                    <p className="text-xs text-cyan-500 uppercase tracking-wide mb-2 flex items-center gap-1">
-                      <Shield className="w-3 h-3" />
-                      Vinculación GRC
-                    </p>
+                  <TabsContent value="info" className="mt-4 space-y-4">
+                    {/* Grid Info */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <p className="text-xs text-zinc-500">Control Asociado</p>
-                        <p className="text-white">
-                          {(() => {
-                            const control = controles.find(c => c.id === viewingVuln.control_id);
-                            return control ? `${control.codigo_control || ""} ${control.nombre_control}` : "-";
-                          })()}
-                        </p>
+                        <p className="text-xs text-zinc-500 uppercase tracking-wide">Fecha Hallazgo</p>
+                        <p className="text-white font-mono">{viewingVuln.fecha_hallazgo || "-"}</p>
                       </div>
                       <div className="space-y-1">
-                        <p className="text-xs text-zinc-500">Riesgo del Catálogo</p>
-                        <p className="text-white">
-                          {(() => {
-                            const riesgo = catalogoRiesgos.find(r => r.id === viewingVuln.riesgo_id);
-                            return riesgo ? (
-                              <span className="flex items-center gap-2">
-                                <Badge variant="outline" className="bg-orange-500/10 text-orange-400 border-orange-500/30 text-xs">
-                                  {riesgo.codigo_riesgo}
-                                </Badge>
-                                {riesgo.nombre_corto}
-                              </span>
-                            ) : "-";
-                          })()}
-                        </p>
+                        <p className="text-xs text-zinc-500 uppercase tracking-wide">Institución</p>
+                        <p className="text-white">{viewingVuln.institucion || "-"}</p>
+                      </div>
+                      <div className="space-y-1 col-span-2">
+                        <p className="text-xs text-zinc-500 uppercase tracking-wide">Aplicaciones</p>
+                        <div className="flex flex-wrap gap-1">
+                          {(viewingVuln.aplicaciones || []).length > 0 ? (
+                            viewingVuln.aplicaciones.map((app) => (
+                              <Badge key={app} variant="secondary" className="bg-indigo-500/20 text-indigo-300">
+                                {app}
+                              </Badge>
+                            ))
+                          ) : (
+                            <p className="text-white">{viewingVuln.aplicacion || "-"}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-zinc-500 uppercase tracking-wide">Responsable</p>
+                        <p className="text-white">{viewingVuln.responsable || "-"}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-zinc-500 uppercase tracking-wide">Fecha Compromiso</p>
+                        <p className="text-white font-mono">{viewingVuln.fecha_compromiso || "-"}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-zinc-500 uppercase tracking-wide">Resultado Re Test</p>
+                        <p className="text-white">{viewingVuln.resultado_re_test || "-"}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-zinc-500 uppercase tracking-wide">Veces en Retest</p>
+                        <p className="text-white font-mono">{viewingVuln.veces_en_retest || 0}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs text-zinc-500 uppercase tracking-wide">Proveedor</p>
+                        <p className="text-white">{viewingVuln.proveedor || "-"}</p>
                       </div>
                     </div>
-                  </div>
-                )}
 
-                {/* Full Width Fields */}
-                <div className="space-y-1">
-                  <p className="text-xs text-zinc-500 uppercase tracking-wide">Informe Pentest</p>
-                  <p className="text-white">{viewingVuln.nombre_informe_pentest || "-"}</p>
-                </div>
+                    {/* GRC Section */}
+                    {(viewingVuln.control_id || viewingVuln.riesgo_id) && (
+                      <div className="p-3 bg-cyan-500/5 rounded-lg border border-cyan-500/20">
+                        <p className="text-xs text-cyan-500 uppercase tracking-wide mb-2 flex items-center gap-1">
+                          <Shield className="w-3 h-3" />
+                          Vinculación GRC
+                        </p>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <p className="text-xs text-zinc-500">Control Asociado</p>
+                            <p className="text-white">
+                              {(() => {
+                                const control = controles.find(c => c.id === viewingVuln.control_id);
+                                return control ? `${control.codigo_control || ""} ${control.nombre_control}` : "-";
+                              })()}
+                            </p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-xs text-zinc-500">Riesgo del Catálogo</p>
+                            <p className="text-white">
+                              {(() => {
+                                const riesgo = catalogoRiesgos.find(r => r.id === viewingVuln.riesgo_id);
+                                return riesgo ? (
+                                  <span className="flex items-center gap-2">
+                                    <Badge variant="outline" className="bg-orange-500/10 text-orange-400 border-orange-500/30 text-xs">
+                                      {riesgo.codigo_riesgo}
+                                    </Badge>
+                                    {riesgo.nombre_corto}
+                                  </span>
+                                ) : "-";
+                              })()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
-                <div className="space-y-1">
-                  <p className="text-xs text-zinc-500 uppercase tracking-wide">Vulnerabilidad</p>
-                  <p className="text-white whitespace-pre-wrap bg-zinc-800/50 p-3 rounded-lg">
-                    {viewingVuln.vulnerabilidad || "-"}
-                  </p>
-                </div>
+                    {/* Full Width Fields */}
+                    <div className="space-y-1">
+                      <p className="text-xs text-zinc-500 uppercase tracking-wide">Informe Pentest</p>
+                      <p className="text-white">{viewingVuln.nombre_informe_pentest || "-"}</p>
+                    </div>
 
-                <div className="space-y-1">
-                  <p className="text-xs text-zinc-500 uppercase tracking-wide">Descripción del Riesgo</p>
-                  <p className="text-white whitespace-pre-wrap bg-zinc-800/50 p-3 rounded-lg">
-                    {viewingVuln.descripcion_riesgo || "-"}
-                  </p>
-                </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-zinc-500 uppercase tracking-wide">Vulnerabilidad</p>
+                      <p className="text-white whitespace-pre-wrap bg-zinc-800/50 p-3 rounded-lg">
+                        {viewingVuln.vulnerabilidad || "-"}
+                      </p>
+                    </div>
 
-                <div className="space-y-1">
-                  <p className="text-xs text-zinc-500 uppercase tracking-wide">Recomendaciones</p>
-                  <p className="text-white whitespace-pre-wrap bg-zinc-800/50 p-3 rounded-lg">
-                    {viewingVuln.recomendaciones || "-"}
-                  </p>
-                </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-zinc-500 uppercase tracking-wide">Descripción del Riesgo</p>
+                      <p className="text-white whitespace-pre-wrap bg-zinc-800/50 p-3 rounded-lg">
+                        {viewingVuln.descripcion_riesgo || "-"}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-xs text-zinc-500 uppercase tracking-wide">Recomendaciones</p>
+                      <p className="text-white whitespace-pre-wrap bg-zinc-800/50 p-3 rounded-lg">
+                        {viewingVuln.recomendaciones || "-"}
+                      </p>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="bitacora" className="mt-4">
+                    {/* Timeline en modo solo lectura */}
+                    <TimelineSeguimiento vulnId={viewingVuln.id} readOnly={true} />
+                  </TabsContent>
+                </Tabs>
               </div>
             )}
           </ScrollArea>

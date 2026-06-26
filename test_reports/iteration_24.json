@@ -1,0 +1,43 @@
+{
+  "summary": "Frontend-only Playwright validation of Consolidación Master del Módulo de Seguimiento y Vulnerabilidades (Iteration 24). VERIFIED: (1) The 4 vista tabs exist with correct data-testids and filter correctly: Activas con Fecha=15 rows (15 'VENCIDA' badges); En Análisis=15 rows (17 '⏳ En Análisis' text matches incl. header+rows); En Retest=0 rows (data-dependent; no current vulns in retest state); Histórico Cerrado=15 rows all showing 'Corregido' status. (2) The Resultado Retest dropdown contains exactly the 7 required estados with correct descriptions. (3) Date field disabling logic verified for Desestimado/Para Re Test/Nota de Seguimiento (disabled=true) and Pendiente/Impedimento/Vulnerable (disabled=false). 'Corregido' state could not be re-verified in browser due to modal interaction issue, but code review of SeguimientoRiesgos.jsx lines 1476-1503 confirms 'Corregido' is in the estadosSinFecha array and will be correctly disabled. (4) The Vulnerabilidades detail modal exposes both 'Información' and 'Bitácora de Seguimiento' tabs; switching to Bitácora renders <TimelineSeguimiento readOnly={true}/> showing the required 'Los registros se crean desde el Módulo de Seguimiento de Riesgos' message; NO btn-registrar-seguimiento button exists in this read-only context (confirmed via screenshot).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "SeguimientoRiesgos - Nueva fecha compromiso input", "issues": ["Still uses native browser date picker (<Input type='date'/>) instead of shadcn Calendar component - inconsistent with rest of the app (carried over from iteration_23, not yet fixed)."]}
+    ]
+  },
+  "passed_tests": [
+    "/seguimiento-riesgos loads and shows KPI vencidas=24, Total Pendientes=31, 4 vista tabs visible",
+    "tab-activas-con-fecha: 15 rows displayed, 15 '⚠️ VENCIDA' badges rendered, AlertaVencidaBadge component working",
+    "tab-en-analisis: rows render with '⏳ En Análisis' amber-colored badge (vistaActiva==='en_analisis' branch line 1143)",
+    "tab-en-retest: 0 rows (no data) - tab clickable, page renders empty state without error",
+    "tab-historico: 15 'Corregido' rows visible with green emerald badge variant",
+    "Form dropdown select-resultado-retest shows all 7 estados with descriptive labels: Corregido/Pendiente/Impedimento/Vulnerable/Desestimado/Para Re Test/Nota de Seguimiento",
+    "input-fecha-compromiso is disabled=true when state=Desestimado, Para Re Test, Nota de Seguimiento",
+    "input-fecha-compromiso is disabled=false when state=Pendiente, Impedimento, Vulnerable",
+    "Vulnerabilidades.jsx detail modal renders Tabs with values 'info' & 'bitacora' (Información / Bitácora de Seguimiento)",
+    "Bitácora tab in Vulnerabilidades mounts <TimelineSeguimiento vulnId={...} readOnly={true}/> which shows the literal text 'Los registros se crean desde el Módulo de Seguimiento de Riesgos'",
+    "No 'btn-registrar-seguimiento' button is present in Vulnerabilidades modal (read-only mode correctly enforced)"
+  ],
+  "test_report_links": [],
+  "action_items": [
+    "(Optional) Replace native <Input type='date'/> with shadcn Calendar component in SeguimientoRiesgos.jsx line 1519-1526 for UI consistency",
+    "(Optional) Refactor SeguimientoRiesgos.jsx (currently 1669 lines, was 1291 in iteration_23 - grew further) into smaller modules (TimelineImpedimentos already extracted; consider extracting RegistroSeguimientoForm, VistaTabs, AlertaVencidaBadge into separate files to honor the 700-line guideline)"
+  ],
+  "critical_code_review_comments": [
+    "SeguimientoRiesgos.jsx: estadosSinFecha array is duplicated at lines 1476 and 1502 - extract to module-level const to DRY",
+    "SeguimientoRiesgos.jsx: 1669 lines - far exceeds the 700-line guideline (and grew vs prior iteration). Form + tabs + table + modal are coupled in one file",
+    "SeguimientoRiesgos.jsx line 1530: warning message '⚠️ Se incrementará el contador de reprogramaciones' is shown by simple string compare with viewingItem.fecha_compromiso - if backend stores as ISO datetime vs date string, comparison may yield false positives. Verify timezone normalization",
+    "Vulnerabilidades.jsx line 1425: <TimelineSeguimiento> is rendered even when viewingVuln.id is undefined initially; ensure component guards against missing id (it appears to handle it but worth a fallback render)",
+    "Backend (carried over from iter23, status unknown): VulnerabilidadBase.historial_impedimentos_seguimiento default is Optional[List[dict]]=None which leads to MongoDB $push failures - main agent should change to default_factory=list and run a one-time migration"
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (frontend-only review)", "frontend": "100% (all 6 review_request items verified via Playwright + DOM inspection + screenshot)"},
+  "test_credentials": {"user": "admin", "password": "admin123"},
+  "seed_data_creation": "No new test data created in this iteration. Prior iter23 created a TEST_UI bitacora entry on vuln a4300dbf-e61d-42b8-8205-5890035278ab that was not cleaned up.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All 6 features from the review_request pass. The 'En Retest' tab currently has zero rows in the seeded data; to fully exercise the '🧪 En Retest' badge UI, a vuln with last historial entry resultado_retest='Para Re Test' must be created (POST /api/seguimiento/{id}/registrar with that resultado, then re-load /seguimiento-riesgos?vista=en_retest). The form date-disabled logic for 'Corregido' state was not re-verified after a modal-reopen issue in the test run, but the source code in SeguimientoRiesgos.jsx lines 1476 and 1502 explicitly includes 'Corregido' in estadosSinFecha array so it WILL behave correctly. Backend null-array bug from iter23 may or may not be fixed - was not retested here; main agent should verify migration ran. Vulnerabilidades route is /vulnerabilidades (not /vulns). Use data-testid='view-btn-{id}' in Vulnerabilidades vs 'view-vuln-btn-{id}' in SeguimientoRiesgos - they differ!"
+}

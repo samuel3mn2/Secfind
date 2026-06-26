@@ -214,8 +214,16 @@ class EntradaBitacoraSeguimiento(BaseModel):
     fecha_compromiso_asignada: Optional[str] = None  # Nueva fecha de compromiso (YYYY-MM-DD)
     notas_impedimento: Optional[str] = None  # Texto libre para detallar bloqueos
 
-# Tipo estricto para resultado de retest
-ResultadoRetestLiteral = Literal["Corregido", "Pendiente", "Impedimento", "Vulnerable", "Desestimado"]
+# Tipo estricto para resultado de retest (expandido para ciclo de vida completo)
+ResultadoRetestLiteral = Literal[
+    "Corregido",      # CASO A: Cierre exitoso
+    "Pendiente",      # CASO E: Prórroga o retest fallido
+    "Impedimento",    # CASO B: Bloqueo operativo
+    "Vulnerable",     # CASO C: Retest ejecutado, vulnerabilidad persiste
+    "Desestimado",    # CASO A: Cierre por falso positivo/riesgo aceptado
+    "Para Re Test",   # CASO D: En proceso de validación con proveedor
+    "Nota de Seguimiento"  # CASO F: Comentario puro sin alterar contadores
+]
 
 class RegistroSeguimientoRequest(BaseModel):
     resultado_retest: ResultadoRetestLiteral
@@ -2958,16 +2966,22 @@ async def get_seguimiento_riesgos(
     tipo_fecha: Optional[str] = "con_fecha",  # "con_fecha", "sin_fecha", "todas"
     incluir_cerradas: bool = False,  # True para mostrar histórico cerrado (auditoría)
     busqueda: Optional[str] = None,  # Búsqueda por código o nombre de vulnerabilidad
+    vista: Optional[str] = None,  # "activas_con_fecha", "en_analisis", "en_retest", "historico"
     current_user: CurrentUser = Depends(get_current_user)
 ):
     """
-    Get vulnerabilities for risk tracking.
-    - tipo_fecha: "con_fecha" (only with fecha_compromiso), "sin_fecha" (without), "todas" (all pending)
-    - vencidas: past due date, not resolved
-    - proximas: due within next 30 days
-    - mes/año_compromiso: filter by specific month/year of fecha_compromiso
-    - incluir_cerradas: True para mostrar vulnerabilidades cerradas (histórico de auditoría)
-    - busqueda: texto libre para filtrar por código o nombre de vulnerabilidad
+    Get vulnerabilities for risk tracking with advanced filtering.
+    
+    Vistas disponibles (parámetro `vista`):
+    - activas_con_fecha: Elementos abiertos con fecha asignada (calendario corriendo)
+    - en_analisis: Elementos activos sin fecha donde último estado es Vulnerable/Impedimento
+    - en_retest: Elementos activos sin fecha donde último estado es "Para Re Test"
+    - historico: Registros con estatus "Cerrado" para auditoría
+    
+    Otros parámetros:
+    - tipo_fecha: "con_fecha", "sin_fecha", "todas"
+    - filtro: "vencidas", "proximas", "todas"
+    - busqueda: texto libre para filtrar por código o nombre
     """
     if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
         raise HTTPException(status_code=403, detail="No tiene permisos para ver el seguimiento de riesgos")
@@ -2981,62 +2995,91 @@ async def get_seguimiento_riesgos(
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     future_30 = (datetime.now(timezone.utc) + timedelta(days=30)).strftime("%Y-%m-%d")
     
-    # Base query: depends on incluir_cerradas flag
-    if incluir_cerradas:
-        # Modo auditoría: solo mostrar cerradas
-        query = {
-            "estatus": {"$in": ["Cerrado", "Corregido", "Desestimado"]}
-        }
+    # ==========================================================================
+    # CONSTRUCCIÓN DE QUERY SEGÚN VISTA
+    # ==========================================================================
+    
+    query = {}
+    
+    if vista == "historico" or incluir_cerradas:
+        # VISTA: Histórico Cerrado (Auditoría)
+        query["estatus"] = {"$in": ["Cerrado", "Corregido", "Desestimado"]}
+        
+    elif vista == "en_retest":
+        # VISTA: En Retest - Sin fecha y último estado es "Para Re Test"
+        query["estatus"] = {"$nin": ["Cerrado", "Corregido", "Desestimado"]}
+        query["$or"] = [
+            {"fecha_compromiso": {"$exists": False}},
+            {"fecha_compromiso": None},
+            {"fecha_compromiso": ""}
+        ]
+        query["resultado_re_test"] = "Para Re Test"
+        
+    elif vista == "en_analisis":
+        # VISTA: En Análisis - Sin fecha y último estado es Vulnerable o Impedimento
+        query["estatus"] = {"$nin": ["Cerrado", "Corregido", "Desestimado"]}
+        query["$or"] = [
+            {"fecha_compromiso": {"$exists": False}},
+            {"fecha_compromiso": None},
+            {"fecha_compromiso": ""}
+        ]
+        query["resultado_re_test"] = {"$in": ["Vulnerable", "Impedimento"]}
+        
+    elif vista == "activas_con_fecha":
+        # VISTA: Activas con Fecha - Estatus abierto y con fecha asignada
+        query["estatus"] = {"$nin": ["Cerrado", "Corregido", "Desestimado"]}
+        query["fecha_compromiso"] = {"$exists": True, "$nin": [None, ""]}
+        
     else:
-        # Modo normal: excluir cerradas
-        query = {
-            "estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]}
-        }
+        # Modo legacy/compatibilidad (sin parámetro vista)
+        if incluir_cerradas:
+            query["estatus"] = {"$in": ["Cerrado", "Corregido", "Desestimado"]}
+        else:
+            query["estatus"] = {"$nin": ["Cerrado", "Corregido", "Desestimado"]}
+            
+            # Filter by tipo_fecha
+            if tipo_fecha == "sin_fecha":
+                query["$or"] = [
+                    {"fecha_compromiso": {"$exists": False}},
+                    {"fecha_compromiso": None},
+                    {"fecha_compromiso": ""}
+                ]
+            elif tipo_fecha == "con_fecha":
+                query["fecha_compromiso"] = {"$exists": True, "$nin": [None, ""]}
     
     # Filtro de búsqueda por código o nombre de vulnerabilidad
     if busqueda and busqueda.strip():
         busqueda_regex = {"$regex": busqueda.strip(), "$options": "i"}
-        query["$or"] = [
+        busqueda_or = [
             {"codigo": busqueda_regex},
             {"vulnerabilidad": busqueda_regex}
         ]
+        # Combinar con $or existente si hay
+        if "$or" in query:
+            existing_or = query.pop("$or")
+            query["$and"] = [{"$or": existing_or}, {"$or": busqueda_or}]
+        else:
+            query["$or"] = busqueda_or
     
-    # Filter by tipo_fecha (solo aplica si NO estamos en modo cerradas)
-    if not incluir_cerradas:
-        if tipo_fecha == "sin_fecha":
-            query_fecha = {"$or": [
-                {"fecha_compromiso": {"$exists": False}},
-                {"fecha_compromiso": None},
-                {"fecha_compromiso": ""}
-            ]}
-            # Merge with existing query
-            if "$or" in query:
-                query["$and"] = [{"$or": query.pop("$or")}, query_fecha]
-            else:
-                query.update(query_fecha)
-        elif tipo_fecha == "con_fecha":
-            query["fecha_compromiso"] = {"$exists": True, "$nin": [None, ""]}
-        # tipo_fecha == "todas" - no fecha_compromiso filter
-        
-        # Filter by month/year of fecha_compromiso (only applies when tipo_fecha is "con_fecha" or "todas")
-        if tipo_fecha != "sin_fecha":
+    # Filtros de fecha adicionales (solo para vistas con fecha)
+    if vista in ["activas_con_fecha", None] and not incluir_cerradas and vista != "historico":
+        if tipo_fecha != "sin_fecha" and not vista:
             if mes and mes != "all" and año_compromiso and año_compromiso != "all":
-                # Filter by specific month and year (YYYY-MM format)
                 prefix = f"{año_compromiso}-{mes}"
                 query["fecha_compromiso"] = {"$regex": f"^{prefix}"}
             elif año_compromiso and año_compromiso != "all":
-                # Filter by year only
                 query["fecha_compromiso"] = {"$regex": f"^{año_compromiso}"}
             elif mes and mes != "all":
-                # Filter by month only (any year)
                 query["fecha_compromiso"] = {"$regex": f"^\\d{{4}}-{mes}"}
             elif filtro == "vencidas":
                 query["fecha_compromiso"] = {"$lt": today, "$nin": [None, ""]}
             elif filtro == "proximas":
-                query["$and"] = query.get("$and", []) + [
+                if "$and" not in query:
+                    query["$and"] = []
+                query["$and"].extend([
                     {"fecha_compromiso": {"$gte": today}},
                     {"fecha_compromiso": {"$lte": future_30}}
-                ]
+                ])
     
     if severidades:
         query["severidad"] = {"$in": severidades}
@@ -3162,17 +3205,43 @@ async def registrar_seguimiento(
     if not existing:
         raise HTTPException(status_code=404, detail="Vulnerabilidad no encontrada")
     
-    # Determinar si es un estado de cierre (no requiere fecha de compromiso)
-    es_estado_cierre = data.resultado_retest in ["Corregido", "Desestimado"]
+    # Determinar el tipo de caso según el resultado_retest
+    resultado = data.resultado_retest
     
-    # Para estados de cierre, forzar fecha_compromiso_asignada a null
-    fecha_para_bitacora = None if es_estado_cierre else data.fecha_compromiso_asignada
+    # ==========================================================================
+    # LÓGICA DE NEGOCIO - 6 CASOS DE CICLO DE VIDA
+    # ==========================================================================
+    
+    # CASO A: Estados de Cierre ("Corregido" y "Desestimado")
+    es_estado_cierre = resultado in ["Corregido", "Desestimado"]
+    
+    # CASO D: Para Re Test - congelar tiempo
+    es_para_retest = resultado == "Para Re Test"
+    
+    # CASO F: Nota de Seguimiento - comentario puro
+    es_nota_seguimiento = resultado == "Nota de Seguimiento"
+    
+    # CASO C: Vulnerable - puede congelar tiempo si no hay fecha
+    es_vulnerable = resultado == "Vulnerable"
+    
+    # CASO B: Impedimento
+    es_impedimento = resultado == "Impedimento"
+    
+    # CASO E: Pendiente
+    es_pendiente = resultado == "Pendiente"
+    
+    # Determinar fecha para la bitácora
+    # Estados que fuerzan fecha null: Cierre, Para Re Test, Nota de Seguimiento
+    if es_estado_cierre or es_para_retest or es_nota_seguimiento:
+        fecha_para_bitacora = None
+    else:
+        fecha_para_bitacora = data.fecha_compromiso_asignada
     
     # Crear entrada de bitácora
     entrada_bitacora = {
         "id_accion": str(uuid.uuid4()),
         "fecha_registro_nota": datetime.now(timezone.utc).isoformat(),
-        "resultado_retest": data.resultado_retest,
+        "resultado_retest": resultado,
         "fecha_compromiso_asignada": fecha_para_bitacora,
         "notas_impedimento": data.notas_impedimento or "",
         "usuario_registro": current_user.nombre or current_user.username
@@ -3189,7 +3258,7 @@ async def registrar_seguimiento(
     update_ops = {
         "$push": {"historial_impedimentos_seguimiento": entrada_bitacora},
         "$set": {
-            "resultado_re_test": data.resultado_retest,
+            "resultado_re_test": resultado,
             "updated_at": datetime.now(timezone.utc).isoformat()
         }
     }
@@ -3197,69 +3266,102 @@ async def registrar_seguimiento(
     # Inicializar $inc si se va a usar
     inc_ops = {}
     
-    # Verificar si la fecha de compromiso cambió (SOLO para estados NO de cierre)
-    fecha_actual = existing.get("fecha_compromiso", "") or ""
+    # Obtener fecha actual de la vulnerabilidad
+    fecha_actual = existing.get("fecha_compromiso") or ""
     fecha_nueva = fecha_para_bitacora or ""
     fecha_cambio = False
-    
-    # Solo procesar cambio de fecha si NO es estado de cierre
-    if not es_estado_cierre and fecha_nueva and fecha_nueva != fecha_actual:
-        update_ops["$set"]["fecha_compromiso"] = fecha_nueva
-        inc_ops["veces_cambiada_fecha"] = 1
-        fecha_cambio = True
+    fecha_limpiada = False  # Para casos donde se limpia la fecha a null
     
     # ==========================================================================
-    # CONTROL DE INCREMENTO DE CONTADORES SEGÚN RESULTADO Y CAMBIO DE FECHA
-    # ==========================================================================
-    # 
-    # Reglas de negocio para veces_en_retest:
-    # 
-    # 1. CORREGIDO / DESESTIMADO / VULNERABLE: 
-    #    SIEMPRE incrementa veces_en_retest (son resultados de validación técnica)
-    #
-    # 2. PENDIENTE (caso especial con exclusión mutua):
-    #    - CASO A (Prórroga/Reprogramación): Si fecha_nueva != fecha_actual
-    #      → SÍ incrementa veces_cambiada_fecha
-    #      → NO incrementa veces_en_retest (solo se movió el calendario)
-    #    - CASO B (Retest fallido): Si fecha_nueva == fecha_actual o no hay fecha
-    #      → SÍ incrementa veces_en_retest (se probó en fecha pactada)
-    #      → NO incrementa veces_cambiada_fecha
-    #
-    # 3. IMPEDIMENTO:
-    #    NUNCA incrementa veces_en_retest (validación técnica no pudo ejecutarse)
-    #    SÍ puede incrementar veces_cambiada_fecha si hay reprogramación
+    # PROCESAMIENTO POR CASO
     # ==========================================================================
     
-    if data.resultado_retest in ["Corregido", "Desestimado", "Vulnerable"]:
-        # Estados de validación técnica: SIEMPRE incrementan veces_en_retest
+    if es_estado_cierre:
+        # CASO A: Corregido / Desestimado
+        # - SÍ cambia estatus a "Cerrado"
+        # - SÍ incrementa veces_en_retest
+        # - NO incrementa veces_cambiada_fecha
+        # - Fecha en bitácora forzada a null (ya hecho arriba)
+        update_ops["$set"]["estatus"] = "Cerrado"
         inc_ops["veces_en_retest"] = 1
         
-    elif data.resultado_retest == "Pendiente":
-        # CASO ESPECIAL: Exclusión mutua entre prórroga y retest fallido
-        if fecha_cambio:
-            # CASO A: Prórroga/Reprogramación administrativa
-            # La fecha ya se marcó para incrementar veces_cambiada_fecha arriba
-            # NO incrementamos veces_en_retest porque no hubo validación técnica
-            pass
-        else:
-            # CASO B: Retest técnico fallido (misma fecha o sin fecha nueva)
-            # SÍ incrementamos veces_en_retest porque se validó técnicamente
-            inc_ops["veces_en_retest"] = 1
+    elif es_impedimento:
+        # CASO B: Impedimento
+        # - Si hay fecha diferente a actual: actualiza fecha_compromiso e incrementa veces_cambiada_fecha
+        # - NO incrementa veces_en_retest (validación bloqueada)
+        # - Mantiene estatus "Pendiente"
+        update_ops["$set"]["estatus"] = "Pendiente"
+        if fecha_nueva and fecha_nueva != fecha_actual:
+            update_ops["$set"]["fecha_compromiso"] = fecha_nueva
+            inc_ops["veces_cambiada_fecha"] = 1
+            fecha_cambio = True
+        elif not fecha_nueva and fecha_actual:
+            # Si viene vacía y había fecha, limpiar para "En Análisis"
+            update_ops["$set"]["fecha_compromiso"] = None
+            fecha_limpiada = True
             
-    elif data.resultado_retest == "Impedimento":
-        # Impedimento: NO incrementa veces_en_retest
-        # El incremento de veces_cambiada_fecha ya se maneja arriba si hay fecha_cambio
-        pass
+    elif es_vulnerable:
+        # CASO C: Vulnerable
+        # - Si fecha vacía: LIMPIA fecha_compromiso global a null (congelar tiempo)
+        # - SÍ incrementa veces_en_retest
+        # - Mantiene estatus "Pendiente"
+        update_ops["$set"]["estatus"] = "Pendiente"
+        inc_ops["veces_en_retest"] = 1
+        if not fecha_nueva:
+            # Limpiar fecha para congelar tiempo ("En Análisis")
+            update_ops["$set"]["fecha_compromiso"] = None
+            fecha_limpiada = True
+        elif fecha_nueva and fecha_nueva != fecha_actual:
+            # Si envía fecha nueva diferente, actualizarla
+            update_ops["$set"]["fecha_compromiso"] = fecha_nueva
+            inc_ops["veces_cambiada_fecha"] = 1
+            fecha_cambio = True
+            
+    elif es_para_retest:
+        # CASO D: Para Re Test
+        # - FUERZA fecha_compromiso global a null (congelar tiempos de expiración)
+        # - NO incrementa veces_en_retest ni veces_cambiada_fecha
+        # - Mantiene estatus "Pendiente"
+        update_ops["$set"]["estatus"] = "Pendiente"
+        update_ops["$set"]["fecha_compromiso"] = None
+        fecha_limpiada = True
+        
+    elif es_pendiente:
+        # CASO E: Pendiente (Prórroga o Transición)
+        # - Si fecha_nueva != fecha_actual (incluyendo desde null): prórroga
+        #   → SÍ actualiza fecha_compromiso, SÍ incrementa veces_cambiada_fecha
+        #   → NO incrementa veces_en_retest
+        # - Si fecha_nueva == fecha_actual: retest fallido
+        #   → SÍ incrementa veces_en_retest
+        #   → NO incrementa veces_cambiada_fecha
+        update_ops["$set"]["estatus"] = "Pendiente"
+        if fecha_nueva and fecha_nueva != fecha_actual:
+            # Prórroga administrativa o asignación de fecha post-análisis
+            update_ops["$set"]["fecha_compromiso"] = fecha_nueva
+            inc_ops["veces_cambiada_fecha"] = 1
+            fecha_cambio = True
+        elif not fecha_nueva and not fecha_actual:
+            # Sin fecha antes y sin fecha ahora: retest fallido sin cambio
+            inc_ops["veces_en_retest"] = 1
+        elif fecha_nueva == fecha_actual:
+            # Misma fecha: retest fallido
+            inc_ops["veces_en_retest"] = 1
+        elif not fecha_nueva and fecha_actual:
+            # Tenía fecha y ahora no: prórroga a estado "En Análisis"
+            update_ops["$set"]["fecha_compromiso"] = None
+            inc_ops["veces_cambiada_fecha"] = 1
+            fecha_limpiada = True
+            
+    elif es_nota_seguimiento:
+        # CASO F: Nota de Seguimiento
+        # - Comentario puro, NO altera fecha_compromiso ni contadores
+        # - NO cambia estatus
+        # - Fecha en bitácora forzada a null (ya hecho arriba)
+        pass  # No hacemos nada adicional
     
     # Si hay operaciones de incremento, agregarlas
     if inc_ops:
         update_ops["$inc"] = inc_ops
-    
-    # Sincronizar estatus basado en resultado de retest (lógica existente)
-    if es_estado_cierre:
-        update_ops["$set"]["estatus"] = "Cerrado"
-    elif data.resultado_retest in ["Vulnerable", "Impedimento", "Pendiente"]:
-        update_ops["$set"]["estatus"] = "Pendiente"
     
     # Ejecutar actualización
     await db.vulnerabilidades.update_one({"id": vuln_id}, update_ops)
