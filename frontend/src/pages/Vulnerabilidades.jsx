@@ -1355,7 +1355,34 @@ export default function Vulnerabilidades() {
                       </div>
                     </div>
 
-                    {/* GRC Section */}
+                    {/* Full Width Fields */}
+                    <div className="space-y-1">
+                      <p className="text-xs text-zinc-500 uppercase tracking-wide">Informe Pentest</p>
+                      <p className="text-white">{viewingVuln.nombre_informe_pentest || "-"}</p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-xs text-zinc-500 uppercase tracking-wide">Vulnerabilidad</p>
+                      <p className="text-white whitespace-pre-wrap bg-zinc-800/50 p-3 rounded-lg">
+                        {viewingVuln.vulnerabilidad || "-"}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-xs text-zinc-500 uppercase tracking-wide">Descripción del Riesgo</p>
+                      <p className="text-white whitespace-pre-wrap bg-zinc-800/50 p-3 rounded-lg">
+                        {viewingVuln.descripcion_riesgo || "-"}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-xs text-zinc-500 uppercase tracking-wide">Recomendaciones</p>
+                      <p className="text-white whitespace-pre-wrap bg-zinc-800/50 p-3 rounded-lg">
+                        {viewingVuln.recomendaciones || "-"}
+                      </p>
+                    </div>
+
+                    {/* GRC Section - Al final del formulario */}
                     {(viewingVuln.control_id || viewingVuln.riesgo_id) && (
                       <div className="p-3 bg-cyan-500/5 rounded-lg border border-cyan-500/20">
                         <p className="text-xs text-cyan-500 uppercase tracking-wide mb-2 flex items-center gap-1">
@@ -1391,33 +1418,6 @@ export default function Vulnerabilidades() {
                         </div>
                       </div>
                     )}
-
-                    {/* Full Width Fields */}
-                    <div className="space-y-1">
-                      <p className="text-xs text-zinc-500 uppercase tracking-wide">Informe Pentest</p>
-                      <p className="text-white">{viewingVuln.nombre_informe_pentest || "-"}</p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <p className="text-xs text-zinc-500 uppercase tracking-wide">Vulnerabilidad</p>
-                      <p className="text-white whitespace-pre-wrap bg-zinc-800/50 p-3 rounded-lg">
-                        {viewingVuln.vulnerabilidad || "-"}
-                      </p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <p className="text-xs text-zinc-500 uppercase tracking-wide">Descripción del Riesgo</p>
-                      <p className="text-white whitespace-pre-wrap bg-zinc-800/50 p-3 rounded-lg">
-                        {viewingVuln.descripcion_riesgo || "-"}
-                      </p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <p className="text-xs text-zinc-500 uppercase tracking-wide">Recomendaciones</p>
-                      <p className="text-white whitespace-pre-wrap bg-zinc-800/50 p-3 rounded-lg">
-                        {viewingVuln.recomendaciones || "-"}
-                      </p>
-                    </div>
                   </TabsContent>
 
                   <TabsContent value="bitacora" className="mt-4">
@@ -1618,92 +1618,6 @@ export default function Vulnerabilidades() {
                   />
                 </div>
 
-                {/* GRC Section - Dominio → Control Cascading */}
-                <div className="space-y-2 md:col-span-2">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Shield className="w-4 h-4 text-cyan-500" />
-                    <span className="text-sm font-medium text-cyan-500">Vinculación GRC</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 p-3 bg-cyan-500/5 rounded-lg border border-cyan-500/20">
-                    <div className="space-y-2">
-                      <Label className="text-zinc-400">Dominio</Label>
-                      <Select
-                        value={selectedDominioId || "_none"}
-                        onValueChange={(v) => {
-                          setSelectedDominioId(v === "_none" ? "" : v);
-                          setFormData({ ...formData, control_id: "" });
-                        }}
-                      >
-                        <SelectTrigger className="bg-black/20 border-zinc-700 text-white">
-                          <SelectValue placeholder="Filtrar por dominio..." />
-                        </SelectTrigger>
-                        <SelectContent className="bg-zinc-900 border-zinc-700">
-                          <SelectItem value="_none" className="text-zinc-400">Todos los dominios</SelectItem>
-                          {dominios.map((d) => (
-                            <SelectItem key={d.id} value={d.id}>{d.nombre_dominio}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-zinc-400">Control Asociado</Label>
-                      <Select
-                        value={formData.control_id || "_none"}
-                        onValueChange={(v) => setFormData({ ...formData, control_id: v === "_none" ? "" : v })}
-                      >
-                        <SelectTrigger className="bg-black/20 border-zinc-700 text-white" data-testid="input-control">
-                          <SelectValue placeholder="Seleccionar control..." />
-                        </SelectTrigger>
-                        <SelectContent className="bg-zinc-900 border-zinc-700 max-h-[200px]">
-                          <SelectItem value="_none" className="text-zinc-400">Sin control</SelectItem>
-                          {filteredControles.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.codigo_control ? `${c.codigo_control} - ` : ""}{c.nombre_control}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Riesgo del Catálogo */}
-                <div className="space-y-2 md:col-span-2">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-orange-500" />
-                    <Label className="text-zinc-400">Riesgo del Catálogo</Label>
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      value={selectedRiesgoName}
-                      readOnly
-                      placeholder="Buscar y seleccionar riesgo del catálogo..."
-                      className="bg-black/20 border-zinc-700 text-white flex-1 cursor-pointer"
-                      onClick={() => setShowRiskSearchModal(true)}
-                      data-testid="input-riesgo-catalogo"
-                    />
-                    {formData.riesgo_id && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setFormData({ ...formData, riesgo_id: "" })}
-                        className="text-zinc-400 hover:text-white shrink-0"
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    )}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setShowRiskSearchModal(true)}
-                      className="border-zinc-700 text-zinc-300 shrink-0"
-                    >
-                      <Search className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-
                 <div className="space-y-2">
                   <Label className="text-zinc-400">Responsable</Label>
                   <SearchableSelect
@@ -1801,6 +1715,92 @@ export default function Vulnerabilidades() {
                     emptyText="No se encontraron informes"
                     data-testid="input-nombre-informe"
                   />
+                </div>
+
+                {/* GRC Section - Dominio → Control Cascading - Al final del formulario */}
+                <div className="space-y-2 md:col-span-2">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Shield className="w-4 h-4 text-cyan-500" />
+                    <span className="text-sm font-medium text-cyan-500">Vinculación GRC</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 p-3 bg-cyan-500/5 rounded-lg border border-cyan-500/20">
+                    <div className="space-y-2">
+                      <Label className="text-zinc-400">Dominio</Label>
+                      <Select
+                        value={selectedDominioId || "_none"}
+                        onValueChange={(v) => {
+                          setSelectedDominioId(v === "_none" ? "" : v);
+                          setFormData({ ...formData, control_id: "" });
+                        }}
+                      >
+                        <SelectTrigger className="bg-black/20 border-zinc-700 text-white">
+                          <SelectValue placeholder="Filtrar por dominio..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-900 border-zinc-700">
+                          <SelectItem value="_none" className="text-zinc-400">Todos los dominios</SelectItem>
+                          {dominios.map((d) => (
+                            <SelectItem key={d.id} value={d.id}>{d.nombre_dominio}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-zinc-400">Control Asociado</Label>
+                      <Select
+                        value={formData.control_id || "_none"}
+                        onValueChange={(v) => setFormData({ ...formData, control_id: v === "_none" ? "" : v })}
+                      >
+                        <SelectTrigger className="bg-black/20 border-zinc-700 text-white" data-testid="input-control">
+                          <SelectValue placeholder="Seleccionar control..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-900 border-zinc-700 max-h-[200px]">
+                          <SelectItem value="_none" className="text-zinc-400">Sin control</SelectItem>
+                          {filteredControles.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.codigo_control ? `${c.codigo_control} - ` : ""}{c.nombre_control}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Riesgo del Catálogo - Al final del formulario */}
+                <div className="space-y-2 md:col-span-2">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-orange-500" />
+                    <Label className="text-zinc-400">Riesgo del Catálogo</Label>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={selectedRiesgoName}
+                      readOnly
+                      placeholder="Buscar y seleccionar riesgo del catálogo..."
+                      className="bg-black/20 border-zinc-700 text-white flex-1 cursor-pointer"
+                      onClick={() => setShowRiskSearchModal(true)}
+                      data-testid="input-riesgo-catalogo"
+                    />
+                    {formData.riesgo_id && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setFormData({ ...formData, riesgo_id: "" })}
+                        className="text-zinc-400 hover:text-white shrink-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowRiskSearchModal(true)}
+                      className="border-zinc-700 text-zinc-300 shrink-0"
+                    >
+                      <Search className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
 
