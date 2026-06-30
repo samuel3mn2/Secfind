@@ -15,16 +15,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   Table,
   TableBody,
   TableCell,
@@ -33,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Plus, Pencil, Trash2, Layers, Save, Loader2 } from "lucide-react";
+import { DeleteWithJustificationModal } from "@/components/DeleteWithJustificationModal";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -52,6 +43,7 @@ export default function Dominios() {
 
   // Delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const canCreateDominio = isAdmin || canCreate("configuracion");
   const canEditDominio = isAdmin || canEdit("configuracion");
@@ -130,10 +122,12 @@ export default function Dominios() {
     }
   };
 
-  const handleDelete = async (dominio) => {
+  const handleDelete = async (justificacion) => {
+    if (!deleteConfirm) return;
+    setDeleteLoading(true);
     try {
       const token = localStorage.getItem("token");
-      await axios.delete(`${API}/config/dominios/${dominio.id}`, {
+      await axios.delete(`${API}/config/dominios/${deleteConfirm.id}?justificacion=${encodeURIComponent(justificacion)}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       toast.success("Dominio eliminado exitosamente");
@@ -142,6 +136,8 @@ export default function Dominios() {
     } catch (error) {
       console.error("Error deleting dominio:", error);
       toast.error(error.response?.data?.detail || "Error al eliminar dominio");
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -316,29 +312,15 @@ export default function Dominios() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
-        <AlertDialogContent className="bg-zinc-900 border-zinc-800">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">¿Eliminar dominio?</AlertDialogTitle>
-            <AlertDialogDescription className="text-zinc-400">
-              Esto eliminará el dominio "{deleteConfirm?.nombre_dominio}". 
-              No se puede eliminar si tiene controles asociados.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="bg-zinc-800 text-white border-zinc-700 hover:bg-zinc-700">
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => handleDelete(deleteConfirm)}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Delete with Justification Modal */}
+      <DeleteWithJustificationModal
+        open={!!deleteConfirm}
+        onOpenChange={(open) => !open && setDeleteConfirm(null)}
+        itemName={deleteConfirm?.nombre_dominio}
+        itemType="el dominio"
+        onConfirm={handleDelete}
+        loading={deleteLoading}
+      />
     </div>
   );
 }

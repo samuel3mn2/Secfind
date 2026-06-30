@@ -158,7 +158,11 @@ def create_controles_router(db, get_current_user: Callable) -> APIRouter:
         return updated
 
     @router.delete("/{control_id}")
-    async def delete_control(control_id: str, current_user = Depends(get_current_user)):
+    async def delete_control(
+        control_id: str, 
+        justificacion: str = Query(..., min_length=10, description="Justificación obligatoria para la eliminación"),
+        current_user = Depends(get_current_user)
+    ):
         """Delete a control"""
         if not current_user.es_admin and not current_user.permisos.configuracion.eliminar:
             raise HTTPException(status_code=403, detail="No tiene permisos para eliminar controles")
@@ -179,17 +183,18 @@ def create_controles_router(db, get_current_user: Callable) -> APIRouter:
         
         await db.config_controles.delete_one({"id": control_id})
         
-        # Audit log
+        # Audit log con justificación
         await db.historial_cambios.insert_one({
             "id": str(uuid.uuid4()),
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "usuario_id": current_user.id,
             "usuario_nombre": current_user.username,
-            "accion": "eliminar",
+            "accion": "ELIMINAR",
             "entidad": "control",
             "entidad_id": control_id,
             "entidad_nombre": f"{existing.get('codigo_control', '')} {existing.get('nombre_control', '')}".strip(),
             "descripcion": f"Control eliminado: {existing.get('nombre_control')}",
+            "justificacion_borrado": justificacion.strip(),
             "cambios": []
         })
         

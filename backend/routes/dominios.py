@@ -2,7 +2,7 @@
 Routes for Dominios (GRC Domains)
 Implementado como función factory para inyección de dependencias
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Callable
 from datetime import datetime, timezone
 import uuid
@@ -116,7 +116,11 @@ def create_dominios_router(db, get_current_user: Callable) -> APIRouter:
         return updated
 
     @router.delete("/{dominio_id}")
-    async def delete_dominio(dominio_id: str, current_user = Depends(get_current_user)):
+    async def delete_dominio(
+        dominio_id: str, 
+        justificacion: str = Query(..., min_length=10, description="Justificación obligatoria para la eliminación"),
+        current_user = Depends(get_current_user)
+    ):
         """Delete a dominio"""
         if not current_user.es_admin and not current_user.permisos.configuracion.eliminar:
             raise HTTPException(status_code=403, detail="No tiene permisos para eliminar dominios")
@@ -135,17 +139,18 @@ def create_dominios_router(db, get_current_user: Callable) -> APIRouter:
         
         await db.config_dominios.delete_one({"id": dominio_id})
         
-        # Audit log
+        # Audit log con justificación
         await db.historial_cambios.insert_one({
             "id": str(uuid.uuid4()),
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "usuario_id": current_user.id,
             "usuario_nombre": current_user.username,
-            "accion": "eliminar",
+            "accion": "ELIMINAR",
             "entidad": "dominio",
             "entidad_id": dominio_id,
             "entidad_nombre": existing.get("nombre_dominio"),
             "descripcion": f"Dominio eliminado: {existing.get('nombre_dominio')}",
+            "justificacion_borrado": justificacion.strip(),
             "cambios": []
         })
         

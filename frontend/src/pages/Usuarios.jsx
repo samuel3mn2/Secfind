@@ -20,21 +20,12 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Users, Plus, Pencil, Trash2, CheckCircle, XCircle, Shield } from "lucide-react";
+import { DeleteWithJustificationModal } from "@/components/DeleteWithJustificationModal";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -51,7 +42,8 @@ export default function Usuarios() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [deleteId, setDeleteId] = useState(null);
+  const [deletingItem, setDeletingItem] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   
   const [formData, setFormData] = useState({
     username: "",
@@ -176,16 +168,19 @@ export default function Usuarios() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!deleteId) return;
+  const handleDelete = async (justificacion) => {
+    if (!deletingItem) return;
+    setDeleteLoading(true);
     try {
-      await axios.delete(`${API}/config/usuarios/${deleteId}`);
+      await axios.delete(`${API}/config/usuarios/${deletingItem.id}?justificacion=${encodeURIComponent(justificacion)}`);
       toast.success("Usuario eliminado exitosamente");
-      setDeleteId(null);
+      setDeletingItem(null);
       fetchUsuarios();
     } catch (error) {
       console.error("Error deleting:", error);
       toast.error(error.response?.data?.detail || "Error al eliminar");
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -315,7 +310,7 @@ export default function Usuarios() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-zinc-400 hover:text-red-500 hover:bg-red-500/10"
-                            onClick={() => setDeleteId(user.id)}
+                            onClick={() => setDeletingItem(user)}
                             data-testid={`delete-user-btn-${user.id}`}
                           >
                             <Trash2 className="w-4 h-4" />
@@ -530,29 +525,15 @@ export default function Usuarios() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <AlertDialogContent className="bg-[#18181b] border-[#27272a] text-white">
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
-            <AlertDialogDescription className="text-zinc-400">
-              Esta acción no se puede deshacer. El usuario será eliminado permanentemente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700 text-white"
-              data-testid="confirm-delete-usuario-btn"
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Delete with Justification Modal */}
+      <DeleteWithJustificationModal
+        open={!!deletingItem}
+        onOpenChange={(open) => !open && setDeletingItem(null)}
+        itemName={deletingItem?.nombre || deletingItem?.username}
+        itemType="el usuario"
+        onConfirm={handleDelete}
+        loading={deleteLoading}
+      />
     </div>
   );
 }

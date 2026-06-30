@@ -21,19 +21,10 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Plus, Pencil, Trash2, Truck, Search } from "lucide-react";
+import { DeleteWithJustificationModal } from "@/components/DeleteWithJustificationModal";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -44,7 +35,8 @@ export default function Proveedores() {
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
-  const [deleteId, setDeleteId] = useState(null);
+  const [deletingItem, setDeletingItem] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [formData, setFormData] = useState({ nombre: "", activo: true });
 
   const canModify = isAdmin || canEdit("configuracion");
@@ -111,16 +103,19 @@ export default function Proveedores() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!deleteId) return;
+  const handleDelete = async (justificacion) => {
+    if (!deletingItem) return;
+    setDeleteLoading(true);
     try {
-      await axios.delete(`${API}/config/proveedores/${deleteId}`);
+      await axios.delete(`${API}/config/proveedores/${deletingItem.id}?justificacion=${encodeURIComponent(justificacion)}`);
       toast.success("Proveedor eliminado exitosamente");
-      setDeleteId(null);
+      setDeletingItem(null);
       fetchProveedores();
     } catch (error) {
       console.error("Error deleting:", error);
-      toast.error("Error al eliminar el proveedor");
+      toast.error(error.response?.data?.detail || "Error al eliminar el proveedor");
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -222,7 +217,7 @@ export default function Proveedores() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-zinc-400 hover:text-red-500 hover:bg-red-500/10"
-                            onClick={() => setDeleteId(prov.id)}
+                            onClick={() => setDeletingItem(prov)}
                             data-testid={`delete-proveedor-btn-${prov.id}`}
                           >
                             <Trash2 className="w-4 h-4" />
@@ -296,29 +291,15 @@ export default function Proveedores() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <AlertDialogContent className="bg-[#18181b] border-[#27272a] text-white">
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar proveedor?</AlertDialogTitle>
-            <AlertDialogDescription className="text-zinc-400">
-              Esta acción no se puede deshacer. El proveedor será eliminado permanentemente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="border-zinc-700 text-zinc-300 hover:bg-zinc-800" data-testid="cancel-delete-proveedor-btn">
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700 text-white"
-              data-testid="confirm-delete-proveedor-btn"
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Delete with Justification Modal */}
+      <DeleteWithJustificationModal
+        open={!!deletingItem}
+        onOpenChange={(open) => !open && setDeletingItem(null)}
+        itemName={deletingItem?.nombre}
+        itemType="el proveedor"
+        onConfirm={handleDelete}
+        loading={deleteLoading}
+      />
     </div>
   );
 }

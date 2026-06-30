@@ -20,19 +20,10 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { AppWindow, Plus, Pencil, Trash2, CheckCircle, XCircle, Search } from "lucide-react";
+import { DeleteWithJustificationModal } from "@/components/DeleteWithJustificationModal";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -43,7 +34,8 @@ export default function Aplicaciones() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingApp, setEditingApp] = useState(null);
-  const [deleteId, setDeleteId] = useState(null);
+  const [deletingItem, setDeletingItem] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [formData, setFormData] = useState({ nombre: "" });
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -130,16 +122,19 @@ export default function Aplicaciones() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!deleteId) return;
+  const handleDelete = async (justificacion) => {
+    if (!deletingItem) return;
+    setDeleteLoading(true);
     try {
-      await axios.delete(`${API}/config/aplicaciones/${deleteId}`);
+      await axios.delete(`${API}/config/aplicaciones/${deletingItem.id}?justificacion=${encodeURIComponent(justificacion)}`);
       toast.success("Aplicación eliminada exitosamente");
-      setDeleteId(null);
+      setDeletingItem(null);
       fetchAplicaciones();
     } catch (error) {
       console.error("Error deleting:", error);
-      toast.error("Error al eliminar");
+      toast.error(error.response?.data?.detail || "Error al eliminar");
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -263,7 +258,7 @@ export default function Aplicaciones() {
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 text-zinc-400 hover:text-red-500 hover:bg-red-500/10"
-                              onClick={() => setDeleteId(app.id)}
+                              onClick={() => setDeletingItem(app)}
                               data-testid={`delete-app-btn-${app.id}`}
                             >
                               <Trash2 className="w-4 h-4" />
@@ -320,29 +315,15 @@ export default function Aplicaciones() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <AlertDialogContent className="bg-[#18181b] border-[#27272a] text-white">
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar aplicación?</AlertDialogTitle>
-            <AlertDialogDescription className="text-zinc-400">
-              Esta acción no se puede deshacer. La aplicación será eliminada del catálogo.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700 text-white"
-              data-testid="confirm-delete-aplicacion-btn"
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Delete with Justification Modal */}
+      <DeleteWithJustificationModal
+        open={!!deletingItem}
+        onOpenChange={(open) => !open && setDeletingItem(null)}
+        itemName={deletingItem?.nombre}
+        itemType="la aplicación"
+        onConfirm={handleDelete}
+        loading={deleteLoading}
+      />
     </div>
   );
 }

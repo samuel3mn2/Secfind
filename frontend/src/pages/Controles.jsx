@@ -15,16 +15,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   Table,
   TableBody,
   TableCell,
@@ -40,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Plus, Pencil, Trash2, Shield, Save, Loader2, Filter } from "lucide-react";
+import { DeleteWithJustificationModal } from "@/components/DeleteWithJustificationModal";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -64,6 +55,7 @@ export default function Controles() {
 
   // Delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const canCreateControl = isAdmin || canCreate("configuracion");
   const canEditControl = isAdmin || canEdit("configuracion");
@@ -156,10 +148,12 @@ export default function Controles() {
     }
   };
 
-  const handleDelete = async (control) => {
+  const handleDelete = async (justificacion) => {
+    if (!deleteConfirm) return;
+    setDeleteLoading(true);
     try {
       const token = localStorage.getItem("token");
-      await axios.delete(`${API}/config/controles/${control.id}`, {
+      await axios.delete(`${API}/config/controles/${deleteConfirm.id}?justificacion=${encodeURIComponent(justificacion)}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       toast.success("Control eliminado exitosamente");
@@ -168,6 +162,8 @@ export default function Controles() {
     } catch (error) {
       console.error("Error deleting control:", error);
       toast.error(error.response?.data?.detail || "Error al eliminar control");
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -393,29 +389,15 @@ export default function Controles() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
-        <AlertDialogContent className="bg-zinc-900 border-zinc-800">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">¿Eliminar control?</AlertDialogTitle>
-            <AlertDialogDescription className="text-zinc-400">
-              Esto eliminará el control "{deleteConfirm?.nombre_control}". 
-              No se puede eliminar si tiene vulnerabilidades o hallazgos asociados.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="bg-zinc-800 text-white border-zinc-700 hover:bg-zinc-700">
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => handleDelete(deleteConfirm)}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Delete with Justification Modal */}
+      <DeleteWithJustificationModal
+        open={!!deleteConfirm}
+        onOpenChange={(open) => !open && setDeleteConfirm(null)}
+        itemName={`${deleteConfirm?.codigo_control || ''} ${deleteConfirm?.nombre_control || ''}`.trim()}
+        itemType="el control"
+        onConfirm={handleDelete}
+        loading={deleteLoading}
+      />
     </div>
   );
 }

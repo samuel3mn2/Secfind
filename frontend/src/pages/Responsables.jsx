@@ -8,9 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Loader2, Plus, Pencil, Trash2, UserCircle, Mail, Search } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { DeleteWithJustificationModal } from "@/components/DeleteWithJustificationModal";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -20,7 +20,8 @@ export default function Responsables() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
-  const [deleteId, setDeleteId] = useState(null);
+  const [deletingItem, setDeletingItem] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   
   const [formData, setFormData] = useState({
@@ -62,14 +63,18 @@ export default function Responsables() {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (justificacion) => {
+    if (!deletingItem) return;
+    setDeleteLoading(true);
     try {
-      await axios.delete(`${API}/config/responsables/${deleteId}`);
+      await axios.delete(`${API}/config/responsables/${deletingItem.id}?justificacion=${encodeURIComponent(justificacion)}`);
       toast.success("Responsable eliminado exitosamente");
-      setDeleteId(null);
+      setDeletingItem(null);
       fetchResponsables();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Error al eliminar");
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -209,7 +214,7 @@ export default function Responsables() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => setDeleteId(item.id)}
+                              onClick={() => setDeletingItem(item)}
                               className="h-8 w-8 text-zinc-400 hover:text-red-400"
                               data-testid={`delete-responsable-${item.id}`}
                             >
@@ -301,30 +306,15 @@ export default function Responsables() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <AlertDialogContent className="bg-[#18181b] border-[#27272a] text-white">
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar responsable?</AlertDialogTitle>
-            <AlertDialogDescription className="text-zinc-400">
-              Esta acción no se puede deshacer. El responsable será eliminado del catálogo.
-              Las vulnerabilidades asignadas a este responsable mantendrán su nombre.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700 text-white"
-              data-testid="confirm-delete-responsable-btn"
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Delete with Justification Modal */}
+      <DeleteWithJustificationModal
+        open={!!deletingItem}
+        onOpenChange={(open) => !open && setDeletingItem(null)}
+        itemName={deletingItem?.nombre}
+        itemType="el responsable"
+        onConfirm={handleDelete}
+        loading={deleteLoading}
+      />
     </div>
   );
 }

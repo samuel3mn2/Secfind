@@ -18,16 +18,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   Table,
   TableBody,
   TableCell,
@@ -46,6 +36,7 @@ import {
   Save,
   Loader2,
 } from "lucide-react";
+import { DeleteWithJustificationModal } from "@/components/DeleteWithJustificationModal";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -69,6 +60,7 @@ export default function GruposInformes() {
 
   // Delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const canCreateGrupo = isAdmin || canCreate("configuracion");
   const canEditGrupo = isAdmin || canEdit("configuracion");
@@ -157,10 +149,12 @@ export default function GruposInformes() {
     }
   };
 
-  const handleDelete = async (grupo) => {
+  const handleDelete = async (justificacion) => {
+    if (!deleteConfirm) return;
+    setDeleteLoading(true);
     try {
       const token = localStorage.getItem("token");
-      await axios.delete(`${API}/config/grupos-informes/${grupo.id}`, {
+      await axios.delete(`${API}/config/grupos-informes/${deleteConfirm.id}?justificacion=${encodeURIComponent(justificacion)}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       toast.success("Grupo eliminado exitosamente");
@@ -169,6 +163,8 @@ export default function GruposInformes() {
     } catch (error) {
       console.error("Error deleting grupo:", error);
       toast.error(error.response?.data?.detail || "Error al eliminar grupo");
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -502,34 +498,15 @@ export default function GruposInformes() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <AlertDialog
+      {/* Delete with Justification Modal */}
+      <DeleteWithJustificationModal
         open={!!deleteConfirm}
-        onOpenChange={() => setDeleteConfirm(null)}
-      >
-        <AlertDialogContent className="bg-zinc-900 border-zinc-800">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">
-              ¿Eliminar grupo?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-zinc-400">
-              Esto eliminará el grupo "{deleteConfirm?.nombre}". Los informes
-              asociados no serán eliminados, solo se desagruparán.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="bg-zinc-800 text-white border-zinc-700 hover:bg-zinc-700">
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => handleDelete(deleteConfirm)}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onOpenChange={(open) => !open && setDeleteConfirm(null)}
+        itemName={deleteConfirm?.nombre}
+        itemType="el grupo de informes"
+        onConfirm={handleDelete}
+        loading={deleteLoading}
+      />
     </div>
   );
 }
