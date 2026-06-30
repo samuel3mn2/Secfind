@@ -4,6 +4,14 @@
 
 ### Cambios Recientes (Junio 2026)
 
+- **BUGFIX: EXPORTACIÓN EXCEL CON FILTROS (2026-06-30)**:
+  - **Problema**: Al exportar a Excel con filtros aplicados, no se respetaban los filtros de `nivel_riesgo` y `proveedor`
+  - **Causa**: Frontend no enviaba estos parámetros y backend no los procesaba
+  - **Solución**:
+    * Frontend: `handleExport()` en `Vulnerabilidades.jsx` ahora envía `filterNivelRiesgo` y `filterProveedor`
+    * Backend: Endpoint `/api/export/excel` ahora procesa `nivel_riesgo`, `proveedor`, `dominio` y `control`
+  - **Verificado**: Exportación ahora retorna solo los registros que coinciden con TODOS los filtros seleccionados
+
 - **SISTEMA DE GOBERNANZA COMPLETO - HALLAZGOS Y CATÁLOGO (2026-06-30)**:
   - **Catálogo de Riesgos**: Integración completa de modales de gobernanza
     * `DeleteWithJustificationModal` para eliminaciones con justificación obligatoria

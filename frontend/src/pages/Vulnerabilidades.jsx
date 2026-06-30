@@ -650,6 +650,8 @@ export default function Vulnerabilidades() {
       if (filterResponsable.length > 0) filterResponsable.forEach(v => params.append("responsable", v));
       if (filterDominio.length > 0) filterDominio.forEach(v => params.append("dominio", v));
       if (filterControl.length > 0) filterControl.forEach(v => params.append("control", v));
+      if (filterNivelRiesgo.length > 0) filterNivelRiesgo.forEach(v => params.append("nivel_riesgo", v));
+      if (filterProveedor.length > 0) filterProveedor.forEach(v => params.append("proveedor", v));
       
       // Add visible columns
       if (visibleColumns.length > 0) {

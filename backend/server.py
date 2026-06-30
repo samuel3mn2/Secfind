@@ -3799,6 +3799,10 @@ async def export_excel(
     aplicaciones = request.query_params.getlist("aplicacion")
     informes = request.query_params.getlist("informe_pentest")
     responsables = request.query_params.getlist("responsable")
+    niveles_riesgo = request.query_params.getlist("nivel_riesgo")
+    proveedores = request.query_params.getlist("proveedor")
+    dominios_filter = request.query_params.getlist("dominio")
+    controles_filter = request.query_params.getlist("control")
     
     if severidades:
         query["severidad"] = {"$in": severidades}
@@ -3811,7 +3815,11 @@ async def export_excel(
     if informes:
         query["nombre_informe_pentest"] = {"$in": informes}
     if responsables:
-        query["responsables"] = {"$in": responsables}
+        query["responsable"] = {"$in": responsables}
+    if niveles_riesgo:
+        query["nivel_riesgo"] = {"$in": niveles_riesgo}
+    if proveedores:
+        query["proveedor"] = {"$in": proveedores}
     if año and año != "all":
         query["fecha_hallazgo"] = {"$regex": f"^{año}"}
     if search:
@@ -3819,9 +3827,23 @@ async def export_excel(
             {"codigo": {"$regex": search, "$options": "i"}},
             {"vulnerabilidad": {"$regex": search, "$options": "i"}},
             {"aplicaciones": {"$regex": search, "$options": "i"}},
-            {"responsables": {"$regex": search, "$options": "i"}},
+            {"responsable": {"$regex": search, "$options": "i"}},
             {"institucion": {"$regex": search, "$options": "i"}}
         ]
+    
+    # Handle dominio filter (needs to get dominio IDs first)
+    if dominios_filter:
+        dominio_docs = await db.config_dominios.find({"nombre_dominio": {"$in": dominios_filter}}, {"_id": 0, "id": 1}).to_list(100)
+        dominio_ids_to_filter = [d["id"] for d in dominio_docs]
+        if dominio_ids_to_filter:
+            query["dominio_id"] = {"$in": dominio_ids_to_filter}
+    
+    # Handle control filter (needs to get control IDs first)
+    if controles_filter:
+        control_docs = await db.config_controles.find({"codigo_control": {"$in": controles_filter}}, {"_id": 0, "id": 1}).to_list(200)
+        control_ids_to_filter = [c["id"] for c in control_docs]
+        if control_ids_to_filter:
+            query["control_id"] = {"$in": control_ids_to_filter}
     
     vulnerabilidades = await db.vulnerabilidades.find(query, {"_id": 0}).to_list(10000)
     
