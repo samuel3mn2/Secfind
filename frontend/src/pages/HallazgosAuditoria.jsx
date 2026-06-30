@@ -23,16 +23,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   Table,
   TableBody,
   TableCell,
@@ -52,6 +42,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { format, parse, isValid } from "date-fns";
 import { es } from "date-fns/locale";
 import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
+import { DeleteWithJustificationModal } from "@/components/DeleteWithJustificationModal";
+import { ConfirmChangesModal } from "@/components/ConfirmChangesModal";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -134,6 +126,12 @@ export default function HallazgosAuditoria() {
 
   // Delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  
+  // Confirm changes modal
+  const [showConfirmChanges, setShowConfirmChanges] = useState(false);
+  const [originalDataForDiff, setOriginalDataForDiff] = useState(null);
+  const [savingChanges, setSavingChanges] = useState(false);
 
   // Risk search modal
   const [riskSearchOpen, setRiskSearchOpen] = useState(false);
@@ -359,10 +357,12 @@ export default function HallazgosAuditoria() {
     }
   };
 
-  const handleDelete = async (hallazgo) => {
+  const handleDelete = async (justificacion) => {
+    if (!deleteConfirm) return;
+    setDeleteLoading(true);
     try {
       const token = localStorage.getItem("token");
-      await axios.delete(`${API}/hallazgos-auditoria/${hallazgo.id}`, {
+      await axios.delete(`${API}/hallazgos-auditoria/${deleteConfirm.id}?justificacion=${encodeURIComponent(justificacion)}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       toast.success("Hallazgo eliminado exitosamente");
@@ -372,6 +372,57 @@ export default function HallazgosAuditoria() {
     } catch (error) {
       console.error("Error deleting hallazgo:", error);
       toast.error(error.response?.data?.detail || "Error al eliminar hallazgo");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  // Función para abrir modal de confirmación de cambios (Diff)
+  const handlePreSave = () => {
+    if (editingHallazgo) {
+      setOriginalDataForDiff({...editingHallazgo});
+      setShowConfirmChanges(true);
+    } else {
+      // Para creación, guardar directamente
+      handleSave();
+    }
+  };
+
+  // Función para confirmar y guardar cambios
+  const handleConfirmSave = async () => {
+    setSavingChanges(true);
+    try {
+      const token = localStorage.getItem("token");
+      // Remove dominio_id from payload (it's only for cascading filter)
+      const { dominio_id, ...payload } = formData;
+      await axios.put(`${API}/hallazgos-auditoria/${editingHallazgo.id}`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast.success("Hallazgo actualizado exitosamente");
+      setShowConfirmChanges(false);
+      setIsModalOpen(false);
+      setEditingHallazgo(null);
+      setFormData({
+        codigo: "",
+        dominio_id: "",
+        control_id: "",
+        brecha: "",
+        riesgo_id: "",
+        probabilidad: 3,
+        impacto: 3,
+        estado: "Abierto",
+        responsable: "",
+        fecha_hallazgo: "",
+        fecha_compromiso: "",
+        observaciones: "",
+      });
+      fetchHallazgos();
+      fetchStats();
+    } catch (error) {
+      console.error("Error saving hallazgo:", error);
+      toast.error(error.response?.data?.detail || "Error al guardar hallazgo");
+    } finally {
+      setSavingChanges(false);
     }
   };
 
@@ -1059,7 +1110,14 @@ export default function HallazgosAuditoria() {
               Cancelar
             </Button>
             <Button
-              onClick={handleSave}
+              onClick={() => {
+                if (editingHallazgo) {
+                  setOriginalDataForDiff({...editingHallazgo});
+                  setShowConfirmChanges(true);
+                } else {
+                  handleSave();
+                }
+              }}
               disabled={saving || !formData.codigo.trim() || !formData.brecha.trim()}
               className="bg-teal-600 hover:bg-teal-700"
               data-testid="btn-guardar-hallazgo"
@@ -1124,28 +1182,27 @@ export default function HallazgosAuditoria() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
-        <AlertDialogContent className="bg-zinc-900 border-zinc-800">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">¿Eliminar hallazgo?</AlertDialogTitle>
-            <AlertDialogDescription className="text-zinc-400">
-              Esto eliminará el hallazgo "{deleteConfirm?.codigo}" de forma permanente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="bg-zinc-800 text-white border-zinc-700 hover:bg-zinc-700">
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => handleDelete(deleteConfirm)}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Delete with Justification Modal */}
+      <DeleteWithJustificationModal
+        open={!!deleteConfirm}
+        onOpenChange={(open) => !open && setDeleteConfirm(null)}
+        itemName={deleteConfirm?.codigo}
+        itemType="el hallazgo de auditoría"
+        onConfirm={handleDelete}
+        loading={deleteLoading}
+      />
+
+      {/* Confirm Changes Modal (Diff) */}
+      <ConfirmChangesModal
+        open={showConfirmChanges}
+        onOpenChange={setShowConfirmChanges}
+        originalData={originalDataForDiff}
+        editedData={formData}
+        onConfirm={handleConfirmSave}
+        onCancel={() => setShowConfirmChanges(false)}
+        loading={savingChanges}
+        entityType="el hallazgo de auditoría"
+      />
 
       {/* Import Modal */}
       <Dialog open={showImportModal} onOpenChange={setShowImportModal}>

@@ -517,7 +517,11 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
         return await enrich_hallazgo(updated)
 
     @router.delete("/{hallazgo_id}")
-    async def delete_hallazgo(hallazgo_id: str, current_user = Depends(get_current_user)):
+    async def delete_hallazgo(
+        hallazgo_id: str, 
+        justificacion: str = Query(..., min_length=10, description="Justificación obligatoria para la eliminación"),
+        current_user = Depends(get_current_user)
+    ):
         """Delete a hallazgo"""
         if not current_user.es_admin and not current_user.permisos.vulnerabilidades.eliminar:
             raise HTTPException(status_code=403, detail="No tiene permisos para eliminar hallazgos")
@@ -528,17 +532,18 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
         
         await db.hallazgos_auditoria.delete_one({"id": hallazgo_id})
         
-        # Audit log
+        # Audit log con justificación
         await db.historial_cambios.insert_one({
             "id": str(uuid.uuid4()),
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "usuario_id": current_user.id,
             "usuario_nombre": current_user.username,
-            "accion": "eliminar",
+            "accion": "ELIMINAR",
             "entidad": "hallazgo_auditoria",
             "entidad_id": hallazgo_id,
             "entidad_nombre": existing.get("codigo"),
             "descripcion": f"Hallazgo eliminado: {existing.get('codigo')}",
+            "justificacion_borrado": justificacion.strip(),
             "cambios": []
         })
         

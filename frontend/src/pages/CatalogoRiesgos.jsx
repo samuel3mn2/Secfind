@@ -16,16 +16,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   Table,
   TableBody,
   TableCell,
@@ -34,6 +24,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Plus, Pencil, Trash2, AlertTriangle, Save, Loader2, Search, BookOpen, Upload, Download, FileSpreadsheet } from "lucide-react";
+import { DeleteWithJustificationModal } from "@/components/DeleteWithJustificationModal";
+import { ConfirmChangesModal } from "@/components/ConfirmChangesModal";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -61,6 +53,12 @@ export default function CatalogoRiesgos() {
 
   // Delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Confirm changes modal (Diff)
+  const [showConfirmChanges, setShowConfirmChanges] = useState(false);
+  const [originalDataForDiff, setOriginalDataForDiff] = useState(null);
+  const [savingChanges, setSavingChanges] = useState(false);
 
   const fetchRiesgos = useCallback(async () => {
     try {
@@ -123,17 +121,9 @@ export default function CatalogoRiesgos() {
       const token = localStorage.getItem("token");
       const headers = { Authorization: `Bearer ${token}` };
 
-      if (editingRiesgo) {
-        await axios.put(
-          `${API}/catalogo-riesgos/${editingRiesgo.id}`,
-          formData,
-          { headers }
-        );
-        toast.success("Riesgo actualizado exitosamente");
-      } else {
-        await axios.post(`${API}/catalogo-riesgos`, formData, { headers });
-        toast.success("Riesgo creado exitosamente");
-      }
+      // Solo para creación (POST)
+      await axios.post(`${API}/catalogo-riesgos`, formData, { headers });
+      toast.success("Riesgo creado exitosamente");
 
       closeModal();
       fetchRiesgos();
@@ -145,10 +135,34 @@ export default function CatalogoRiesgos() {
     }
   };
 
-  const handleDelete = async (riesgo) => {
+  // Función para confirmar y guardar cambios (edición con Diff)
+  const handleConfirmSave = async () => {
+    setSavingChanges(true);
     try {
       const token = localStorage.getItem("token");
-      await axios.delete(`${API}/catalogo-riesgos/${riesgo.id}`, {
+      await axios.put(`${API}/catalogo-riesgos/${editingRiesgo.id}`, formData, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast.success("Riesgo actualizado exitosamente");
+      setShowConfirmChanges(false);
+      setIsModalOpen(false);
+      setEditingRiesgo(null);
+      setFormData({ codigo_riesgo: "", nombre_corto: "", descripcion_completa: "" });
+      fetchRiesgos();
+    } catch (error) {
+      console.error("Error updating riesgo:", error);
+      toast.error(error.response?.data?.detail || "Error al actualizar riesgo");
+    } finally {
+      setSavingChanges(false);
+    }
+  };
+
+  const handleDelete = async (justificacion) => {
+    if (!deleteConfirm) return;
+    setDeleteLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      await axios.delete(`${API}/catalogo-riesgos/${deleteConfirm.id}?justificacion=${encodeURIComponent(justificacion)}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       toast.success("Riesgo eliminado del catálogo");
@@ -157,6 +171,8 @@ export default function CatalogoRiesgos() {
     } catch (error) {
       console.error("Error deleting riesgo:", error);
       toast.error(error.response?.data?.detail || "Error al eliminar riesgo");
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -453,7 +469,16 @@ export default function CatalogoRiesgos() {
               Cancelar
             </Button>
             <Button
-              onClick={handleSave}
+              onClick={() => {
+                if (editingRiesgo) {
+                  // Para edición: abrir modal de confirmación de cambios
+                  setOriginalDataForDiff({...editingRiesgo});
+                  setShowConfirmChanges(true);
+                } else {
+                  // Para creación: guardar directamente
+                  handleSave();
+                }
+              }}
               disabled={saving || !formData.codigo_riesgo.trim() || !formData.nombre_corto.trim()}
               className="bg-orange-600 hover:bg-orange-700"
               data-testid="btn-guardar-riesgo"
@@ -469,29 +494,27 @@ export default function CatalogoRiesgos() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
-        <AlertDialogContent className="bg-zinc-900 border-zinc-800">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">¿Eliminar riesgo del catálogo?</AlertDialogTitle>
-            <AlertDialogDescription className="text-zinc-400">
-              Esto eliminará el riesgo "{deleteConfirm?.nombre_corto}" del catálogo.
-              No se puede eliminar si tiene vulnerabilidades o hallazgos asociados.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="bg-zinc-800 text-white border-zinc-700 hover:bg-zinc-700">
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => handleDelete(deleteConfirm)}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Delete with Justification Modal */}
+      <DeleteWithJustificationModal
+        open={!!deleteConfirm}
+        onOpenChange={(open) => !open && setDeleteConfirm(null)}
+        itemName={deleteConfirm?.codigo_riesgo}
+        itemType="el riesgo del catálogo"
+        onConfirm={handleDelete}
+        loading={deleteLoading}
+      />
+
+      {/* Confirm Changes Modal (Diff) */}
+      <ConfirmChangesModal
+        open={showConfirmChanges}
+        onOpenChange={setShowConfirmChanges}
+        originalData={originalDataForDiff}
+        editedData={formData}
+        onConfirm={handleConfirmSave}
+        onCancel={() => setShowConfirmChanges(false)}
+        loading={savingChanges}
+        entityType="el riesgo"
+      />
 
       {/* Import Modal */}
       <Dialog open={showImportModal} onOpenChange={setShowImportModal}>
