@@ -120,6 +120,47 @@ class CurrentUser(BaseModel):
     es_admin: bool
     permisos: UserPermissions
 
+# ============ DELETE JUSTIFICATION MODEL ============
+
+class DeleteJustification(BaseModel):
+    """Modelo para justificación obligatoria en operaciones de eliminación"""
+    justificacion: str
+    
+    @classmethod
+    def validate_justificacion(cls, v):
+        if not v or len(v.strip()) < 10:
+            raise ValueError("La justificación debe tener al menos 10 caracteres")
+        return v.strip()
+
+# Función auxiliar para registrar eliminaciones en auditoría
+async def registrar_eliminacion_en_auditoria(
+    db,
+    usuario_id: str,
+    usuario_nombre: str,
+    entidad: str,
+    entidad_id: str,
+    entidad_nombre: str,
+    justificacion: str,
+    datos_eliminados: dict = None
+):
+    """Registra una eliminación en la colección de auditoría del sistema"""
+    from datetime import datetime, timezone
+    
+    registro = {
+        "timestamp": datetime.now(timezone.utc),
+        "usuario_id": usuario_id,
+        "usuario_nombre": usuario_nombre,
+        "accion": "ELIMINAR",
+        "entidad": entidad,
+        "entidad_id": entidad_id,
+        "entidad_nombre": entidad_nombre,
+        "justificacion_borrado": justificacion,
+        "cambios": [],
+        "datos_anteriores": datos_eliminados or {}
+    }
+    
+    await db.historial_cambios.insert_one(registro)
+
 # ============ VULNERABILITY MODELS ============
 
 # Nivel de Riesgo GRC - valores normalizados
@@ -766,7 +807,11 @@ async def update_usuario(user_id: str, data: UsuarioUpdate, current_user: Curren
     )
 
 @api_router.delete("/config/usuarios/{user_id}")
-async def delete_usuario(user_id: str, current_user: CurrentUser = Depends(get_current_user)):
+async def delete_usuario(
+    user_id: str, 
+    justificacion: str = Query(..., min_length=10, description="Justificación obligatoria"),
+    current_user: CurrentUser = Depends(get_current_user)
+):
     if not current_user.es_admin and not current_user.permisos.configuracion.eliminar:
         raise HTTPException(status_code=403, detail="No tiene permisos para eliminar usuarios")
     
@@ -774,9 +819,26 @@ async def delete_usuario(user_id: str, current_user: CurrentUser = Depends(get_c
     if user_id == current_user.id:
         raise HTTPException(status_code=400, detail="No puede eliminarse a sí mismo")
     
+    # Obtener datos antes de eliminar
+    existing = await db.usuarios.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
     result = await db.usuarios.delete_one({"id": user_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # Registrar en historial
+    await registrar_eliminacion_en_auditoria(
+        db=db,
+        usuario_id=current_user.id,
+        usuario_nombre=current_user.username,
+        entidad="usuario",
+        entidad_id=user_id,
+        entidad_nombre=existing.get("nombre", existing.get("username", "")),
+        justificacion=justificacion.strip(),
+        datos_eliminados=existing
+    )
     
     return {"message": "Usuario eliminado exitosamente"}
 
@@ -835,13 +897,33 @@ async def update_institucion(inst_id: str, data: InstitucionUpdate, current_user
     return updated
 
 @api_router.delete("/config/instituciones/{inst_id}")
-async def delete_institucion(inst_id: str, current_user: CurrentUser = Depends(get_current_user)):
+async def delete_institucion(
+    inst_id: str, 
+    justificacion: str = Query(..., min_length=10, description="Justificación obligatoria"),
+    current_user: CurrentUser = Depends(get_current_user)
+):
     if not current_user.es_admin and not current_user.permisos.configuracion.eliminar:
         raise HTTPException(status_code=403, detail="No tiene permisos para eliminar instituciones")
+    
+    existing = await db.instituciones.find_one({"id": inst_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Institución no encontrada")
     
     result = await db.instituciones.delete_one({"id": inst_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Institución no encontrada")
+    
+    await registrar_eliminacion_en_auditoria(
+        db=db,
+        usuario_id=current_user.id,
+        usuario_nombre=current_user.username,
+        entidad="institucion",
+        entidad_id=inst_id,
+        entidad_nombre=existing.get("nombre", ""),
+        justificacion=justificacion.strip(),
+        datos_eliminados=existing
+    )
+    
     return {"message": "Institución eliminada exitosamente"}
 
 # ============ APPLICATION CONFIGURATION ROUTES ============
@@ -895,13 +977,33 @@ async def update_aplicacion(app_id: str, data: AplicacionUpdate, current_user: C
     return updated
 
 @api_router.delete("/config/aplicaciones/{app_id}")
-async def delete_aplicacion(app_id: str, current_user: CurrentUser = Depends(get_current_user)):
+async def delete_aplicacion(
+    app_id: str, 
+    justificacion: str = Query(..., min_length=10, description="Justificación obligatoria"),
+    current_user: CurrentUser = Depends(get_current_user)
+):
     if not current_user.es_admin and not current_user.permisos.configuracion.eliminar:
         raise HTTPException(status_code=403, detail="No tiene permisos para eliminar aplicaciones")
+    
+    existing = await db.aplicaciones.find_one({"id": app_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Aplicación no encontrada")
     
     result = await db.aplicaciones.delete_one({"id": app_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Aplicación no encontrada")
+    
+    await registrar_eliminacion_en_auditoria(
+        db=db,
+        usuario_id=current_user.id,
+        usuario_nombre=current_user.username,
+        entidad="aplicacion",
+        entidad_id=app_id,
+        entidad_nombre=existing.get("nombre", ""),
+        justificacion=justificacion.strip(),
+        datos_eliminados=existing
+    )
+    
     return {"message": "Aplicación eliminada exitosamente"}
 
 # ============ PROVIDER CONFIGURATION ROUTES ============
@@ -953,13 +1055,33 @@ async def update_proveedor(prov_id: str, data: ProveedorUpdate, current_user: Cu
     return updated
 
 @api_router.delete("/config/proveedores/{prov_id}")
-async def delete_proveedor(prov_id: str, current_user: CurrentUser = Depends(get_current_user)):
+async def delete_proveedor(
+    prov_id: str, 
+    justificacion: str = Query(..., min_length=10, description="Justificación obligatoria"),
+    current_user: CurrentUser = Depends(get_current_user)
+):
     if not current_user.es_admin and not current_user.permisos.configuracion.eliminar:
         raise HTTPException(status_code=403, detail="No tiene permisos para eliminar proveedores")
+    
+    existing = await db.proveedores.find_one({"id": prov_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Proveedor no encontrado")
     
     result = await db.proveedores.delete_one({"id": prov_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Proveedor no encontrado")
+    
+    await registrar_eliminacion_en_auditoria(
+        db=db,
+        usuario_id=current_user.id,
+        usuario_nombre=current_user.username,
+        entidad="proveedor",
+        entidad_id=prov_id,
+        entidad_nombre=existing.get("nombre", ""),
+        justificacion=justificacion.strip(),
+        datos_eliminados=existing
+    )
+    
     return {"message": "Proveedor eliminado exitosamente"}
 
 # ============ INFORME PENTEST CONFIGURATION ROUTES ============
@@ -1011,13 +1133,33 @@ async def update_informe_pentest(informe_id: str, data: InformePentestUpdate, cu
     return updated
 
 @api_router.delete("/config/informes-pentest/{informe_id}")
-async def delete_informe_pentest(informe_id: str, current_user: CurrentUser = Depends(get_current_user)):
+async def delete_informe_pentest(
+    informe_id: str, 
+    justificacion: str = Query(..., min_length=10, description="Justificación obligatoria"),
+    current_user: CurrentUser = Depends(get_current_user)
+):
     if not current_user.es_admin and not current_user.permisos.configuracion.eliminar:
         raise HTTPException(status_code=403, detail="No tiene permisos para eliminar informes")
+    
+    existing = await db.informes_pentest.find_one({"id": informe_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Informe no encontrado")
     
     result = await db.informes_pentest.delete_one({"id": informe_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Informe no encontrado")
+    
+    await registrar_eliminacion_en_auditoria(
+        db=db,
+        usuario_id=current_user.id,
+        usuario_nombre=current_user.username,
+        entidad="informe_pentest",
+        entidad_id=informe_id,
+        entidad_nombre=existing.get("nombre", ""),
+        justificacion=justificacion.strip(),
+        datos_eliminados=existing
+    )
+    
     return {"message": "Informe eliminado exitosamente"}
 
 # ============ RESPONSABLES ENDPOINTS ============
@@ -1069,13 +1211,33 @@ async def update_responsable(responsable_id: str, data: ResponsableUpdate, curre
     return updated
 
 @api_router.delete("/config/responsables/{responsable_id}")
-async def delete_responsable(responsable_id: str, current_user: CurrentUser = Depends(get_current_user)):
+async def delete_responsable(
+    responsable_id: str, 
+    justificacion: str = Query(..., min_length=10, description="Justificación obligatoria"),
+    current_user: CurrentUser = Depends(get_current_user)
+):
     if not current_user.es_admin and not current_user.permisos.configuracion.eliminar:
         raise HTTPException(status_code=403, detail="No tiene permisos para eliminar")
+    
+    existing = await db.responsables.find_one({"id": responsable_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Responsable no encontrado")
     
     result = await db.responsables.delete_one({"id": responsable_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Responsable no encontrado")
+    
+    await registrar_eliminacion_en_auditoria(
+        db=db,
+        usuario_id=current_user.id,
+        usuario_nombre=current_user.username,
+        entidad="responsable",
+        entidad_id=responsable_id,
+        entidad_nombre=existing.get("nombre", ""),
+        justificacion=justificacion.strip(),
+        datos_eliminados=existing
+    )
+    
     return {"message": "Responsable eliminado exitosamente"}
 
 # ============ REPORT GROUPS ENDPOINTS ============
@@ -1148,14 +1310,34 @@ async def update_grupo_informes(grupo_id: str, data: GrupoInformesUpdate, curren
     return updated
 
 @api_router.delete("/config/grupos-informes/{grupo_id}")
-async def delete_grupo_informes(grupo_id: str, current_user: CurrentUser = Depends(get_current_user)):
+async def delete_grupo_informes(
+    grupo_id: str, 
+    justificacion: str = Query(..., min_length=10, description="Justificación obligatoria"),
+    current_user: CurrentUser = Depends(get_current_user)
+):
     """Delete a report group"""
     if not current_user.es_admin and not current_user.permisos.configuracion.eliminar:
         raise HTTPException(status_code=403, detail="No tiene permisos para eliminar grupos")
     
+    existing = await db.grupos_informes.find_one({"id": grupo_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Grupo no encontrado")
+    
     result = await db.grupos_informes.delete_one({"id": grupo_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Grupo no encontrado")
+    
+    await registrar_eliminacion_en_auditoria(
+        db=db,
+        usuario_id=current_user.id,
+        usuario_nombre=current_user.username,
+        entidad="grupo_informes",
+        entidad_id=grupo_id,
+        entidad_nombre=existing.get("nombre", ""),
+        justificacion=justificacion.strip(),
+        datos_eliminados=existing
+    )
+    
     return {"message": "Grupo eliminado exitosamente"}
 
 @api_router.get("/config/informes-sin-grupo")
@@ -1246,14 +1428,34 @@ async def update_vista_guardada(vista_id: str, data: VistaGuardadaUpdate, curren
     return updated
 
 @api_router.delete("/vistas-guardadas/{vista_id}")
-async def delete_vista_guardada(vista_id: str, current_user: CurrentUser = Depends(get_current_user)):
+async def delete_vista_guardada(
+    vista_id: str, 
+    justificacion: str = Query(..., min_length=10, description="Justificación obligatoria"),
+    current_user: CurrentUser = Depends(get_current_user)
+):
     """Delete a saved view"""
     if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
         raise HTTPException(status_code=403, detail="No tiene permisos")
     
+    existing = await db.vistas_guardadas.find_one({"id": vista_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Vista no encontrada")
+    
     result = await db.vistas_guardadas.delete_one({"id": vista_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Vista no encontrada")
+    
+    await registrar_eliminacion_en_auditoria(
+        db=db,
+        usuario_id=current_user.id,
+        usuario_nombre=current_user.username,
+        entidad="vista_guardada",
+        entidad_id=vista_id,
+        entidad_nombre=existing.get("nombre", ""),
+        justificacion=justificacion.strip(),
+        datos_eliminados=existing
+    )
+    
     return {"message": "Vista eliminada exitosamente"}
 
 # ============ NOTIFICATION CONFIGURATION ENDPOINTS ============
@@ -2363,27 +2565,38 @@ async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate, c
     return updated
 
 @api_router.delete("/vulnerabilidades/{vuln_id}")
-async def delete_vulnerabilidad(vuln_id: str, current_user: CurrentUser = Depends(get_current_user)):
+async def delete_vulnerabilidad(
+    vuln_id: str, 
+    justificacion: str = Query(..., min_length=10, description="Justificación obligatoria para la eliminación"),
+    current_user: CurrentUser = Depends(get_current_user)
+):
     if not current_user.es_admin and not current_user.permisos.vulnerabilidades.eliminar:
         raise HTTPException(status_code=403, detail="No tiene permisos para eliminar vulnerabilidades")
     
+    # Validar justificación
+    if not justificacion or len(justificacion.strip()) < 10:
+        raise HTTPException(status_code=400, detail="La justificación debe tener al menos 10 caracteres")
+    
     # Obtener datos antes de eliminar para el historial
     existing = await db.vulnerabilidades.find_one({"id": vuln_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Vulnerabilidad no encontrada")
     
     result = await db.vulnerabilidades.delete_one({"id": vuln_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Vulnerabilidad no encontrada")
     
-    # Registrar en historial
-    if existing:
-        await registrar_cambio(
-            entidad="vulnerabilidad",
-            entidad_id=vuln_id,
-            entidad_nombre=existing.get("vulnerabilidad", "")[:50],
-            accion="eliminar",
-            usuario_id=current_user.id,
-            usuario_nombre=current_user.username
-        )
+    # Registrar en historial con justificación
+    await registrar_eliminacion_en_auditoria(
+        db=db,
+        usuario_id=current_user.id,
+        usuario_nombre=current_user.username,
+        entidad="vulnerabilidad",
+        entidad_id=vuln_id,
+        entidad_nombre=existing.get("vulnerabilidad", "")[:100],
+        justificacion=justificacion.strip(),
+        datos_eliminados=existing
+    )
     
     return {"message": "Vulnerabilidad eliminada exitosamente"}
 
@@ -3953,11 +4166,30 @@ async def import_excel(file: UploadFile = File(...), current_user: CurrentUser =
     return {"message": msg, "inserted": inserted_count, "skipped_duplicates": skipped_duplicates, "catalogs_created": catalogs_created}
 
 @api_router.delete("/vulnerabilidades")
-async def delete_all_vulnerabilidades(current_user: CurrentUser = Depends(get_current_user)):
+async def delete_all_vulnerabilidades(
+    justificacion: str = Query(..., min_length=10, description="Justificación obligatoria para eliminación masiva"),
+    current_user: CurrentUser = Depends(get_current_user)
+):
     if not current_user.es_admin:
         raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar todos los registros")
     
+    # Contar antes de eliminar
+    count = await db.vulnerabilidades.count_documents({})
+    
     result = await db.vulnerabilidades.delete_many({})
+    
+    # Registrar en auditoría
+    await registrar_eliminacion_en_auditoria(
+        db=db,
+        usuario_id=current_user.id,
+        usuario_nombre=current_user.username,
+        entidad="vulnerabilidades_masivo",
+        entidad_id="ALL",
+        entidad_nombre=f"Eliminación masiva de {count} vulnerabilidades",
+        justificacion=justificacion.strip(),
+        datos_eliminados={"total_eliminados": count}
+    )
+    
     return {"message": f"Se eliminaron {result.deleted_count} registros"}
 
 # ============ PDF IMPORT ENDPOINTS ============

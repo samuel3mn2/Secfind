@@ -1,0 +1,68 @@
+{
+  "summary": "Tested governance & control features (iteration 25): DeleteWithJustificationModal, ConfirmChangesModal with Diff, Auditoría reactive search. Backend (6/6 tests passed) and Frontend (all 3 flows verified via Playwright) PASS. Minor React DOM-nesting warning in DeleteWithJustificationModal and a missing key prop in Auditoria TableBody were observed in console.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "DeleteWithJustificationModal",
+        "issues": [
+          "React DOM nesting warning: <AlertDialogDescription> renders as <p>, but the children include another <p> (line 74) and a <div> (line 77). This triggers 'In HTML, <p>/<div> cannot be a descendant of <p>' hydration warnings. Replace AlertDialogDescription's children with inline elements or use a wrapper <div> outside the Description."
+        ]
+      },
+      {
+        "screen": "Auditoria.jsx TableBody",
+        "issues": [
+          "React key warning: 'Each child in a list should have a unique key prop' from TableBody — the .map() of filteredHistorial likely renders something (a fragment or sibling row) without a unique key. Verify the row key around lines 408-... ensures key={item.id}."
+        ]
+      }
+    ]
+  },
+  "passed_tests": [
+    "Backend: DELETE /api/vulnerabilidades/{id} without justificacion → 422",
+    "Backend: DELETE /api/vulnerabilidades/{id} with justificacion < 10 chars → 422",
+    "Backend: DELETE /api/vulnerabilidades/{id} with valid justificacion → 200",
+    "Backend: DELETE /api/config/instituciones/{id} without justificacion → 422",
+    "Backend: DELETE /api/config/instituciones/{id} with valid justificacion → 200",
+    "Backend: Deletion creates audit entry with justificacion_borrado field populated in /api/historial",
+    "Frontend: DeleteWithJustificationModal opens, Confirm button disabled when input empty",
+    "Frontend: DeleteWithJustificationModal Confirm button disabled when justification < 10 chars ('short')",
+    "Frontend: DeleteWithJustificationModal Confirm button enabled when justification >= 10 chars",
+    "Frontend: cancel-delete-btn closes modal correctly",
+    "Frontend: ConfirmChangesModal appears when 'Guardar Cambios' clicked after modifying a vulnerability",
+    "Frontend: diff-field-vulnerabilidad rendered with valor anterior (red) and nuevo valor (green) — Diff visual confirmed",
+    "Frontend: 'Total: 1 campo modificado' counter displayed",
+    "Frontend: cancel-changes-btn closes ConfirmChangesModal and keeps user in edit dialog",
+    "Frontend: search-auditoria input filters reactively (20 rows → 14 rows when typing 'eliminar')",
+    "Frontend: Audit log displays 'Razón: ...' (justificacion_borrado) under ELIMINAR entries — end-to-end registration confirmed"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_delete_justification.py",
+    "/app/test_reports/pytest/pytest_delete_justification.xml"
+  ],
+  "action_items": [
+    "Fix DOM-nesting warning in /app/frontend/src/components/DeleteWithJustificationModal.jsx: AlertDialogDescription wraps a <p> tag, so the inner <p>/<div> elements (lines 74-86) cause invalid nested HTML. Suggested fix: move the <div> and second <p> outside AlertDialogDescription, or replace AlertDialogDescription content with only inline elements (e.g., <span>s)",
+    "Fix React key warning in /app/frontend/src/pages/Auditoria.jsx TableBody — ensure every direct child of the map() has a unique key (likely a stray <></> or sibling without key around line 408)"
+  ],
+  "critical_code_review_comments": [
+    "DeleteWithJustificationModal.jsx: AlertDialogDescription should not contain block elements (<p>, <div>). Refactor to keep description as a short single-line string and place the entity badge + warning paragraph as siblings outside the Description.",
+    "ConfirmChangesModal.jsx: IGNORED_FIELDS list at line 40 is local to component — consider exposing it via prop so callers can extend if needed (e.g., to ignore organization-specific computed fields).",
+    "Auditoria.jsx: filteredHistorial is recomputed on every render without useMemo — for 462 records the cost is low, but if list grows, wrap with useMemo([historial, searchText]).",
+    "Backend test_delete_justification.py is well structured; recommend adding similar coverage for /api/config/aplicaciones, /api/config/informes-pentest, /api/config/dominios, /api/config/controles, /api/catalogo-riesgos, /api/hallazgos-auditoria to ensure ALL delete endpoints enforce the 10-char rule (problem statement says 'CUALQUIER elemento')."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (6/6 tests pass)",
+    "frontend": "100% (3/3 features verified)"
+  },
+  "test_credentials": {"user": "admin", "password": "admin123"},
+  "seed_data_creation": "Backend test fixtures created and cleaned up: TEST_DEL_<ts> vulnerability, TestInst_<ts> instituciones, AuditTest_<ts> proveedores (all auto-deleted with justification). One vulnerability 'Open SMTP relay de forma no autenticada' was edited via UI and changes were CANCELLED (not saved), so DB state unchanged.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 25 governance features (delete justification, diff confirm, auditoria search) are fully working. Two minor React warnings remain (DOM nesting in DeleteWithJustificationModal, missing key in Auditoria TableBody) — both are non-blocking but should be fixed for code quality. Backend test suite to run: pytest /app/backend/tests/test_delete_justification.py. Note that backend currently enforces min_length=10 via FastAPI Query validator on /api/vulnerabilidades and /api/config/instituciones and /api/config/proveedores — verify other resource DELETE endpoints (aplicaciones, informes-pentest, dominios, controles, catalogo-riesgos, hallazgos-auditoria) have the same Query(min_length=10) constraint applied. The Diff modal only triggers on EDIT (not CREATE) — verify if needed.",
+  "rca of the issue": "N/A - no critical bugs found"
+}

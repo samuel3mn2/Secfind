@@ -56,6 +56,7 @@ export default function Auditoria() {
   const [filterUsuario, setFilterUsuario] = useState("");
   const [filterFechaDesde, setFilterFechaDesde] = useState("");
   const [filterFechaHasta, setFilterFechaHasta] = useState("");
+  const [searchText, setSearchText] = useState(""); // Búsqueda reactiva local
   
   // Detail modal
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -204,10 +205,29 @@ export default function Auditoria() {
     setFilterUsuario("");
     setFilterFechaDesde("");
     setFilterFechaHasta("");
+    setSearchText("");
     setCurrentPage(1);
   };
 
-  const hasFilters = filterEntidad || filterAccion || filterUsuario || filterFechaDesde || filterFechaHasta;
+  const hasFilters = filterEntidad || filterAccion || filterUsuario || filterFechaDesde || filterFechaHasta || searchText;
+
+  // Filtrado local reactivo por texto de búsqueda
+  const filteredHistorial = historial.filter((item) => {
+    if (!searchText.trim()) return true;
+    const search = searchText.toLowerCase();
+    return (
+      (item.usuario_nombre || "").toLowerCase().includes(search) ||
+      (item.entidad_nombre || "").toLowerCase().includes(search) ||
+      (item.entidad || "").toLowerCase().includes(search) ||
+      (item.accion || "").toLowerCase().includes(search) ||
+      (item.justificacion_borrado || "").toLowerCase().includes(search) ||
+      (item.cambios || []).some(c => 
+        (c.campo || "").toLowerCase().includes(search) ||
+        String(c.valor_anterior || "").toLowerCase().includes(search) ||
+        String(c.valor_nuevo || "").toLowerCase().includes(search)
+      )
+    );
+  });
 
   if (!isAdmin) {
     return (
@@ -249,6 +269,18 @@ export default function Auditoria() {
             <div className="flex items-center gap-2 text-zinc-400">
               <Filter className="w-4 h-4" />
               <span className="text-sm font-medium">Filtros:</span>
+            </div>
+
+            {/* Barra de búsqueda reactiva */}
+            <div className="relative flex-1 min-w-[250px]">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <Input
+                placeholder="Buscar en descripción, usuario, elemento..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="pl-9 bg-black/20 border-zinc-700 text-white w-full"
+                data-testid="search-auditoria"
+              />
             </div>
 
             <Select value={filterEntidad} onValueChange={setFilterEntidad}>
@@ -324,7 +356,12 @@ export default function Auditoria() {
 
       {/* Stats */}
       <div className="flex items-center gap-4 text-sm text-zinc-400">
-        <span>{total} registros encontrados</span>
+        <span>{total} registros totales</span>
+        {searchText && (
+          <span className="text-cyan-400">
+            | Mostrando {filteredHistorial.length} coincidencia{filteredHistorial.length !== 1 ? "s" : ""}
+          </span>
+        )}
       </div>
 
       {/* Table */}
@@ -335,10 +372,24 @@ export default function Auditoria() {
               <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2" />
               Cargando historial...
             </div>
-          ) : historial.length === 0 ? (
+          ) : filteredHistorial.length === 0 ? (
             <div className="p-8 text-center text-zinc-400">
               <History className="w-12 h-12 mx-auto mb-2 opacity-50" />
-              No hay registros en el historial
+              {searchText ? (
+                <>
+                  <p>No se encontraron registros que coincidan con &quot;{searchText}&quot;</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSearchText("")}
+                    className="mt-2 text-cyan-400"
+                  >
+                    Limpiar búsqueda
+                  </Button>
+                </>
+              ) : (
+                <p>No hay registros en el historial</p>
+              )}
             </div>
           ) : (
             <Table>
@@ -354,7 +405,7 @@ export default function Auditoria() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {historial.map((item) => (
+                {filteredHistorial.map((item) => (
                   <TableRow
                     key={item.id}
                     className="border-zinc-800 hover:bg-zinc-800/50"
@@ -384,8 +435,15 @@ export default function Auditoria() {
                         {formatEntidadName(item.entidad)}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-zinc-300 max-w-[300px] truncate">
-                      {item.entidad_nombre || item.entidad_id?.slice(0, 8) + "..."}
+                    <TableCell className="text-zinc-300 max-w-[300px]">
+                      <div className="truncate">
+                        {item.entidad_nombre || item.entidad_id?.slice(0, 8) + "..."}
+                      </div>
+                      {item.justificacion_borrado && (
+                        <div className="text-xs text-amber-400 mt-1 truncate" title={item.justificacion_borrado}>
+                          Razón: {item.justificacion_borrado}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="text-center">
                       {item.cambios && item.cambios.length > 0 ? (
@@ -482,6 +540,13 @@ export default function Auditoria() {
                 <div>
                   <span className="text-zinc-500 text-sm">Elemento:</span>
                   <p className="text-white">{selectedItem.entidad_nombre}</p>
+                </div>
+              )}
+
+              {selectedItem.justificacion_borrado && (
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+                  <span className="text-amber-400 text-sm font-medium block mb-1">Justificación del Borrado:</span>
+                  <p className="text-amber-200 whitespace-pre-wrap">{selectedItem.justificacion_borrado}</p>
                 </div>
               )}
 

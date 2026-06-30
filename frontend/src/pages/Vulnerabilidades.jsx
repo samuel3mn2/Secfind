@@ -84,6 +84,8 @@ import {
 import ImportarPDF from "@/pages/ImportarPDF";
 import BulkEntryModal from "@/components/BulkEntryModal";
 import { TimelineSeguimiento } from "@/components/TimelineSeguimiento";
+import { DeleteWithJustificationModal } from "@/components/DeleteWithJustificationModal";
+import { ConfirmChangesModal } from "@/components/ConfirmChangesModal";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -308,6 +310,16 @@ export default function Vulnerabilidades() {
   
   // Tab de detalle de vulnerabilidad
   const [activeDetailTab, setActiveDetailTab] = useState("info");
+  
+  // Delete with justification modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingItem, setDeletingItem] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  
+  // Confirm changes modal (Diff)
+  const [showConfirmChangesModal, setShowConfirmChangesModal] = useState(false);
+  const [originalDataForDiff, setOriginalDataForDiff] = useState(null);
+  const [savingChanges, setSavingChanges] = useState(false);
 
   // Toggle column visibility
   const toggleColumn = (columnId) => {
@@ -561,16 +573,60 @@ export default function Vulnerabilidades() {
     setPendingFormData(null);
   };
 
-  const handleDelete = async () => {
-    if (!deleteId) return;
+  // Nueva función para abrir el modal de eliminación con justificación
+  const handleOpenDeleteModal = (vuln) => {
+    setDeletingItem(vuln);
+    setShowDeleteModal(true);
+  };
+
+  // Nueva función para confirmar eliminación con justificación
+  const handleConfirmDelete = async (justificacion) => {
+    if (!deletingItem) return;
+    setDeleteLoading(true);
     try {
-      await axios.delete(`${API}/vulnerabilidades/${deleteId}`);
+      await axios.delete(`${API}/vulnerabilidades/${deletingItem.id}?justificacion=${encodeURIComponent(justificacion)}`);
       toast.success("Vulnerabilidad eliminada exitosamente");
-      setDeleteId(null);
+      setShowDeleteModal(false);
+      setDeletingItem(null);
       fetchVulnerabilidades();
     } catch (error) {
       console.error("Error deleting:", error);
-      toast.error("Error al eliminar la vulnerabilidad");
+      toast.error(error.response?.data?.detail || "Error al eliminar la vulnerabilidad");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  // Función para abrir modal de confirmación de cambios (Diff)
+  const handlePreSave = () => {
+    // Guardar datos originales para comparación
+    if (editingVuln) {
+      setOriginalDataForDiff({...editingVuln});
+    }
+    setShowConfirmChangesModal(true);
+  };
+
+  // Función para confirmar y guardar cambios
+  const handleConfirmSave = async () => {
+    setSavingChanges(true);
+    try {
+      if (editingVuln) {
+        await axios.put(`${API}/vulnerabilidades/${editingVuln.id}`, formData);
+        toast.success("Vulnerabilidad actualizada exitosamente");
+      } else {
+        await axios.post(`${API}/vulnerabilidades`, formData);
+        toast.success("Vulnerabilidad creada exitosamente");
+      }
+      setShowConfirmChangesModal(false);
+      setShowModal(false);
+      setEditingVuln(null);
+      setFormData({});
+      fetchVulnerabilidades();
+    } catch (error) {
+      console.error("Error saving:", error);
+      toast.error(error.response?.data?.detail || "Error al guardar la vulnerabilidad");
+    } finally {
+      setSavingChanges(false);
     }
   };
 
@@ -1235,7 +1291,7 @@ export default function Vulnerabilidades() {
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 text-zinc-400 hover:text-red-500 hover:bg-red-500/10"
-                              onClick={() => setDeleteId(vuln.id)}
+                              onClick={() => handleOpenDeleteModal(vuln)}
                               data-testid={`delete-btn-${vuln.id}`}
                             >
                               <Trash2 className="w-4 h-4" />
@@ -1476,7 +1532,7 @@ export default function Vulnerabilidades() {
             </p>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh] pr-4">
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form id="vuln-form" onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-zinc-400">Código</Label>
@@ -1827,7 +1883,17 @@ export default function Vulnerabilidades() {
                   Cancelar
                 </Button>
                 <Button
-                  type="submit"
+                  type="button"
+                  onClick={() => {
+                    // Para edición, mostrar modal de confirmación con Diff
+                    if (editingVuln) {
+                      setOriginalDataForDiff({...editingVuln});
+                      setShowConfirmChangesModal(true);
+                    } else {
+                      // Para creación, submit directo
+                      document.getElementById('vuln-form')?.requestSubmit();
+                    }
+                  }}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white"
                   data-testid="save-btn"
                 >
@@ -1839,29 +1905,27 @@ export default function Vulnerabilidades() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <AlertDialogContent className="bg-[#18181b] border-[#27272a] text-white">
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar vulnerabilidad?</AlertDialogTitle>
-            <AlertDialogDescription className="text-zinc-400">
-              Esta acción no se puede deshacer. La vulnerabilidad será eliminada permanentemente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="border-zinc-700 text-zinc-300 hover:bg-zinc-800" data-testid="cancel-delete-btn">
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700 text-white"
-              data-testid="confirm-delete-btn"
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Delete Confirmation with Justification */}
+      <DeleteWithJustificationModal
+        open={showDeleteModal}
+        onOpenChange={setShowDeleteModal}
+        itemName={deletingItem?.vulnerabilidad}
+        itemType="la vulnerabilidad"
+        onConfirm={handleConfirmDelete}
+        loading={deleteLoading}
+      />
+
+      {/* Confirm Changes Modal (Diff) */}
+      <ConfirmChangesModal
+        open={showConfirmChangesModal}
+        onOpenChange={setShowConfirmChangesModal}
+        originalData={originalDataForDiff}
+        editedData={formData}
+        onConfirm={handleConfirmSave}
+        onCancel={() => setShowConfirmChangesModal(false)}
+        loading={savingChanges}
+        entityType="la vulnerabilidad"
+      />
 
       {/* PDF Import Modal */}
       <Dialog open={showPdfImport} onOpenChange={setShowPdfImport}>
