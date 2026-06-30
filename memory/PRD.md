@@ -4,6 +4,18 @@
 
 ### Cambios Recientes (Junio 2026)
 
+- **SISTEMA DE GOBERNANZA COMPLETO - HALLAZGOS Y CATÁLOGO (2026-06-30)**:
+  - **Catálogo de Riesgos**: Integración completa de modales de gobernanza
+    * `DeleteWithJustificationModal` para eliminaciones con justificación obligatoria
+    * `ConfirmChangesModal` con Diff visual antes de actualizar registros
+    * Creación directa sin modal diff (solo para ediciones)
+    * Data-testids añadidos: `btn-editar-riesgo-{id}`, `btn-eliminar-riesgo-{id}`
+  - **Hallazgos de Auditoría**: Integración completa de modales de gobernanza
+    * Misma arquitectura que Vulnerabilidades y Catálogo de Riesgos
+    * Modal Diff muestra campos modificados con valor anterior/nuevo
+    * Data-testids añadidos: `btn-editar-hallazgo-{id}`, `btn-eliminar-hallazgo-{id}`
+  - **Tests**: 8/8 pruebas pasadas (iteration_27.json) - 100% éxito
+
 - **SISTEMA DE GOBERNANZA Y CONTROL (2026-06-30)**:
   - **Flujo de Borrado con Justificación Obligatoria**:
     * Componente reutilizable `DeleteWithJustificationModal.jsx`

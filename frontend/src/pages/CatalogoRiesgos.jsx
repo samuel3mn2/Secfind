@@ -360,6 +360,7 @@ export default function CatalogoRiesgos() {
                             variant="ghost"
                             onClick={() => openEditModal(riesgo)}
                             className="text-zinc-400 hover:text-white"
+                            data-testid={`btn-editar-riesgo-${riesgo.id}`}
                           >
                             <Pencil className="w-4 h-4" />
                           </Button>
@@ -368,6 +369,7 @@ export default function CatalogoRiesgos() {
                             variant="ghost"
                             onClick={() => setDeleteConfirm(riesgo)}
                             className="text-red-400 hover:text-red-300"
+                            data-testid={`btn-eliminar-riesgo-${riesgo.id}`}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>

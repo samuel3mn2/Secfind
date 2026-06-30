@@ -782,6 +782,7 @@ export default function HallazgosAuditoria() {
                                 variant="ghost"
                                 onClick={() => openEditModal(hallazgo)}
                                 className="text-zinc-400 hover:text-white"
+                                data-testid={`btn-editar-hallazgo-${hallazgo.id}`}
                               >
                                 <Pencil className="w-4 h-4" />
                               </Button>
@@ -792,6 +793,7 @@ export default function HallazgosAuditoria() {
                                 variant="ghost"
                                 onClick={() => setDeleteConfirm(hallazgo)}
                                 className="text-red-400 hover:text-red-300"
+                                data-testid={`btn-eliminar-hallazgo-${hallazgo.id}`}
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
