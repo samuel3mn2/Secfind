@@ -70,19 +70,21 @@ export function DeleteWithJustificationModal({
             <AlertTriangle className="w-5 h-5" />
             Confirmar Eliminación
           </AlertDialogTitle>
-          <AlertDialogDescription className="text-zinc-400 space-y-3">
-            <p>
-              Estás a punto de eliminar {itemType}:
-            </p>
-            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
-              <p className="text-red-300 font-medium break-words">
-                {itemName || "Sin nombre"}
-              </p>
+          <AlertDialogDescription asChild>
+            <div className="text-zinc-400 space-y-3">
+              <span className="block">
+                Estás a punto de eliminar {itemType}:
+              </span>
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                <span className="text-red-300 font-medium break-words">
+                  {itemName || "Sin nombre"}
+                </span>
+              </div>
+              <span className="text-amber-400 text-sm flex items-center gap-1">
+                <FileText className="w-4 h-4" />
+                Esta acción requiere una justificación obligatoria.
+              </span>
             </div>
-            <p className="text-amber-400 text-sm flex items-center gap-1">
-              <FileText className="w-4 h-4" />
-              Esta acción requiere una justificación obligatoria.
-            </p>
           </AlertDialogDescription>
         </AlertDialogHeader>
 

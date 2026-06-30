@@ -1,8 +1,36 @@
 # SecFind - Sistema de Gestión de Vulnerabilidades
 
-## Última Actualización: 2026-06-26
+## Última Actualización: 2026-06-30
 
 ### Cambios Recientes (Junio 2026)
+
+- **SISTEMA DE GOBERNANZA Y CONTROL (2026-06-30)**:
+  - **Flujo de Borrado con Justificación Obligatoria**:
+    * Componente reutilizable `DeleteWithJustificationModal.jsx`
+    * Modal requiere nota mínima de 10 caracteres antes de habilitar botón de eliminar
+    * Backend: Todos los endpoints DELETE ahora requieren parámetro `justificacion` (Query, min 10 chars)
+    * Endpoints actualizados: vulnerabilidades, usuarios, instituciones, aplicaciones, proveedores, informes-pentest, responsables, grupos-informes, vistas-guardadas
+    * Eliminaciones se registran en colección de auditoría con campo `justificacion_borrado`
+  - **Modal de Confirmación con Diff Visual**:
+    * Componente reutilizable `ConfirmChangesModal.jsx`
+    * Al editar vulnerabilidades, muestra comparación visual de campos modificados
+    * Valor anterior (rojo) → Valor nuevo (verde)
+    * Contador de campos modificados
+    * Botones: "Cancelar y Seguir Editando" / "Sí, Confirmar y Guardar"
+  - **Barra de Búsqueda en Auditoría**:
+    * Filtrado reactivo local de registros en la tabla de logs
+    * Búsqueda por usuario, elemento, acción, descripción, justificación
+    * Indicador de coincidencias encontradas
+  - **Tests**: 6/6 tests pasados en test_delete_justification.py
+
+- **FILTRO DE PROVEEDOR EN VULNERABILIDADES (2026-06-30)**:
+  - MultiSelectFilter para filtrar por proveedor
+  - Backend actualizado para soportar múltiples valores de proveedor
+
+- **REORGANIZACIÓN FORMULARIOS VULNERABILIDADES (2026-06-26)**:
+  - Secciones "Vinculación GRC" y "Riesgo del Catálogo" movidas al final del formulario
+  - Aplica tanto al modal de Vista como al de Edición
+
 - **CONSOLIDACIÓN MASTER MÓDULO SEGUIMIENTO (2026-06-26)**:
   - **Backend - 7 Estados Literal**: Validación Pydantic estricta con:
     * Corregido, Pendiente, Impedimento, Vulnerable, Desestimado, Para Re Test, Nota de Seguimiento
