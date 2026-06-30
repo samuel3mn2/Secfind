@@ -2155,6 +2155,7 @@ async def get_vulnerabilidades(
     dominios_filter = request.query_params.getlist("dominio")
     controles_filter = request.query_params.getlist("control")
     nivel_riesgo_filter = request.query_params.getlist("nivel_riesgo")
+    proveedores_filter = request.query_params.getlist("proveedor")
     
     query = {}
     if severidades:
@@ -2165,8 +2166,8 @@ async def get_vulnerabilidades(
         query["institucion"] = {"$in": instituciones}
     if aplicaciones:
         query["aplicaciones"] = {"$in": aplicaciones}
-    if proveedor:
-        query["proveedor"] = proveedor
+    if proveedores_filter:
+        query["proveedor"] = {"$in": proveedores_filter}
     if informes:
         query["nombre_informe_pentest"] = {"$in": informes}
     if responsables:

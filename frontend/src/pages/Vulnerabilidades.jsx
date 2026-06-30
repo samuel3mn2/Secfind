@@ -270,6 +270,7 @@ export default function Vulnerabilidades() {
   const [filterDominio, setFilterDominio] = useState([]);
   const [filterControl, setFilterControl] = useState([]);
   const [filterNivelRiesgo, setFilterNivelRiesgo] = useState([]);
+  const [filterProveedor, setFilterProveedor] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showBulkEntryModal, setShowBulkEntryModal] = useState(false);
@@ -419,6 +420,7 @@ export default function Vulnerabilidades() {
       if (filterDominio.length > 0) filterDominio.forEach(v => params.append("dominio", v));
       if (filterControl.length > 0) filterControl.forEach(v => params.append("control", v));
       if (filterNivelRiesgo.length > 0) filterNivelRiesgo.forEach(v => params.append("nivel_riesgo", v));
+      if (filterProveedor.length > 0) filterProveedor.forEach(v => params.append("proveedor", v));
 
       const response = await axios.get(`${API}/vulnerabilidades?${params.toString()}`);
       setVulnerabilidades(response.data);
@@ -429,7 +431,7 @@ export default function Vulnerabilidades() {
     } finally {
       setLoading(false);
     }
-  }, [search, filterSeveridad, filterEstatus, filterInstitucion, filterAño, filterAplicacion, filterInforme, filterResponsable, filterDominio, filterControl, filterNivelRiesgo]);
+  }, [search, filterSeveridad, filterEstatus, filterInstitucion, filterAño, filterAplicacion, filterInforme, filterResponsable, filterDominio, filterControl, filterNivelRiesgo, filterProveedor]);
 
   useEffect(() => {
     fetchOptions();
@@ -900,6 +902,16 @@ export default function Vulnerabilidades() {
                 searchPlaceholder="Buscar nivel..."
                 allLabel="Todos los niveles"
                 data-testid="filter-nivel-riesgo"
+              />
+
+              <MultiSelectFilter
+                options={options?.proveedores || []}
+                selected={filterProveedor}
+                onChange={setFilterProveedor}
+                placeholder="Proveedor"
+                searchPlaceholder="Buscar proveedor..."
+                allLabel="Todos los proveedores"
+                data-testid="filter-proveedor"
               />
 
               {/* Import/Export */}
