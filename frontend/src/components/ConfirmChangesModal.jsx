@@ -198,7 +198,7 @@ export function ConfirmChangesModal({
                 </p>
               </div>
 
-              <ScrollArea className="flex-1 mt-4 pr-2" style={{ maxHeight: "calc(90vh - 280px)" }}>
+              <ScrollArea className="flex-1 mt-4 pr-2 max-h-[calc(90vh-280px)]">
                 <div className="space-y-3 pb-2">
                   {changes.map((change, idx) => (
                     <div

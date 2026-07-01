@@ -1,6 +1,20 @@
 # SecFind - Sistema de Gestión de Vulnerabilidades
 
-## Última Actualización: 2026-06-30
+## Última Actualización: 2026-07-01
+
+### Cambios Recientes (Julio 2026)
+
+- **BUGFIX: Modal de Confirmación muestra UUIDs en lugar de nombres (2026-07-01)**:
+  - **Problema reportado**: El modal ConfirmChangesModal mostraba UUIDs para Control Asociado y Riesgo del Catálogo en lugar de nombres legibles
+  - **Causa**: El componente mostraba valores crudos de `control_id` y `riesgo_id` sin resolverlos a nombres
+  - **Solución**:
+    * Agregado prop `lookupMaps` al componente `ConfirmChangesModal.jsx`
+    * Creada función `resolveIdToName()` que mapea IDs a nombres legibles (formato: "COD - Nombre")
+    * `Vulnerabilidades.jsx`: Creado `lookupMaps` useMemo con mapas de controles, riesgos y dominios
+    * `HallazgosAuditoria.jsx`: Aplicada la misma arquitectura
+    * `dominio_id` agregado a IGNORED_FIELDS (solo se usa para filtro en cascada)
+  - **Mejora de scroll**: Cambiado de inline style a clase Tailwind `max-h-[calc(90vh-280px)]` para mejor compatibilidad
+  - **Verificado**: Testing agent confirmó 0 UUIDs en el modal - 100% éxito
 
 ### Cambios Recientes (Junio 2026)
 
