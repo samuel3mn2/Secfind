@@ -369,7 +369,7 @@ export default function Vulnerabilidades() {
 
   // Filter controles based on selected dominio
   const filteredControles = useMemo(() => {
-    if (!selectedDominioId) return controles;
+    if (!selectedDominioId) return []; // No mostrar controles si no hay dominio seleccionado
     return controles.filter(c => c.dominio_id === selectedDominioId);
   }, [controles, selectedDominioId]);
 
@@ -1823,18 +1823,16 @@ export default function Vulnerabilidades() {
                     <div className="space-y-2">
                       <Label className="text-zinc-400">Dominio</Label>
                       <Select
-                        value={selectedDominioId || "_none"}
+                        value={selectedDominioId || ""}
                         onValueChange={(v) => {
-                          const newDominioId = v === "_none" ? "" : v;
-                          setSelectedDominioId(newDominioId);
-                          setFormData({ ...formData, control_id: "", dominio_id: newDominioId });
+                          setSelectedDominioId(v);
+                          setFormData({ ...formData, control_id: "", dominio_id: v });
                         }}
                       >
                         <SelectTrigger className="bg-black/20 border-zinc-700 text-white" data-testid="input-dominio">
-                          <SelectValue placeholder="Filtrar por dominio..." />
+                          <SelectValue placeholder="Seleccionar dominio..." />
                         </SelectTrigger>
                         <SelectContent className="bg-zinc-900 border-zinc-700">
-                          <SelectItem value="_none" className="text-zinc-400">Todos los dominios</SelectItem>
                           {dominios.map((d) => (
                             <SelectItem key={d.id} value={d.id}>{d.nombre_dominio}</SelectItem>
                           ))}
@@ -1846,9 +1844,10 @@ export default function Vulnerabilidades() {
                       <Select
                         value={formData.control_id || "_none"}
                         onValueChange={(v) => setFormData({ ...formData, control_id: v === "_none" ? "" : v })}
+                        disabled={!selectedDominioId}
                       >
                         <SelectTrigger className="bg-black/20 border-zinc-700 text-white" data-testid="input-control">
-                          <SelectValue placeholder="Seleccionar control..." />
+                          <SelectValue placeholder={selectedDominioId ? "Seleccionar control..." : "Primero seleccione un dominio"} />
                         </SelectTrigger>
                         <SelectContent className="bg-zinc-900 border-zinc-700 max-h-[200px]">
                           <SelectItem value="_none" className="text-zinc-400">Sin control</SelectItem>

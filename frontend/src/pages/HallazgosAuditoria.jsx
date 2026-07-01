@@ -149,7 +149,7 @@ export default function HallazgosAuditoria() {
 
   // Filter controles based on selected dominio
   const filteredControles = useMemo(() => {
-    if (!formData.dominio_id) return controles;
+    if (!formData.dominio_id) return []; // No mostrar controles si no hay dominio seleccionado
     return controles.filter(c => c.dominio_id === formData.dominio_id);
   }, [controles, formData.dominio_id]);
 
@@ -918,14 +918,13 @@ export default function HallazgosAuditoria() {
               <div className="space-y-2">
                 <Label className="text-zinc-300">Dominio</Label>
                 <Select
-                  value={formData.dominio_id || "_none"}
-                  onValueChange={(v) => setFormData((prev) => ({ ...prev, dominio_id: v === "_none" ? "" : v, control_id: "" }))}
+                  value={formData.dominio_id || ""}
+                  onValueChange={(v) => setFormData((prev) => ({ ...prev, dominio_id: v, control_id: "" }))}
                 >
                   <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white">
-                    <SelectValue placeholder="Filtrar por dominio..." />
+                    <SelectValue placeholder="Seleccionar dominio..." />
                   </SelectTrigger>
                   <SelectContent className="bg-zinc-900 border-zinc-700">
-                    <SelectItem value="_none" className="text-zinc-300">N/A</SelectItem>
                     {dominios.map((d) => (
                       <SelectItem key={d.id} value={d.id} className="text-zinc-300">
                         {d.nombre_dominio}
@@ -939,9 +938,10 @@ export default function HallazgosAuditoria() {
                 <Select
                   value={formData.control_id || "_none"}
                   onValueChange={(v) => setFormData((prev) => ({ ...prev, control_id: v === "_none" ? "" : v }))}
+                  disabled={!formData.dominio_id}
                 >
                   <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white">
-                    <SelectValue placeholder="Seleccionar control..." />
+                    <SelectValue placeholder={formData.dominio_id ? "Seleccionar control..." : "Primero seleccione un dominio"} />
                   </SelectTrigger>
                   <SelectContent className="bg-zinc-900 border-zinc-700 max-h-[200px]">
                     <SelectItem value="_none" className="text-zinc-300">Sin control</SelectItem>
