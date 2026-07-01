@@ -487,12 +487,14 @@ export default function Vulnerabilidades() {
       setEditingVuln(vuln);
       // Find dominio_id from control if exists
       const control = controles.find(c => c.id === vuln.control_id);
-      setSelectedDominioId(control?.dominio_id || "");
+      const dominioId = control?.dominio_id || "";
+      setSelectedDominioId(dominioId);
       setFormData({ 
         ...vuln,
         aplicaciones: vuln.aplicaciones || [],
         control_id: vuln.control_id || "",
         riesgo_id: vuln.riesgo_id || "",
+        dominio_id: dominioId,
       });
     } else {
       setEditingVuln(null);
@@ -507,6 +509,7 @@ export default function Vulnerabilidades() {
         nivel_riesgo: "",
         control_id: "",
         riesgo_id: "",
+        dominio_id: "",
         descripcion_riesgo: "",
         responsable: "",
         fecha_compromiso: "",
@@ -621,7 +624,10 @@ export default function Vulnerabilidades() {
   const handlePreSave = () => {
     // Guardar datos originales para comparación
     if (editingVuln) {
-      setOriginalDataForDiff({...editingVuln});
+      // Find original dominio_id from control if exists
+      const control = controles.find(c => c.id === editingVuln.control_id);
+      const originalDominioId = control?.dominio_id || "";
+      setOriginalDataForDiff({...editingVuln, dominio_id: originalDominioId});
     }
     setShowConfirmChangesModal(true);
   };
@@ -1819,11 +1825,12 @@ export default function Vulnerabilidades() {
                       <Select
                         value={selectedDominioId || "_none"}
                         onValueChange={(v) => {
-                          setSelectedDominioId(v === "_none" ? "" : v);
-                          setFormData({ ...formData, control_id: "" });
+                          const newDominioId = v === "_none" ? "" : v;
+                          setSelectedDominioId(newDominioId);
+                          setFormData({ ...formData, control_id: "", dominio_id: newDominioId });
                         }}
                       >
-                        <SelectTrigger className="bg-black/20 border-zinc-700 text-white">
+                        <SelectTrigger className="bg-black/20 border-zinc-700 text-white" data-testid="input-dominio">
                           <SelectValue placeholder="Filtrar por dominio..." />
                         </SelectTrigger>
                         <SelectContent className="bg-zinc-900 border-zinc-700">

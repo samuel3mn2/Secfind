@@ -8,7 +8,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowRight, CheckCircle2, AlertTriangle, FileEdit } from "lucide-react";
 
 /**
@@ -41,8 +40,7 @@ export function ConfirmChangesModal({
   // Campos a ignorar en la comparación
   const IGNORED_FIELDS = [
     "id", "_id", "created_at", "updated_at", "timestamp",
-    "historial_impedimentos_seguimiento", "codigo", "veces_cambiada_fecha",
-    "dominio_id" // Ignorar dominio_id ya que es solo para filtro en cascada
+    "historial_impedimentos_seguimiento", "codigo", "veces_cambiada_fecha"
   ];
 
   // Mapeo de nombres de campo a etiquetas legibles por defecto
@@ -62,6 +60,7 @@ export function ConfirmChangesModal({
     resultado_re_test: "Resultado Retest",
     veces_en_retest: "Veces en Retest",
     nivel_riesgo: "Nivel de Riesgo",
+    dominio_id: "Dominio",
     control_id: "Control Asociado",
     riesgo_id: "Riesgo del Catálogo",
     fecha_hallazgo: "Fecha Hallazgo",
@@ -99,7 +98,7 @@ export function ConfirmChangesModal({
       return lookupMaps.riesgos[value] || value;
     }
     
-    // Resolver dominio_id (aunque lo ignoramos, por si acaso)
+    // Resolver dominio_id
     if (field === "dominio_id" && lookupMaps.dominios) {
       return lookupMaps.dominios[value] || value;
     }
@@ -172,7 +171,7 @@ export function ConfirmChangesModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#18181b] border-[#27272a] text-white max-w-2xl max-h-[90vh] flex flex-col">
+      <DialogContent className="bg-[#18181b] border-[#27272a] text-white max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2 text-amber-400">
             <FileEdit className="w-5 h-5" />
@@ -180,7 +179,7 @@ export function ConfirmChangesModal({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {changes.length === 0 ? (
             <div className="text-center py-6">
               <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-green-400" />
@@ -198,7 +197,8 @@ export function ConfirmChangesModal({
                 </p>
               </div>
 
-              <ScrollArea className="flex-1 mt-4 pr-2 max-h-[calc(90vh-280px)]">
+              {/* Contenedor con scroll nativo */}
+              <div className="flex-1 mt-4 pr-2 overflow-y-auto min-h-0" style={{ maxHeight: "calc(85vh - 250px)" }}>
                 <div className="space-y-3 pb-2">
                   {changes.map((change, idx) => (
                     <div
@@ -231,7 +231,7 @@ export function ConfirmChangesModal({
                     </div>
                   ))}
                 </div>
-              </ScrollArea>
+              </div>
 
               <div className="text-center text-sm text-zinc-400 flex-shrink-0 pt-2">
                 Total: <strong className="text-indigo-400">{changes.length}</strong> campo{changes.length !== 1 ? "s" : ""} modificado{changes.length !== 1 ? "s" : ""}

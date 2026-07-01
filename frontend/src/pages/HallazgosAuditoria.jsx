@@ -400,7 +400,10 @@ export default function HallazgosAuditoria() {
   // Función para abrir modal de confirmación de cambios (Diff)
   const handlePreSave = () => {
     if (editingHallazgo) {
-      setOriginalDataForDiff({...editingHallazgo});
+      // Find original dominio_id from control if exists
+      const control = controles.find(c => c.id === editingHallazgo.control_id);
+      const originalDominioId = control?.dominio_id || "";
+      setOriginalDataForDiff({...editingHallazgo, dominio_id: originalDominioId});
       setShowConfirmChanges(true);
     } else {
       // Para creación, guardar directamente

@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 29 (frontend only): Verified BOTH bug fixes in ConfirmChangesModal on Vulnerabilidades page — (1) Dominio now appears as a diff card with the human-readable name 'Seguridad EndPoints' (previously was hidden because dominio_id was in IGNORED_FIELDS); (2) Scroll is functional in the confirmation modal — replaced Radix ScrollArea with a native div (className='flex-1 mt-4 pr-2 overflow-y-auto min-h-0', inline style maxHeight='calc(85vh - 250px)') and it correctly scrolls when content overflows. E2E flow: Login (admin/admin123) → Vulnerabilidades → Edit first row → change Vulnerabilidad (textarea), Severidad (Media→Alta), Estatus (Cerrado→En Proceso), Control (vacío→CTRL-EP-03) and Dominio (vacío→Seguridad EndPoints) → Guardar → Confirm modal rendered 5 diff cards; scroll container reports clientHeight=668, scrollHeight=726, scrollable=true; programmatic scroll moved scrollTop from 0→58. Cancelled to avoid DB writes.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "Vulnerabilidades: Dominio diff card appears with data-testid='diff-field-dominio_id' showing label 'Dominio' and readable value 'Seguridad EndPoints' (NOT a UUID) — bug 1 fixed",
+    "Vulnerabilidades: Control Asociado diff card shows 'CTRL-EP-03 - Configuración segura (Baseline/Hardening)' (NOT a UUID) — regression clean",
+    "Vulnerabilidades: With 5 modified fields, 0 UUIDs found anywhere in confirm modal text (regex scan)",
+    "Vulnerabilidades: ConfirmChangesModal native scroll div (overflow-y-auto min-h-0) engages when scrollHeight (726px) > clientHeight (668px); scrollTop advanced from 0→58 on scrollTo(bottom) — bug 2 fixed",
+    "Vulnerabilidades: 'Total: 5 campos modificados' counter matches diff-field-* card count",
+    "HallazgosAuditoria (code review only): symmetric implementation confirmed — line 405 handlePreSave sets originalDataForDiff with dominio_id (from control lookup), line 922 onValueChange writes dominio_id to formData, ConfirmChangesModal DEFAULT_LABELS already maps dominio_id→'Dominio' and resolveIdToName resolves via lookupMaps.dominios. High confidence no separate UI test needed."
+  ],
+  "not_tested": [
+    "HallazgosAuditoria live UI flow — code is symmetric to Vulnerabilidades; main agent can self-verify with a single edit-and-save cycle if desired."
+  ],
+  "test_report_links": ["Playwright in-tool E2E (no .py file created — pure UI verification)"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ConfirmChangesModal.jsx (line 41-44): dominio_id was correctly REMOVED from IGNORED_FIELDS; only 'id, _id, created_at, updated_at, timestamp, historial_impedimentos_seguimiento, codigo, veces_cambiada_fecha' remain — correct.",
+    "ConfirmChangesModal.jsx (line 63): DEFAULT_LABELS['dominio_id'] = 'Dominio' — correct human label.",
+    "ConfirmChangesModal.jsx (line 101-104): resolveIdToName resolves dominio_id via lookupMaps.dominios[value] — verified working.",
+    "ConfirmChangesModal.jsx (line 201): Switched from Radix ScrollArea to native <div className='flex-1 mt-4 pr-2 overflow-y-auto min-h-0' style={{maxHeight: 'calc(85vh - 250px)'}}> — scroll now engages reliably (verified with real browser: clientHeight=668, scrollHeight=726, scrollable=true, scrollTop advanced to 58 on scrollTo bottom).",
+    "Vulnerabilidades.jsx: handleOpenModal (line 485-512) initializes formData.dominio_id from the loaded control's dominio_id; onValueChange (line 1827-1831) writes both selectedDominioId and formData.dominio_id; handlePreSave (line 624-630) mirrors dominio_id into originalDataForDiff so the diff comparison is symmetric — no false positives/negatives.",
+    "HallazgosAuditoria.jsx (line 401-406): handlePreSave uses the same pattern (find original control, extract control.dominio_id, spread into originalDataForDiff) — parity with Vulnerabilidades confirmed."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "n/a (frontend-only iteration)", "frontend": "100% — both reported bugs verified fixed" },
+  "test_credentials": { "user": "admin", "password": "admin123" },
+  "seed_data_creation": "None — CANCELLED via 'Cancelar y Seguir Editando' before any DB write. Zero side effects on production data.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Both bugs (Dominio not shown in diff, ScrollArea not scrolling) are resolved. The ConfirmChangesModal now uses a native scrolling div (not Radix ScrollArea) — future test scripts must use `[role=\"dialog\"] div.overflow-y-auto` (last-match) NOT `[data-radix-scroll-area-viewport]` to check scroll inside the CONFIRM modal. The Vulnerabilidades EDIT modal still uses Radix ScrollArea (viewport selector still valid there).",
+  "rca of the issue": "Bug 1 (Dominio missing): ConfirmChangesModal previously listed 'dominio_id' in IGNORED_FIELDS so the diff loop (line 120) skipped it entirely. Fix: removed dominio_id from IGNORED_FIELDS AND ensured parent pages populate formData.dominio_id + originalDataForDiff.dominio_id so both sides of the comparison are consistent. lookupMaps.dominios resolves the UUID to nombre_dominio ('Seguridad EndPoints') at render time. Bug 2 (Scroll broken): Radix ScrollArea's inner [data-radix-scroll-area-viewport] does not always respect a maxHeight applied to the root inside a flex-col DialogContent — the viewport can exceed the constraint. Fix: replaced the ScrollArea with a plain <div overflow-y-auto min-h-0 style=maxHeight> that reliably enforces height and shows a native scrollbar. Verified: with 5 diff cards the container has scrollHeight (726) > clientHeight (668) and scrollTop moves as expected."
+}
