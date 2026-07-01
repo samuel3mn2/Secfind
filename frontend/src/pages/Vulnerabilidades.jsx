@@ -390,6 +390,26 @@ export default function Vulnerabilidades() {
     return r ? `${r.codigo_riesgo} - ${r.nombre_corto}` : "";
   }, [catalogoRiesgos, formData.riesgo_id]);
 
+  // Lookup maps for ConfirmChangesModal to resolve IDs to names
+  const lookupMaps = useMemo(() => {
+    const controlesMap = {};
+    controles.forEach(c => {
+      controlesMap[c.id] = `${c.codigo_control} - ${c.nombre_control || c.descripcion || ''}`.trim();
+    });
+    
+    const riesgosMap = {};
+    catalogoRiesgos.forEach(r => {
+      riesgosMap[r.id] = `${r.codigo_riesgo} - ${r.nombre_corto}`;
+    });
+    
+    const dominiosMap = {};
+    dominios.forEach(d => {
+      dominiosMap[d.id] = d.nombre_dominio;
+    });
+    
+    return { controles: controlesMap, riesgos: riesgosMap, dominios: dominiosMap };
+  }, [controles, catalogoRiesgos, dominios]);
+
   const fetchOptions = async () => {
     try {
       const response = await axios.get(`${API}/dropdown-options`);
@@ -1927,6 +1947,7 @@ export default function Vulnerabilidades() {
         onCancel={() => setShowConfirmChangesModal(false)}
         loading={savingChanges}
         entityType="la vulnerabilidad"
+        lookupMaps={lookupMaps}
       />
 
       {/* PDF Import Modal */}

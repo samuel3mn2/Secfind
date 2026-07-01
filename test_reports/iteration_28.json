@@ -1,0 +1,44 @@
+{
+  "summary": "Iteration 28 (frontend only): Verified ConfirmChangesModal fix on Vulnerabilidades — Control Asociado and Riesgo del Catálogo now display human-readable names (format 'COD - Nombre') instead of UUIDs in the Diff modal. Also verified the ScrollArea structural fix (flex-1 + flex-col + min-h-0 + maxHeight inline style) is in place and content is not clipped for typical multi-field changes. Full E2E flow via Playwright: Login → open row-1 edit → change Severidad, Estatus, Resultado Retest, Descripción, and set Vinculación GRC (Dominio=Seguridad EndPoints, Control=CTRL-EP-03, Riesgo=R-002) → Guardar → Confirm modal shows 5 diff cards with 0 UUIDs. Cancel used to avoid persisting changes.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      { "screen": "ConfirmChangesModal (Vulnerabilidades)", "issues": ["When many fields are modified (5+), the ScrollArea viewport clientHeight (726px) exceeds the inline maxHeight of calc(90vh - 280px) (~692px). Radix ScrollArea root style maxHeight is not enforcing on the viewport in this flex layout; scrollbar does not appear yet in the tested case (5 fields fit within 90vh dialog). Recommend also constraining the inner [data-radix-scroll-area-viewport] via a max-height CSS rule OR reducing the '280px' offset, so that scrolling activates BEFORE any risk of clipping when content exceeds ~700px. This is a preventive recommendation — current 5-field render was not clipped, but a heavier record with many fields modified may still overflow the dialog."]
+    ]
+  },
+  "passed_tests": [
+    "Vulnerabilidades: Edit modal opens; Vinculación GRC section reachable via ScrollArea",
+    "Vulnerabilidades: Dominio→Control cascade works (Seguridad EndPoints → 4 CTRL-EP-* options)",
+    "Vulnerabilidades: 'Buscar riesgo' modal opens and R-XXX selection populates the Riesgo del Catálogo input with 'R-001 - Acceso a cuentas sin validación de identidad'",
+    "Vulnerabilidades: ConfirmChangesModal 'diff-field-control_id' shows 'CTRL-EP-03 - Configuración segura (Baseline/Hardening)' (NOT a UUID) — resolveIdToName + lookupMaps working",
+    "Vulnerabilidades: ConfirmChangesModal 'diff-field-riesgo_id' shows 'R-001 - Acceso a cuentas sin validación de identidad' / 'R-002 - Transferencias fraudulentas' (NOT a UUID) — resolveIdToName + lookupMaps working",
+    "Vulnerabilidades: With 5 modified fields, 0 UUIDs found in any Diff card (regex scan of full modal text) — regression clean",
+    "Vulnerabilidades: 'dominio_id' correctly ignored in the diff (only 2 diff cards when only Dominio+Control+Riesgo changed; dominio not shown separately)",
+    "ConfirmChangesModal ScrollArea is structurally set (flex-1 within flex-col dialog with min-h-0 and inline maxHeight); content renders within dialog bounds for 5-field case"
+  ],
+  "not_tested": [
+    "HallazgosAuditoria ConfirmChangesModal with Control ID — code path is identical (same component, same lookupMaps prop pattern per iteration_27) but was not re-exercised via UI in this run due to token budget. Recommend main-agent quick self-check.",
+    "Extreme scroll case (10+ modified fields) to force the ScrollArea to actually scroll. Structurally supported, but not exercised."
+  ],
+  "test_report_links": ["Playwright in-tool E2E (no .py file needed for this UI verification)"],
+  "action_items": [
+    "OPTIONAL/PREVENTIVE: Harden ScrollArea height constraint in ConfirmChangesModal — apply max-height to the inner viewport (e.g., a global CSS rule targeting '[data-radix-scroll-area-viewport]' within the modal, or set explicit height instead of maxHeight on the ScrollArea) so scrollbar always engages before the dialog can overflow.",
+    "OPTIONAL: Have main agent open a HallazgosAuditoria row edit → change Control Asociado → Save, to visually re-confirm the same fix path (component is shared, low risk)."
+  ],
+  "critical_code_review_comments": [
+    "ConfirmChangesModal.jsx (lines 88-108): resolveIdToName correctly handles control_id, control_asociado_id, riesgo_id, dominio_id and falls back to the raw value when lookup key is missing — safe fallback.",
+    "ConfirmChangesModal.jsx (line 46): dominio_id is in IGNORED_FIELDS which is correct per spec ('solo para filtro en cascada'). Confirmed in test: only 2 diff cards produced when Dominio+Control+Riesgo were all set.",
+    "Vulnerabilidades.jsx (lines 393-411): lookupMaps useMemo correctly builds {controles, riesgos, dominios} keyed by id — verified working end-to-end.",
+    "ConfirmChangesModal.jsx (line 201): inline style '{ maxHeight: calc(90vh - 280px) }' is applied to the ScrollArea root, but Radix ScrollArea's inner [data-radix-scroll-area-viewport] can still grow beyond that in some flex contexts. Consider adding `.h-full max-h-full` on the viewport via a Tailwind class or CSS override for safety."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "n/a (frontend-only iteration)", "frontend": "100% on primary bug (UUID→Name)" },
+  "test_credentials": { "user": "admin", "password": "admin123" },
+  "seed_data_creation": "None — all edit operations were CANCELLED via the ConfirmChangesModal 'Cancelar y Seguir Editando' button and then the outer 'Cancelar'. Zero DB writes.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The lookupMaps → resolveIdToName pattern is verified working on Vulnerabilidades. Same component is reused in HallazgosAuditoria with a symmetric lookupMaps prop; assume working unless a specific regression is reported. To test scrolling under stress, load a vulnerabilidad and modify 10+ fields (all combos + all textareas) then Save — the ScrollArea should engage a scrollbar (may need CSS refinement per action_items).",
+  "rca of the issue": "Root cause of the reported bug (UUIDs in diff) was that ConfirmChangesModal originally compared raw form-state IDs field-by-field with String() serialization, so control_id and riesgo_id (UUIDs) were rendered directly. Fix: parent pages (Vulnerabilidades.jsx line ~393, HallazgosAuditoria.jsx line ~166) now build lookupMaps {controles, riesgos, dominios} and pass them to <ConfirmChangesModal lookupMaps={lookupMaps} />; the modal's resolveIdToName() (line 88) maps id→'COD - Nombre' before rendering. Verified end-to-end via Playwright — 0 UUIDs in the diff pane across 5 modified fields."
+}

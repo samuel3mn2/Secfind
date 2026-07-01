@@ -164,6 +164,26 @@ export default function HallazgosAuditoria() {
     );
   }, [riesgos, riskSearchTerm]);
 
+  // Lookup maps for ConfirmChangesModal to resolve IDs to names
+  const lookupMaps = useMemo(() => {
+    const controlesMap = {};
+    controles.forEach(c => {
+      controlesMap[c.id] = `${c.codigo_control} - ${c.nombre_control || c.descripcion || ''}`.trim();
+    });
+    
+    const riesgosMap = {};
+    riesgos.forEach(r => {
+      riesgosMap[r.id] = `${r.codigo_riesgo} - ${r.nombre_corto}`;
+    });
+    
+    const dominiosMap = {};
+    dominios.forEach(d => {
+      dominiosMap[d.id] = d.nombre_dominio;
+    });
+    
+    return { controles: controlesMap, riesgos: riesgosMap, dominios: dominiosMap };
+  }, [controles, riesgos, dominios]);
+
   const fetchReferenceData = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
@@ -1204,6 +1224,7 @@ export default function HallazgosAuditoria() {
         onCancel={() => setShowConfirmChanges(false)}
         loading={savingChanges}
         entityType="el hallazgo de auditoría"
+        lookupMaps={lookupMaps}
       />
 
       {/* Import Modal */}

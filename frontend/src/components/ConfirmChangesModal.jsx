@@ -24,6 +24,7 @@ import { ArrowRight, CheckCircle2, AlertTriangle, FileEdit } from "lucide-react"
  * @param {boolean} loading - Estado de carga durante el guardado
  * @param {string} entityType - Tipo de entidad (ej: "vulnerabilidad", "hallazgo")
  * @param {object} fieldLabels - Mapeo opcional de nombres de campo a etiquetas legibles
+ * @param {object} lookupMaps - Mapas para resolver IDs a nombres legibles { controles: {id: nombre}, riesgos: {id: nombre}, dominios: {id: nombre} }
  */
 export function ConfirmChangesModal({
   open,
@@ -35,11 +36,13 @@ export function ConfirmChangesModal({
   loading = false,
   entityType = "registro",
   fieldLabels = {},
+  lookupMaps = {},
 }) {
   // Campos a ignorar en la comparación
   const IGNORED_FIELDS = [
     "id", "_id", "created_at", "updated_at", "timestamp",
-    "historial_impedimentos_seguimiento", "codigo", "veces_cambiada_fecha"
+    "historial_impedimentos_seguimiento", "codigo", "veces_cambiada_fecha",
+    "dominio_id" // Ignorar dominio_id ya que es solo para filtro en cascada
   ];
 
   // Mapeo de nombres de campo a etiquetas legibles por defecto
@@ -82,6 +85,28 @@ export function ConfirmChangesModal({
     ...fieldLabels,
   };
 
+  // Función para resolver IDs a nombres legibles
+  const resolveIdToName = (field, value) => {
+    if (!value) return value;
+    
+    // Resolver control_id o control_asociado_id
+    if ((field === "control_id" || field === "control_asociado_id") && lookupMaps.controles) {
+      return lookupMaps.controles[value] || value;
+    }
+    
+    // Resolver riesgo_id
+    if (field === "riesgo_id" && lookupMaps.riesgos) {
+      return lookupMaps.riesgos[value] || value;
+    }
+    
+    // Resolver dominio_id (aunque lo ignoramos, por si acaso)
+    if (field === "dominio_id" && lookupMaps.dominios) {
+      return lookupMaps.dominios[value] || value;
+    }
+    
+    return value;
+  };
+
   // Calcular los cambios entre original y editado
   const changes = useMemo(() => {
     if (!originalData || !editedData) return [];
@@ -112,14 +137,14 @@ export function ConfirmChangesModal({
         changedFields.push({
           field: key,
           label: DEFAULT_LABELS[key] || key,
-          oldValue: oldVal,
-          newValue: newVal,
+          oldValue: resolveIdToName(key, oldVal),
+          newValue: resolveIdToName(key, newVal),
         });
       }
     });
 
     return changedFields;
-  }, [originalData, editedData, fieldLabels]);
+  }, [originalData, editedData, fieldLabels, lookupMaps]);
 
   const formatValue = (value) => {
     if (value === null || value === undefined || value === "") {
@@ -147,15 +172,15 @@ export function ConfirmChangesModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#18181b] border-[#27272a] text-white max-w-2xl max-h-[90vh]">
-        <DialogHeader>
+      <DialogContent className="bg-[#18181b] border-[#27272a] text-white max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2 text-amber-400">
             <FileEdit className="w-5 h-5" />
             Confirmar Cambios
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
           {changes.length === 0 ? (
             <div className="text-center py-6">
               <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-green-400" />
@@ -166,15 +191,15 @@ export function ConfirmChangesModal({
             </div>
           ) : (
             <>
-              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 flex-shrink-0">
                 <p className="text-amber-300 text-sm flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4" />
                   Vas a realizar los siguientes cambios en {entityType}:
                 </p>
               </div>
 
-              <ScrollArea className="max-h-[400px] pr-2">
-                <div className="space-y-3">
+              <ScrollArea className="flex-1 mt-4 pr-2" style={{ maxHeight: "calc(90vh - 280px)" }}>
+                <div className="space-y-3 pb-2">
                   {changes.map((change, idx) => (
                     <div
                       key={idx}
@@ -208,14 +233,14 @@ export function ConfirmChangesModal({
                 </div>
               </ScrollArea>
 
-              <div className="text-center text-sm text-zinc-400">
+              <div className="text-center text-sm text-zinc-400 flex-shrink-0 pt-2">
                 Total: <strong className="text-indigo-400">{changes.length}</strong> campo{changes.length !== 1 ? "s" : ""} modificado{changes.length !== 1 ? "s" : ""}
               </div>
             </>
           )}
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 flex-shrink-0">
           <Button
             variant="outline"
             onClick={handleCancel}
