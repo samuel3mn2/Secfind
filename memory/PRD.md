@@ -4,6 +4,16 @@
 
 ### Cambios Recientes (Julio 2026)
 
+- **BUGFIX: Modal de Confirmación - Dominio faltante y Scroll (2026-07-01)**:
+  - **Problema 1**: El Dominio seleccionado no aparecía en el modal de confirmación
+    * Causa: `dominio_id` estaba en IGNORED_FIELDS y no se guardaba en formData
+    * Solución: Removido de IGNORED_FIELDS, ahora se guarda en `formData.dominio_id` y se incluye en `originalDataForDiff`
+  - **Problema 2**: El scroll no funcionaba con muchos cambios
+    * Causa: El ScrollArea de Radix no respetaba el maxHeight en flex layout
+    * Solución: Reemplazado por `<div className="overflow-y-auto min-h-0" style={{maxHeight: 'calc(85vh - 250px)'}}>` (scroll nativo)
+  - **Verificado**: Testing agent confirmó scroll funcional (scrollHeight 726px > clientHeight 668px) y Dominio visible con nombre legible
+  - **Archivos**: `ConfirmChangesModal.jsx`, `Vulnerabilidades.jsx`, `HallazgosAuditoria.jsx`
+
 - **BUGFIX: Modal de Confirmación muestra UUIDs en lugar de nombres (2026-07-01)**:
   - **Problema reportado**: El modal ConfirmChangesModal mostraba UUIDs para Control Asociado y Riesgo del Catálogo en lugar de nombres legibles
   - **Causa**: El componente mostraba valores crudos de `control_id` y `riesgo_id` sin resolverlos a nombres
