@@ -68,6 +68,8 @@ import {
   Eye,
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   X,
   ChevronsUpDown,
   Check,
@@ -438,7 +440,7 @@ export default function Vulnerabilidades() {
     }
   }, []);
 
-  const fetchVulnerabilidades = useCallback(async () => {
+  const fetchVulnerabilidades = useCallback(async (resetPage = true) => {
     try {
       const params = new URLSearchParams();
       if (search) params.append("search", search);
@@ -456,7 +458,9 @@ export default function Vulnerabilidades() {
 
       const response = await axios.get(`${API}/vulnerabilidades?${params.toString()}`);
       setVulnerabilidades(response.data);
-      setCurrentPage(1);
+      if (resetPage) {
+        setCurrentPage(1);
+      }
     } catch (error) {
       console.error("Error fetching vulnerabilidades:", error);
       toast.error("Error al cargar vulnerabilidades");
@@ -647,7 +651,8 @@ export default function Vulnerabilidades() {
       setShowModal(false);
       setEditingVuln(null);
       setFormData({});
-      fetchVulnerabilidades();
+      // No resetear página al actualizar, sí al crear
+      fetchVulnerabilidades(!editingVuln);
     } catch (error) {
       console.error("Error saving:", error);
       toast.error(error.response?.data?.detail || "Error al guardar la vulnerabilidad");
@@ -1340,7 +1345,19 @@ export default function Vulnerabilidades() {
               <p className="text-sm text-zinc-500">
                 Página {currentPage} de {totalPages}
               </p>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
+                {/* First page button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(1)}
+                  className="border-zinc-700 text-zinc-300"
+                  title="Primera página"
+                  data-testid="first-page-btn"
+                >
+                  <ChevronsLeft className="w-4 h-4" />
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -1351,6 +1368,26 @@ export default function Vulnerabilidades() {
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
+                
+                {/* Page jump input */}
+                <div className="flex items-center gap-1">
+                  <span className="text-sm text-zinc-500">Ir a:</span>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={totalPages}
+                    value={currentPage}
+                    onChange={(e) => {
+                      const page = parseInt(e.target.value);
+                      if (page >= 1 && page <= totalPages) {
+                        setCurrentPage(page);
+                      }
+                    }}
+                    className="w-16 h-8 bg-zinc-800 border-zinc-700 text-white text-center text-sm"
+                    data-testid="page-jump-input"
+                  />
+                </div>
+                
                 <Button
                   variant="outline"
                   size="sm"
@@ -1360,6 +1397,18 @@ export default function Vulnerabilidades() {
                   data-testid="next-page-btn"
                 >
                   <ChevronRight className="w-4 h-4" />
+                </Button>
+                {/* Last page button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(totalPages)}
+                  className="border-zinc-700 text-zinc-300"
+                  title="Última página"
+                  data-testid="last-page-btn"
+                >
+                  <ChevronsRight className="w-4 h-4" />
                 </Button>
               </div>
             </div>
