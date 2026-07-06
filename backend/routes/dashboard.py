@@ -91,11 +91,28 @@ class FiltrosVista(BaseModel):
     estados_hallazgo: List[str] = Field(default_factory=list)
 
 
+class PivotConfig(BaseModel):
+    """Configuración de la tabla pivote para análisis avanzado"""
+    rows: List[str] = Field(default_factory=list)  # Campos en filas
+    cols: List[str] = Field(default_factory=list)  # Campos en columnas
+    aggregatorName: str = "Count"  # Tipo de agregación
+    vals: List[str] = Field(default_factory=list)  # Valores a agregar
+    rendererName: str = "Table"  # Tipo de visualización
+    sorters: dict = Field(default_factory=dict)  # Configuración de ordenamiento
+    rowOrder: str = "key_a_to_z"
+    colOrder: str = "key_a_to_z"
+    hiddenAttributes: List[str] = Field(default_factory=list)
+    hiddenFromAggregators: List[str] = Field(default_factory=list)
+    hiddenFromDragDrop: List[str] = Field(default_factory=list)
+
+
 class DashboardVistaCreate(BaseModel):
     nombre: str
     es_publica: bool = False
     informes_seleccionados: List[str] = Field(default_factory=list)
     filtros: FiltrosVista = Field(default_factory=FiltrosVista)
+    pivot_config: Optional[PivotConfig] = None  # Configuración de tabla pivote
+    active_tab: str = "dashboard"  # "dashboard" o "pivot"
 
 
 class DashboardVistaUpdate(BaseModel):
@@ -104,6 +121,8 @@ class DashboardVistaUpdate(BaseModel):
     es_publica: bool = False
     informes_seleccionados: List[str] = Field(default_factory=list)
     filtros: FiltrosVista = Field(default_factory=FiltrosVista)
+    pivot_config: Optional[PivotConfig] = None
+    active_tab: str = "dashboard"
 
 
 class DashboardVista(BaseModel):
@@ -114,6 +133,8 @@ class DashboardVista(BaseModel):
     es_publica: bool = False
     informes_seleccionados: List[str] = Field(default_factory=list)
     filtros: FiltrosVista = Field(default_factory=FiltrosVista)
+    pivot_config: Optional[dict] = None
+    active_tab: str = "dashboard"
     created_at: str
 
 
@@ -162,6 +183,12 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
             # Asegurar estructura de filtros
             if "filtros" not in v or v["filtros"] is None:
                 v["filtros"] = {"dominios": [], "responsables": [], "estados_vulnerabilidad": [], "estados_hallazgo": []}
+            # Asegurar estructura de pivot_config
+            if "pivot_config" not in v:
+                v["pivot_config"] = None
+            # Asegurar active_tab
+            if "active_tab" not in v:
+                v["active_tab"] = "dashboard"
         
         return vistas
 
@@ -175,6 +202,8 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
         Validaciones:
         - Nombre único por usuario
         - Si es pública, nombre único entre todas las públicas
+        
+        Incluye soporte para configuración de tabla pivote (pivot_config).
         """
         if not current_user.es_admin and not current_user.permisos.dashboard.ver:
             raise HTTPException(status_code=403, detail="No tiene permisos")
@@ -184,6 +213,8 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
         es_publica = data.get("es_publica", False)
         informes = data.get("informes_seleccionados", [])
         filtros = data.get("filtros", {})
+        pivot_config = data.get("pivot_config", None)  # Configuración de tabla pivote
+        active_tab = data.get("active_tab", "dashboard")  # Pestaña activa
         
         if not nombre:
             raise HTTPException(status_code=400, detail="El nombre de la vista es requerido")
@@ -232,7 +263,9 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
                     "nombre": nombre,
                     "es_publica": es_publica,
                     "informes_seleccionados": informes,
-                    "filtros": filtros_clean
+                    "filtros": filtros_clean,
+                    "pivot_config": pivot_config,
+                    "active_tab": active_tab
                 }}
             )
             
@@ -264,6 +297,8 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
                 "es_publica": es_publica,
                 "informes_seleccionados": informes,
                 "filtros": filtros_clean,
+                "pivot_config": pivot_config,
+                "active_tab": active_tab,
                 "created_at": datetime.now(timezone.utc).isoformat()
             }
             
@@ -327,6 +362,9 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
         panel_severidad = await _get_panel_severidad(db, filtros)
         top_dominios = await _get_top_dominios(db, filtros)
         
+        # Obtener datos unificados para Pivot Table
+        datos_unificados = await _get_datos_unificados_pivot(db, filtros)
+        
         # Obtener opciones para filtros
         opciones = await _get_filter_options(db)
         
@@ -336,6 +374,7 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
             "mapa_calor_grc": mapa_calor_grc,
             "panel_severidad": panel_severidad,
             "top_dominios": top_dominios,
+            "datos_unificados": datos_unificados,  # Para Pivot Table
             "filtros_aplicados": filtros,
             "opciones_filtros": opciones
         }
@@ -1213,6 +1252,170 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
         )[:5]
         
         return sorted_dominios
+
+    async def _get_datos_unificados_pivot(db, filtros: dict) -> list:
+        """
+        Obtiene datos unificados de vulnerabilidades y hallazgos para la tabla pivote.
+        Normaliza campos para que ambos tipos de registro compartan las mismas dimensiones.
+        """
+        datos = []
+        
+        # === VULNERABILIDADES ===
+        vuln_match = {}
+        if filtros.get("informes_seleccionados"):
+            vuln_match["nombre_informe_pentest"] = {"$in": filtros["informes_seleccionados"]}
+        if filtros.get("responsables"):
+            vuln_match["responsable"] = {"$in": filtros["responsables"]}
+        if filtros.get("estados_vulnerabilidad"):
+            vuln_match["estatus"] = {"$in": filtros["estados_vulnerabilidad"]}
+        
+        vuln_pipeline = [
+            {"$match": vuln_match} if vuln_match else {"$match": {}},
+            NIVEL_RIESGO_COMPUTED_STAGE,
+            {
+                "$lookup": {
+                    "from": "config_controles",
+                    "localField": "control_id",
+                    "foreignField": "id",
+                    "as": "control_info"
+                }
+            },
+            {
+                "$lookup": {
+                    "from": "config_dominios",
+                    "localField": "control_info.dominio_id",
+                    "foreignField": "id",
+                    "as": "dominio_info"
+                }
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "tipo": {"$literal": "Vulnerabilidad"},
+                    "codigo": 1,
+                    "vulnerabilidad": 1,
+                    "severidad": 1,
+                    "nivel_riesgo": "$nivel_riesgo_computed",
+                    "estatus": 1,
+                    "responsable": 1,
+                    "institucion": 1,
+                    "fecha_hallazgo": 1,
+                    "nombre_informe_pentest": 1,
+                    "dominio": {"$ifNull": [{"$arrayElemAt": ["$dominio_info.nombre_dominio", 0]}, "Sin Dominio"]},
+                    "proveedor": 1
+                }
+            }
+        ]
+        
+        # Filtrar por dominios si aplica
+        if filtros.get("dominios"):
+            dominios_filter = filtros["dominios"]
+            dominio_ids = await db.config_dominios.find(
+                {"nombre_dominio": {"$in": dominios_filter}},
+                {"_id": 0, "id": 1}
+            ).to_list(100)
+            dominio_id_list = [d["id"] for d in dominio_ids]
+            
+            control_ids = await db.config_controles.find(
+                {"dominio_id": {"$in": dominio_id_list}},
+                {"_id": 0, "id": 1}
+            ).to_list(200)
+            control_id_list = [c["id"] for c in control_ids]
+            
+            # Agregar filtro al match
+            vuln_pipeline[0]["$match"]["control_id"] = {"$in": control_id_list}
+        
+        vulns = await db.vulnerabilidades.aggregate(vuln_pipeline).to_list(1000)
+        datos.extend(vulns)
+        
+        # === HALLAZGOS DE AUDITORÍA ===
+        hall_match = {}
+        if filtros.get("responsables"):
+            hall_match["responsable"] = {"$in": filtros["responsables"]}
+        if filtros.get("estados_hallazgo"):
+            hall_match["estado"] = {"$in": filtros["estados_hallazgo"]}
+        
+        hall_pipeline = [
+            {"$match": hall_match} if hall_match else {"$match": {}},
+            {
+                "$lookup": {
+                    "from": "config_controles",
+                    "localField": "control_id",
+                    "foreignField": "id",
+                    "as": "control_info"
+                }
+            },
+            {
+                "$lookup": {
+                    "from": "config_dominios",
+                    "localField": "control_info.dominio_id",
+                    "foreignField": "id",
+                    "as": "dominio_info"
+                }
+            },
+            {
+                "$addFields": {
+                    "riesgo_inherente": {
+                        "$multiply": [
+                            {"$ifNull": ["$probabilidad", 1]},
+                            {"$ifNull": ["$impacto", 1]}
+                        ]
+                    }
+                }
+            },
+            {
+                "$addFields": {
+                    "nivel_riesgo_computed": {
+                        "$switch": {
+                            "branches": [
+                                {"case": {"$gte": ["$riesgo_inherente", 12]}, "then": "Alto"},
+                                {"case": {"$gte": ["$riesgo_inherente", 8]}, "then": "Medio Alto"},
+                                {"case": {"$gte": ["$riesgo_inherente", 4]}, "then": "Medio"},
+                            ],
+                            "default": "Bajo"
+                        }
+                    }
+                }
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "tipo": {"$literal": "Hallazgo"},
+                    "codigo": 1,
+                    "brecha": 1,
+                    "nivel_riesgo": "$nivel_riesgo_computed",
+                    "estado": 1,
+                    "responsable": 1,
+                    "fecha_hallazgo": "$fecha_identificacion",
+                    "dominio": {"$ifNull": [{"$arrayElemAt": ["$dominio_info.nombre_dominio", 0]}, "Sin Dominio"]},
+                    "riesgo_inherente": 1,
+                    "probabilidad": 1,
+                    "impacto": 1
+                }
+            }
+        ]
+        
+        # Filtrar por dominios si aplica (para hallazgos)
+        if filtros.get("dominios"):
+            dominios_filter = filtros["dominios"]
+            dominio_ids = await db.config_dominios.find(
+                {"nombre_dominio": {"$in": dominios_filter}},
+                {"_id": 0, "id": 1}
+            ).to_list(100)
+            dominio_id_list = [d["id"] for d in dominio_ids]
+            
+            control_ids = await db.config_controles.find(
+                {"dominio_id": {"$in": dominio_id_list}},
+                {"_id": 0, "id": 1}
+            ).to_list(200)
+            control_id_list = [c["id"] for c in control_ids]
+            
+            hall_pipeline[0]["$match"]["control_id"] = {"$in": control_id_list}
+        
+        hallazgos = await db.hallazgos_auditoria.aggregate(hall_pipeline).to_list(1000)
+        datos.extend(hallazgos)
+        
+        return datos
 
     async def _get_filter_options(db) -> dict:
         """Obtiene las opciones disponibles para los filtros."""

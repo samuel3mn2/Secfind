@@ -32,6 +32,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -55,9 +56,12 @@ import {
   X,
   Eye,
   Globe,
-  Lock
+  Lock,
+  BarChart3,
+  Table2
 } from "lucide-react";
 import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
+import { PivotAnalysis } from "@/components/PivotAnalysis";
 import {
   BarChart,
   Bar,
@@ -704,6 +708,10 @@ export default function DashboardGRC() {
   const [showHeatmapDetail, setShowHeatmapDetail] = useState(false);
   const [heatmapDetailData, setHeatmapDetailData] = useState(null);
   
+  // Pivot Analysis state
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [pivotConfig, setPivotConfig] = useState(null);
+  
   // Ref to track if initial load is done
   const isInitialMount = useRef(true);
 
@@ -831,6 +839,8 @@ export default function DashboardGRC() {
       setSelectedEstadosVuln([]);
       setSelectedEstadosHall([]);
       setSelectedVista(null);
+      setPivotConfig(null);
+      setActiveTab("dashboard");
       return;
     }
     
@@ -840,6 +850,15 @@ export default function DashboardGRC() {
     setSelectedResponsables(vista.filtros?.responsables || []);
     setSelectedEstadosVuln(vista.filtros?.estados_vulnerabilidad || []);
     setSelectedEstadosHall(vista.filtros?.estados_hallazgo || []);
+    
+    // Aplicar configuración de pivot si existe
+    if (vista.pivot_config) {
+      setPivotConfig(vista.pivot_config);
+    }
+    // Cambiar a la pestaña que tenía la vista guardada
+    if (vista.active_tab) {
+      setActiveTab(vista.active_tab);
+    }
   };
 
   // Save view
@@ -861,7 +880,9 @@ export default function DashboardGRC() {
           responsables: selectedResponsables,
           estados_vulnerabilidad: selectedEstadosVuln,
           estados_hallazgo: selectedEstadosHall,
-        }
+        },
+        pivot_config: pivotConfig,  // Configuración de tabla pivote
+        active_tab: activeTab       // Pestaña activa (dashboard o pivot)
       };
       
       await axios.post(`${API}/dashboard/vistas`, payload);
@@ -1205,37 +1226,60 @@ export default function DashboardGRC() {
         </CardContent>
       </Card>
 
-      {/* KPIs Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KPICard
-          title="Vulnerabilidades Activas"
-          value={kpis.vulnerabilidades_activas || 0}
-          subtitle={`${kpis.desglose_severidad?.Critica || 0} críticas`}
-          icon={Shield}
-          color="red"
-        />
-        <KPICard
-          title="Hallazgos Abiertos"
-          value={kpis.hallazgos_abiertos || 0}
-          subtitle={`Riesgo máx: ${kpis.riesgo_max_hallazgos || 0}/16`}
-          icon={AlertTriangle}
-          color="orange"
-        />
-        <KPICard
-          title="Índice de Exposición"
-          value={`${kpis.indice_exposicion || 0}%`}
-          subtitle="Score ponderado"
-          icon={Activity}
-          color={kpis.indice_exposicion > 70 ? "red" : kpis.indice_exposicion > 40 ? "orange" : "green"}
-        />
-        <KPICard
-          title="Riesgo Promedio"
-          value={kpis.riesgo_promedio_hallazgos || 0}
-          subtitle={`Máx posible: 16 | Actual máx: ${kpis.riesgo_max_hallazgos || 0}`}
-          icon={TrendingUp}
-          color={kpis.riesgo_promedio_hallazgos > 12 ? "red" : kpis.riesgo_promedio_hallazgos > 8 ? "orange" : "indigo"}
-        />
-      </div>
+      {/* Tabs: Dashboard / Análisis Avanzado */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="bg-zinc-800/50 border border-zinc-700 p-1">
+          <TabsTrigger 
+            value="dashboard" 
+            className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white text-zinc-400"
+            data-testid="tab-dashboard"
+          >
+            <LayoutDashboard className="w-4 h-4 mr-2" />
+            Dashboard
+          </TabsTrigger>
+          <TabsTrigger 
+            value="pivot" 
+            className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white text-zinc-400"
+            data-testid="tab-pivot"
+          >
+            <Table2 className="w-4 h-4 mr-2" />
+            Análisis Avanzado (Pivot)
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Dashboard Content */}
+        <TabsContent value="dashboard" className="mt-4 space-y-6">
+          {/* KPIs Row */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <KPICard
+              title="Vulnerabilidades Activas"
+              value={kpis.vulnerabilidades_activas || 0}
+              subtitle={`${kpis.desglose_severidad?.Critica || 0} críticas`}
+              icon={Shield}
+              color="red"
+            />
+            <KPICard
+              title="Hallazgos Abiertos"
+              value={kpis.hallazgos_abiertos || 0}
+              subtitle={`Riesgo máx: ${kpis.riesgo_max_hallazgos || 0}/16`}
+              icon={AlertTriangle}
+              color="orange"
+            />
+            <KPICard
+              title="Índice de Exposición"
+              value={`${kpis.indice_exposicion || 0}%`}
+              subtitle="Score ponderado"
+              icon={Activity}
+              color={kpis.indice_exposicion > 70 ? "red" : kpis.indice_exposicion > 40 ? "orange" : "green"}
+            />
+            <KPICard
+              title="Riesgo Promedio"
+              value={kpis.riesgo_promedio_hallazgos || 0}
+              subtitle={`Máx posible: 16 | Actual máx: ${kpis.riesgo_max_hallazgos || 0}`}
+              icon={TrendingUp}
+              color={kpis.riesgo_promedio_hallazgos > 12 ? "red" : kpis.riesgo_promedio_hallazgos > 8 ? "orange" : "indigo"}
+            />
+          </div>
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1330,6 +1374,18 @@ export default function DashboardGRC() {
           />
         </CardContent>
       </Card>
+        </TabsContent>
+
+        {/* Pivot Analysis Content */}
+        <TabsContent value="pivot" className="mt-4">
+          <PivotAnalysis 
+            data={dashboardData?.datos_unificados || []}
+            pivotState={pivotConfig}
+            onPivotStateChange={setPivotConfig}
+            loading={refreshing}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Save View Modal */}
       <Dialog open={showSaveModal} onOpenChange={setShowSaveModal}>

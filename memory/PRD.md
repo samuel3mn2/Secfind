@@ -1,8 +1,28 @@
 # SecFind - Sistema de Gestión de Vulnerabilidades
 
-## Última Actualización: 2026-07-01
+## Última Actualización: 2026-07-06
 
 ### Cambios Recientes (Julio 2026)
+
+- **FEATURE: Análisis Avanzado con Tabla Pivote en Dashboard GRC (2026-07-06)**:
+  - **Frontend**:
+    * Nueva pestaña "Análisis Avanzado (Pivot)" en Dashboard GRC
+    * Componente `PivotAnalysis.jsx` con react-pivottable y Plotly
+    * Campos disponibles: tipo_registro, area_proceso, nivel_riesgo, estado, responsable, institucion, mes_deteccion, severidad, informe
+    * Visualizaciones: Tabla, Barras Apiladas, Líneas, Áreas, Heatmap
+    * Drag-and-drop para filas y columnas
+    * Escala de colores unificada (Alto=rojo, Medio Alto=naranja, Medio=amarillo, Bajo=verde)
+    * Estilo Dark Mode integrado
+    * Botón "Exportar CSV" funcional
+  - **Backend**:
+    * Nuevo modelo `PivotConfig` para almacenar configuración de pivot
+    * Campos agregados a `DashboardVistaCreate/Update`: `pivot_config`, `active_tab`
+    * Nueva función `_get_datos_unificados_pivot()` que retorna datos de Vulnerabilidades + Hallazgos normalizados
+    * Endpoint `/api/dashboard/data` ahora incluye `datos_unificados` 
+  - **Integración con Guardado de Vistas**:
+    * La configuración de pivot (filas, columnas, aggregator, renderer) se guarda con la vista
+    * Al cargar vista guardada, se restaura la configuración de pivot y la pestaña activa
+  - **Verificado**: 450 registros cargados, gráfico de barras apiladas funcionando
 
 - **BUGFIX: Modal de Confirmación - Dominio faltante y Scroll (2026-07-01)**:
   - **Problema 1**: El Dominio seleccionado no aparecía en el modal de confirmación
