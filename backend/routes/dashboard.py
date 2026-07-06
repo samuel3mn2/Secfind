@@ -362,8 +362,9 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
         panel_severidad = await _get_panel_severidad(db, filtros)
         top_dominios = await _get_top_dominios(db, filtros)
         
-        # Obtener datos unificados para Pivot Table
-        datos_unificados = await _get_datos_unificados_pivot(db, filtros)
+        # Datos separados para Pivot Tables independientes
+        datos_vulnerabilidades = await _get_datos_vulnerabilidades_pivot(db, filtros)
+        datos_hallazgos = await _get_datos_hallazgos_pivot(db, filtros)
         
         # Obtener opciones para filtros
         opciones = await _get_filter_options(db)
@@ -374,7 +375,8 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
             "mapa_calor_grc": mapa_calor_grc,
             "panel_severidad": panel_severidad,
             "top_dominios": top_dominios,
-            "datos_unificados": datos_unificados,  # Para Pivot Table
+            "datos_vulnerabilidades": datos_vulnerabilidades,  # Para Pivot de Vulnerabilidades
+            "datos_hallazgos": datos_hallazgos,  # Para Pivot de Hallazgos
             "filtros_aplicados": filtros,
             "opciones_filtros": opciones
         }
@@ -1253,14 +1255,11 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
         
         return sorted_dominios
 
-    async def _get_datos_unificados_pivot(db, filtros: dict) -> list:
+    async def _get_datos_vulnerabilidades_pivot(db, filtros: dict) -> list:
         """
-        Obtiene datos unificados de vulnerabilidades y hallazgos para la tabla pivote.
-        Normaliza campos para que ambos tipos de registro compartan las mismas dimensiones.
+        Obtiene datos de VULNERABILIDADES para tabla pivote.
+        Campos específicos técnicos de Pentest.
         """
-        datos = []
-        
-        # === VULNERABILIDADES ===
         vuln_match = {}
         if filtros.get("informes_seleccionados"):
             vuln_match["nombre_informe_pentest"] = {"$in": filtros["informes_seleccionados"]}
@@ -1269,7 +1268,23 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
         if filtros.get("estados_vulnerabilidad"):
             vuln_match["estatus"] = {"$in": filtros["estados_vulnerabilidad"]}
         
-        vuln_pipeline = [
+        # Filtrar por dominios si aplica
+        if filtros.get("dominios"):
+            dominios_filter = filtros["dominios"]
+            dominio_ids = await db.config_dominios.find(
+                {"nombre_dominio": {"$in": dominios_filter}},
+                {"_id": 0, "id": 1}
+            ).to_list(100)
+            dominio_id_list = [d["id"] for d in dominio_ids]
+            
+            control_ids = await db.config_controles.find(
+                {"dominio_id": {"$in": dominio_id_list}},
+                {"_id": 0, "id": 1}
+            ).to_list(200)
+            control_id_list = [c["id"] for c in control_ids]
+            vuln_match["control_id"] = {"$in": control_id_list}
+        
+        pipeline = [
             {"$match": vuln_match} if vuln_match else {"$match": {}},
             NIVEL_RIESGO_COMPUTED_STAGE,
             {
@@ -1291,7 +1306,6 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
             {
                 "$project": {
                     "_id": 0,
-                    "tipo": {"$literal": "Vulnerabilidad"},
                     "codigo": 1,
                     "vulnerabilidad": 1,
                     "severidad": 1,
@@ -1299,13 +1313,61 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
                     "estatus": 1,
                     "responsable": 1,
                     "institucion": 1,
+                    "aplicaciones": 1,
                     "fecha_hallazgo": 1,
+                    "fecha_compromiso": 1,
                     "nombre_informe_pentest": 1,
-                    "dominio": {"$ifNull": [{"$arrayElemAt": ["$dominio_info.nombre_dominio", 0]}, "Sin Dominio"]},
-                    "proveedor": 1
+                    "proveedor": 1,
+                    "resultado_re_test": 1,
+                    "veces_en_retest": 1,
+                    "dominio": {"$ifNull": [{"$arrayElemAt": ["$dominio_info.nombre_dominio", 0]}, "Sin Dominio"]}
                 }
             }
         ]
+        
+        vulns = await db.vulnerabilidades.aggregate(pipeline).to_list(2000)
+        
+        # Transformar para pivot con campos específicos de Pentest
+        result = []
+        for v in vulns:
+            mes_deteccion = "Sin fecha"
+            if v.get("fecha_hallazgo"):
+                try:
+                    d = datetime.fromisoformat(v["fecha_hallazgo"].replace("Z", "+00:00")) if isinstance(v["fecha_hallazgo"], str) else v["fecha_hallazgo"]
+                    meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+                    mes_deteccion = f"{meses[d.month - 1]} {d.year}"
+                except:
+                    pass
+            
+            result.append({
+                "codigo": v.get("codigo", "N/A"),
+                "vulnerabilidad": v.get("vulnerabilidad", "N/A"),
+                "severidad": v.get("severidad", "Sin severidad"),
+                "nivel_riesgo": v.get("nivel_riesgo", "Sin clasificar"),
+                "estatus": v.get("estatus", "Sin estado"),
+                "responsable": v.get("responsable", "Sin asignar"),
+                "institucion": v.get("institucion", "N/A"),
+                "aplicacion": v.get("aplicaciones", "N/A"),
+                "informe_pentest": v.get("nombre_informe_pentest", "N/A"),
+                "proveedor": v.get("proveedor", "N/A"),
+                "dominio": v.get("dominio", "Sin Dominio"),
+                "mes_deteccion": mes_deteccion,
+                "resultado_retest": v.get("resultado_re_test", "N/A"),
+                "veces_retest": v.get("veces_en_retest", 0)
+            })
+        
+        return result
+
+    async def _get_datos_hallazgos_pivot(db, filtros: dict) -> list:
+        """
+        Obtiene datos de HALLAZGOS DE AUDITORÍA para tabla pivote.
+        Campos específicos normativos de Auditoría/GRC.
+        """
+        hall_match = {}
+        if filtros.get("responsables"):
+            hall_match["responsable"] = {"$in": filtros["responsables"]}
+        if filtros.get("estados_hallazgo"):
+            hall_match["estado"] = {"$in": filtros["estados_hallazgo"]}
         
         # Filtrar por dominios si aplica
         if filtros.get("dominios"):
@@ -1321,21 +1383,9 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
                 {"_id": 0, "id": 1}
             ).to_list(200)
             control_id_list = [c["id"] for c in control_ids]
-            
-            # Agregar filtro al match
-            vuln_pipeline[0]["$match"]["control_id"] = {"$in": control_id_list}
+            hall_match["control_id"] = {"$in": control_id_list}
         
-        vulns = await db.vulnerabilidades.aggregate(vuln_pipeline).to_list(1000)
-        datos.extend(vulns)
-        
-        # === HALLAZGOS DE AUDITORÍA ===
-        hall_match = {}
-        if filtros.get("responsables"):
-            hall_match["responsable"] = {"$in": filtros["responsables"]}
-        if filtros.get("estados_hallazgo"):
-            hall_match["estado"] = {"$in": filtros["estados_hallazgo"]}
-        
-        hall_pipeline = [
+        pipeline = [
             {"$match": hall_match} if hall_match else {"$match": {}},
             {
                 "$lookup": {
@@ -1380,42 +1430,56 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
             {
                 "$project": {
                     "_id": 0,
-                    "tipo": {"$literal": "Hallazgo"},
                     "codigo": 1,
                     "brecha": 1,
                     "nivel_riesgo": "$nivel_riesgo_computed",
                     "estado": 1,
                     "responsable": 1,
                     "fecha_hallazgo": "$fecha_identificacion",
+                    "fecha_compromiso": "$fecha_compromiso_remediacion",
                     "dominio": {"$ifNull": [{"$arrayElemAt": ["$dominio_info.nombre_dominio", 0]}, "Sin Dominio"]},
+                    "control": {"$ifNull": [{"$arrayElemAt": ["$control_info.codigo_control", 0]}, "Sin Control"]},
                     "riesgo_inherente": 1,
                     "probabilidad": 1,
-                    "impacto": 1
+                    "impacto": 1,
+                    "observaciones": 1
                 }
             }
         ]
         
-        # Filtrar por dominios si aplica (para hallazgos)
-        if filtros.get("dominios"):
-            dominios_filter = filtros["dominios"]
-            dominio_ids = await db.config_dominios.find(
-                {"nombre_dominio": {"$in": dominios_filter}},
-                {"_id": 0, "id": 1}
-            ).to_list(100)
-            dominio_id_list = [d["id"] for d in dominio_ids]
-            
-            control_ids = await db.config_controles.find(
-                {"dominio_id": {"$in": dominio_id_list}},
-                {"_id": 0, "id": 1}
-            ).to_list(200)
-            control_id_list = [c["id"] for c in control_ids]
-            
-            hall_pipeline[0]["$match"]["control_id"] = {"$in": control_id_list}
+        hallazgos = await db.hallazgos_auditoria.aggregate(pipeline).to_list(2000)
         
-        hallazgos = await db.hallazgos_auditoria.aggregate(hall_pipeline).to_list(1000)
-        datos.extend(hallazgos)
+        # Transformar para pivot con campos específicos de Auditoría
+        result = []
+        for h in hallazgos:
+            mes_deteccion = "Sin fecha"
+            if h.get("fecha_hallazgo"):
+                try:
+                    fecha_str = h["fecha_hallazgo"]
+                    if isinstance(fecha_str, str):
+                        d = datetime.fromisoformat(fecha_str.replace("Z", "+00:00"))
+                    else:
+                        d = fecha_str
+                    meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+                    mes_deteccion = f"{meses[d.month - 1]} {d.year}"
+                except:
+                    pass
+            
+            result.append({
+                "codigo": h.get("codigo", "N/A"),
+                "brecha": h.get("brecha", "N/A"),
+                "nivel_riesgo": h.get("nivel_riesgo", "Sin clasificar"),
+                "estado": h.get("estado", "Sin estado"),
+                "responsable": h.get("responsable", "Sin asignar"),
+                "dominio": h.get("dominio", "Sin Dominio"),
+                "control": h.get("control", "Sin Control"),
+                "mes_deteccion": mes_deteccion,
+                "probabilidad": h.get("probabilidad", 0),
+                "impacto": h.get("impacto", 0),
+                "riesgo_inherente": h.get("riesgo_inherente", 0)
+            })
         
-        return datos
+        return result
 
     async def _get_filter_options(db) -> dict:
         """Obtiene las opciones disponibles para los filtros."""

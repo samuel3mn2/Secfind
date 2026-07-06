@@ -1,0 +1,67 @@
+{
+  "summary": "Iteration 30 (both): Pivot Analysis module in Dashboard GRC verified end-to-end. Backend: created /app/backend/tests/test_pivot_data.py (pytest) with 6 tests — all PASS. Confirmed GET /api/dashboard/data returns separate 'datos_vulnerabilidades' (pentest fields: codigo, vulnerabilidad, severidad, nivel_riesgo, estatus, responsable, institucion, aplicacion, informe_pentest, proveedor, dominio, mes_deteccion, resultado_retest, veces_retest) and 'datos_hallazgos' (audit fields: codigo, brecha, nivel_riesgo, estado, responsable, dominio, control, mes_deteccion, probabilidad, impacto, riesgo_inherente). Schemas are strictly disjoint (no field mixing). Frontend: [data-testid=tab-pivot] present with label 'Análisis Avanzado (Pivot)'. Inside pivot module both [data-testid=module-vulnerabilidades] (badge 266) and [data-testid=module-hallazgos] (badge 184) render. Layout selector Paralelo/Solo Tabla/Solo Gráfico switches correctly. Exportar CSV button clickable and shows sonner toast 'Datos exportados a CSV'. Aggressive dark-mode CSS is applied: draggable pvtAttr elements have computed color=rgb(255,255,255); pvtRows/pvtCols background=rgb(30,30,33). Draggable field pills for Vulnerabilidades show pentest-only fields (aplicacion, informe_pentest, proveedor, severidad, resultado_retest, veces_retest, vulnerabilidad, estatus...) and for Hallazgos show audit-only fields (brecha, control, impacto, probabilidad, riesgo_inherente, estado...) confirming the two pivots are truly independent.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Dashboard GRC → Análisis Avanzado (Pivot) → Paralelo layout",
+        "issues": [
+          "Two small empty white/light rectangles appear in the upper-left corner of each PivotTableUI (likely react-pivottable's un-labeled renderer/aggregator container without a matching selector in FORCED_DARK_MODE_CSS). Purely cosmetic; content is legible. Consider extending CSS to force dark bg on any residual .pvtUi containers/tds without explicit class.",
+          "Plotly chart renderer emits many console warnings 'width(-1) and height(-1) of chart should be greater than 0' when the container starts hidden then becomes visible. Not caused by this feature (also appears in Dashboard tab) but frequency increases when switching layout modes; consider setting minWidth/minHeight on .pivot-container or lazy-mounting the chart only when visible."
+        ]
+      }
+    ]
+  },
+  "passed_tests": [
+    "Backend: GET /api/dashboard/data returns 200 with admin token",
+    "Backend: response contains datos_vulnerabilidades (list) AND datos_hallazgos (list) as separate keys",
+    "Backend: datos_vulnerabilidades[i] contains all 14 pentest fields and NO audit-only fields (brecha, control, probabilidad, impacto, riesgo_inherente)",
+    "Backend: datos_hallazgos[i] contains all 11 audit fields and NO pentest-only fields (vulnerabilidad, severidad, estatus, informe_pentest, proveedor, aplicacion, resultado_retest, veces_retest)",
+    "Backend: schemas are strictly disjoint — vulns have 'vulnerabilidad' but no 'brecha'; hallazgos have 'brecha' but no 'vulnerabilidad'",
+    "Backend: full response still includes kpis, matriz_4x4, mapa_calor_grc, panel_severidad, top_dominios, opciones_filtros",
+    "Frontend: [data-testid=tab-pivot] labeled 'Análisis Avanzado (Pivot)' is present in DashboardGRC",
+    "Frontend: [data-testid=module-vulnerabilidades] and [data-testid=module-hallazgos] both render; badges show numeric counts (266 vuln, 184 hall)",
+    "Frontend: layout buttons Paralelo / Solo Tabla / Solo Gráfico all clickable and switch view",
+    "Frontend: Exportar CSV button present and produces sonner toast 'Datos exportados a CSV' on click",
+    "Frontend: pvtAttr draggable pills have computed color=rgb(255,255,255) — dark-mode text contrast requirement satisfied",
+    "Frontend: pvtRows/pvtCols drop zones have computed background=rgb(30,30,33) — correct dark bg",
+    "Frontend: Vulnerabilidades pivot exposes pentest-specific attributes; Hallazgos pivot exposes audit-specific attributes (schemas properly separated end-to-end)",
+    "Frontend: Table renderer in Paralelo mode shows real aggregated data (ALTO=2, BAJO=2, MEDIO=18, MEDIO ALTO=17, SIN CLASIFICAR=82, TOTALS row)"
+  ],
+  "not_tested": [
+    "Filter popup (pvtFilterBox) contrast: clicking the ▼ triangle on an attribute pill to open the filter dialog was not exercised — main agent can visually confirm if needed",
+    "Renderer/Aggregator <select> dropdowns: react-pivottable did not render visible <select> elements in the observed layouts (they appear only for certain configurations). CSS for select/option is written but not visually validated on this render"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_pivot_data.py",
+    "/app/test_reports/pytest/pytest_pivot_data.xml"
+  ],
+  "action_items": [
+    "OPTIONAL POLISH: Investigate the two empty light rectangles in the top-left corner of each PivotTableUI (likely a pvtRenderers/pvtVals subelement not covered by the current wildcard CSS). Add a rule like `.pvtUi table.pvtUi > tbody > tr > td { background: #18181b !important; }` to eliminate the residual light box.",
+    "OPTIONAL POLISH: Suppress plotly 'width(-1) height(-1)' warnings by giving .pivot-container a minWidth/minHeight or mounting the chart PivotTableUI only when its card is visible (conditional render already exists, but the chart still fires warnings during initial layout)."
+  ],
+  "critical_code_review_comments": [
+    "PivotAnalysis.jsx (line 517-521): props default to empty arrays — safe against undefined dashboardData; DashboardGRC.jsx line 1382-1383 correctly maps dashboardData?.datos_vulnerabilidades / datos_hallazgos with `|| []` fallback. No null-ref risk.",
+    "PivotAnalysis.jsx (line 560-574): CSS is injected via useEffect that removes/reinjects the <style> node on every mount and cleans up on unmount — good hygiene; no leakage between navigations.",
+    "PivotAnalysis.jsx (line 577-595): handleExportCSV correctly escapes null with `|| ''`; however it does NOT escape double-quotes inside values (a value containing `\"` would break CSV structure). Low-priority hardening: replace `${row[h] || ''}` with `${String(row[h] ?? '').replace(/\"/g, '\"\"')}`.",
+    "dashboard.py _get_datos_vulnerabilidades_pivot (line 1258-1359): correct — applies filters, joins config_controles → config_dominios, projects only pentest fields; result is post-processed with `mes_deteccion` derived from fecha_hallazgo. No _id leakage (excluded via {'_id': 0}).",
+    "dashboard.py _get_datos_hallazgos_pivot (line 1361-1482): computes riesgo_inherente = probabilidad * impacto and derives nivel_riesgo_computed via $switch thresholds (>=12 Alto, >=8 Medio Alto, >=4 Medio, else Bajo). Consistent with matriz 4x4 semantics. No _id leakage.",
+    "dashboard.py (line 366-379): endpoint response returns both datos_vulnerabilidades and datos_hallazgos as separate keys — matches PivotAnalysis contract exactly.",
+    "GLOBAL CONCERN (not blocking): dashboard.py is 1517 lines — exceeds the recommended 700-line file guideline. Consider splitting into dashboard/vistas.py + dashboard/pivot.py + dashboard/matriz.py for maintainability."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_pivot_data.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (6/6 pytest cases passing)",
+    "frontend": "100% (all critical selectors + interactions + CSS contrast verified)"
+  },
+  "test_credentials": { "user": "admin", "password": "admin123" },
+  "seed_data_creation": "None — read-only endpoint tests + UI navigation only. Exportar CSV button was clicked (client-side download only, no DB write).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Pivot Analysis module in Dashboard GRC is fully functional. Backend: /api/dashboard/data emits datos_vulnerabilidades (14 pentest fields) and datos_hallazgos (11 audit fields) as strictly-separate arrays. Frontend selectors: [data-testid=tab-pivot], [data-testid=module-vulnerabilidades], [data-testid=module-hallazgos]. Only cosmetic residue: two small light rectangles inside each PivotTableUI (residual pvtRenderers/pvtVals container not covered by wildcard CSS) — flagged as optional polish. Draggable attributes and drop zones already have correct dark-mode contrast.",
+  "rca of the issue": "N/A — no bugs found for this feature. The prior fix (main agent passing vulnerabilidadesData and hallazgosData props separately) works correctly."
+}

@@ -1379,7 +1379,8 @@ export default function DashboardGRC() {
         {/* Pivot Analysis Content */}
         <TabsContent value="pivot" className="mt-4">
           <PivotAnalysis 
-            data={dashboardData?.datos_unificados || []}
+            vulnerabilidadesData={dashboardData?.datos_vulnerabilidades || []}
+            hallazgosData={dashboardData?.datos_hallazgos || []}
             pivotState={pivotConfig}
             onPivotStateChange={setPivotConfig}
             loading={refreshing}
