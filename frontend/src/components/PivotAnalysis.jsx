@@ -215,6 +215,7 @@ table.pvtUi ul li:hover,
 /* ============================================================================
    PVTDROPDOWN - SELECTOR DE RENDERER (Table, Stacked Bar Chart) Y AGGREGATOR (Count)
    Este NO es un <select>, es un div personalizado de react-pivottable
+   IMPORTANTE: overflow debe ser visible para que el menú desplegable se muestre
    ============================================================================ */
 .pvtDropdown,
 .pvtRenderers .pvtDropdown,
@@ -229,6 +230,8 @@ div.pvtDropdown,
     color: #ffffff !important;
     min-width: 180px !important;
     cursor: pointer !important;
+    overflow: visible !important;
+    position: relative !important;
 }
 
 .pvtDropdownValue,
@@ -585,10 +588,12 @@ li.pvtAttr {
 
 /* ============================================================================
    FILTER BOX (POPUP DE FILTROS) - SOLUCIÓN DEFINITIVA
+   IMPORTANTE: No bloquear pointer-events para permitir drag y close
    ============================================================================ */
 .pvtFilterBox,
 div.pvtFilterBox,
-.pvtUi .pvtFilterBox {
+.pvtUi .pvtFilterBox,
+.pvtFilterBox.react-draggable {
     background: #1f1f23 !important;
     background-color: #1f1f23 !important;
     border: 2px solid #6366f1 !important;
@@ -597,21 +602,26 @@ div.pvtFilterBox,
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9) !important;
     padding: 16px !important;
     z-index: 99999 !important;
+    cursor: move !important;
+    position: absolute !important;
 }
 
-.pvtFilterBox *,
-div.pvtFilterBox * {
-    color: #e4e4e7 !important;
-    background-color: transparent !important;
-}
-
+/* Hijos del FilterBox - NO bloquear pointer-events */
 .pvtFilterBox h4,
 .pvtFilterBox p,
 .pvtFilterBox span,
-.pvtFilterBox label,
+.pvtFilterBox label {
+    color: #e4e4e7 !important;
+    background: transparent !important;
+    pointer-events: auto !important;
+}
+
+/* Links dentro del FilterBox deben ser clickeables */
 .pvtFilterBox a {
     color: #e4e4e7 !important;
     background: transparent !important;
+    pointer-events: auto !important;
+    cursor: pointer !important;
 }
 
 .pvtFilterBox h4 {
@@ -713,7 +723,7 @@ div.pvtFilterBox * {
     background: #27272a !important;
 }
 
-/* CLOSE BUTTON (X) */
+/* CLOSE BUTTON (X) - DEBE SER CLICKEABLE */
 .pvtCloseX,
 a.pvtCloseX,
 button.pvtCloseX,
@@ -722,32 +732,35 @@ button.pvtCloseX,
     background: #ef4444 !important;
     background-color: #ef4444 !important;
     border-radius: 50% !important;
-    width: 24px !important;
-    height: 24px !important;
+    width: 28px !important;
+    height: 28px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    font-size: 14px !important;
+    font-size: 16px !important;
     cursor: pointer !important;
     text-decoration: none !important;
     font-weight: bold !important;
     position: absolute !important;
     top: 8px !important;
     right: 8px !important;
+    z-index: 100000 !important;
+    pointer-events: auto !important;
+    line-height: 1 !important;
 }
 
 .pvtCloseX:hover {
     background: #dc2626 !important;
     background-color: #dc2626 !important;
+    transform: scale(1.1) !important;
 }
 
 /* ============================================================================
    DROPDOWN MENU DE ATRIBUTOS - ULTRA-AGRESIVO
+   NOTA: pvtDropdown DEBE tener overflow:visible para mostrar el menú desplegable
    ============================================================================ */
-.pvtDropdown,
 .pvtAttrDropdown,
 ul.pvtDropdown,
-.pvtUi .pvtDropdown,
 .pvtUi ul,
 .pvtFilterBox ul {
     background: #1f1f23 !important;
@@ -761,6 +774,11 @@ ul.pvtDropdown,
     list-style: none !important;
     padding: 4px !important;
     margin: 0 !important;
+}
+
+/* ASEGURAR QUE pvtDropdown (el contenedor) tenga overflow visible */
+div.pvtDropdown {
+    overflow: visible !important;
 }
 
 .pvtDropdown li,
@@ -1058,6 +1076,23 @@ export function PivotAnalysis({
           color: #e4e4e7 !important;
           padding: 10px 14px !important;
         `;
+      });
+
+      // Añadir event listener al botón de cerrar para asegurar que funcione
+      document.querySelectorAll('.pvtCloseX').forEach(el => {
+        // Solo añadir si no tiene ya nuestro listener
+        if (!el.hasAttribute('data-close-listener-added')) {
+          el.setAttribute('data-close-listener-added', 'true');
+          el.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // Encontrar el FilterBox padre y ocultarlo
+            const filterBox = el.closest('.pvtFilterBox');
+            if (filterBox) {
+              filterBox.style.display = 'none';
+            }
+          }, true);
+        }
       });
     };
 
