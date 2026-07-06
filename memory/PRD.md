@@ -4,6 +4,15 @@
 
 ### Cambios Recientes (Julio 2026)
 
+- **BUGFIX: Dark Mode en Pivot Tables - Dropdowns pvtDropdown (2026-07-06)**:
+  - **Problema reportado**: Los selectores "Table", "Stacked Bar Chart", "Count" tenían fondo blanco con texto gris claro casi invisible
+  - **Causa**: React-pivottable usa componentes `div.pvtDropdown` personalizados (NO elementos `<select>` nativos) que no se estilizaban
+  - **Solución**:
+    * Agregados estilos CSS específicos para `.pvtDropdown`, `.pvtDropdownValue`, `.pvtDropdownCurrent`, `.pvtDropdownMenu`
+    * MutationObserver modificado para aplicar estilos inline a los `.pvtDropdown` dinámicamente
+    * Estilos: fondo `#18181b`, texto `#ffffff`, borde `#6366f1`
+  - **Verificado**: Screenshots y JavaScript confirman estilos aplicados correctamente
+
 - **FEATURE: Análisis Avanzado con Pivot Tables SEPARADOS (2026-07-06)**:
   - **Rediseño completo por requerimiento del usuario**: Separación estricta de datos
   - **Frontend** (`PivotAnalysis.jsx`):

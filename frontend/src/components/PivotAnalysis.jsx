@@ -212,6 +212,88 @@ table.pvtUi ul li:hover,
     background-color: #3f3f46 !important;
 }
 
+/* ============================================================================
+   PVTDROPDOWN - SELECTOR DE RENDERER (Table, Stacked Bar Chart) Y AGGREGATOR (Count)
+   Este NO es un <select>, es un div personalizado de react-pivottable
+   ============================================================================ */
+.pvtDropdown,
+.pvtRenderers .pvtDropdown,
+.pvtAggregator .pvtDropdown,
+div.pvtDropdown,
+.pvtUi .pvtDropdown,
+.pivot-container .pvtDropdown {
+    background: #18181b !important;
+    background-color: #18181b !important;
+    border: 2px solid #6366f1 !important;
+    border-radius: 8px !important;
+    color: #ffffff !important;
+    min-width: 180px !important;
+    cursor: pointer !important;
+}
+
+.pvtDropdownValue,
+.pvtDropdownCurrent,
+.pvtDropdown .pvtDropdownValue,
+.pvtDropdown .pvtDropdownCurrent,
+div.pvtDropdownValue,
+div.pvtDropdownCurrent {
+    background: #18181b !important;
+    background-color: #18181b !important;
+    color: #ffffff !important;
+    padding: 10px 36px 10px 14px !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    border-radius: 6px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+}
+
+.pvtDropdownIcon,
+.pvtDropdown .pvtDropdownIcon {
+    color: #ffffff !important;
+    margin-left: 8px !important;
+}
+
+/* DROPDOWN MENU CUANDO SE ABRE */
+.pvtDropdownMenu,
+.pvtDropdown .pvtDropdownMenu,
+div.pvtDropdownMenu {
+    background: #1f1f23 !important;
+    background-color: #1f1f23 !important;
+    border: 2px solid #6366f1 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.9) !important;
+    z-index: 99999 !important;
+    max-height: 300px !important;
+    overflow-y: auto !important;
+    margin-top: 4px !important;
+}
+
+.pvtDropdownMenu .pvtDropdownValue,
+.pvtDropdown .pvtDropdownMenu .pvtDropdownValue {
+    background: transparent !important;
+    background-color: transparent !important;
+    color: #e4e4e7 !important;
+    padding: 10px 14px !important;
+    border: none !important;
+    border-radius: 4px !important;
+    margin: 2px 4px !important;
+}
+
+.pvtDropdownMenu .pvtDropdownValue:hover {
+    background: #4f46e5 !important;
+    background-color: #4f46e5 !important;
+    color: #ffffff !important;
+}
+
+.pvtDropdownMenu .pvtDropdownActiveValue,
+.pvtDropdownMenu .pvtDropdownValue.pvtDropdownActiveValue {
+    background: #3f3f46 !important;
+    background-color: #3f3f46 !important;
+    color: #ffffff !important;
+}
+
 /* Links dentro de los items (como "only") */
 .pvtCheckContainer a,
 .pvtAttrDropdown a,
@@ -265,8 +347,20 @@ td.pvtGrandTotal {
 }
 
 /* ============================================================================
-   SELECTORES Y DROPDOWNS - SOLUCIÓN DEFINITIVA
+   SELECTORES Y DROPDOWNS - SOLUCIÓN ULTRA-AGRESIVA
    ============================================================================ */
+
+/* MÁXIMA ESPECIFICIDAD PARA SELECT ELEMENTS */
+.pivot-container select,
+.pivot-container .pvtUi select,
+.pivot-container .pvtRenderers select,
+.pivot-container .pvtAggregator select,
+table.pvtUi select,
+table.pvtUi td select,
+.pvtRenderers > select,
+.pvtAggregator > select,
+select.pvtRenderers,
+select.pvtAggregator,
 select,
 .pvtUi select,
 .pvtRenderers select,
@@ -893,6 +987,77 @@ export function PivotAnalysis({
       // Aplicar a elementos seleccionados
       document.querySelectorAll('.pvtCheckContainer p.selected').forEach(el => {
         el.style.cssText = 'background-color: #3f3f46 !important; color: #e4e4e7 !important; border-radius: 4px !important;';
+      });
+
+      // FORZAR ESTILOS EN SELECT ELEMENTS (pvtRenderers, pvtAggregator)
+      document.querySelectorAll('.pvtUi select, .pvtRenderers, .pvtAggregator, select').forEach(el => {
+        if (el.tagName === 'SELECT' || el.querySelector('select')) {
+          const selectEl = el.tagName === 'SELECT' ? el : el.querySelector('select');
+          if (selectEl) {
+            selectEl.style.cssText = `
+              background-color: #18181b !important;
+              color: #ffffff !important;
+              border: 2px solid #6366f1 !important;
+              border-radius: 8px !important;
+              padding: 10px 36px 10px 14px !important;
+              font-weight: 600 !important;
+              font-size: 14px !important;
+              cursor: pointer !important;
+              -webkit-appearance: none !important;
+              -moz-appearance: none !important;
+              appearance: none !important;
+              min-width: 180px !important;
+            `;
+          }
+        }
+      });
+
+      // También aplicar a los options
+      document.querySelectorAll('.pvtUi select option, select option').forEach(el => {
+        el.style.cssText = 'background-color: #18181b !important; color: #ffffff !important; padding: 12px 14px !important;';
+      });
+
+      // FORZAR ESTILOS EN PVTDROPDOWN (selector de renderer y aggregator)
+      document.querySelectorAll('.pvtDropdown, .pvtRenderers .pvtDropdown, .pvtAggregator .pvtDropdown').forEach(el => {
+        el.style.cssText = `
+          background-color: #18181b !important;
+          border: 2px solid #6366f1 !important;
+          border-radius: 8px !important;
+          min-width: 180px !important;
+        `;
+      });
+
+      document.querySelectorAll('.pvtDropdownValue, .pvtDropdownCurrent').forEach(el => {
+        el.style.cssText = `
+          background-color: #18181b !important;
+          color: #ffffff !important;
+          padding: 10px 14px !important;
+          font-weight: 600 !important;
+          font-size: 14px !important;
+        `;
+      });
+
+      document.querySelectorAll('.pvtDropdownIcon').forEach(el => {
+        el.style.cssText = 'color: #ffffff !important;';
+      });
+
+      // Aplicar a menú desplegable cuando se abre
+      document.querySelectorAll('.pvtDropdownMenu').forEach(el => {
+        el.style.cssText = `
+          background-color: #1f1f23 !important;
+          border: 2px solid #6366f1 !important;
+          border-radius: 8px !important;
+          box-shadow: 0 12px 32px rgba(0, 0, 0, 0.9) !important;
+          z-index: 99999 !important;
+        `;
+      });
+
+      document.querySelectorAll('.pvtDropdownMenu .pvtDropdownValue').forEach(el => {
+        el.style.cssText = `
+          background-color: transparent !important;
+          color: #e4e4e7 !important;
+          padding: 10px 14px !important;
+        `;
       });
     };
 
