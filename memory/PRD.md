@@ -4,25 +4,21 @@
 
 ### Cambios Recientes (Julio 2026)
 
-- **FEATURE: Análisis Avanzado con Tabla Pivote en Dashboard GRC (2026-07-06)**:
-  - **Frontend**:
-    * Nueva pestaña "Análisis Avanzado (Pivot)" en Dashboard GRC
-    * Componente `PivotAnalysis.jsx` con react-pivottable y Plotly
-    * Campos disponibles: tipo_registro, area_proceso, nivel_riesgo, estado, responsable, institucion, mes_deteccion, severidad, informe
-    * Visualizaciones: Tabla, Barras Apiladas, Líneas, Áreas, Heatmap
-    * Drag-and-drop para filas y columnas
-    * Escala de colores unificada (Alto=rojo, Medio Alto=naranja, Medio=amarillo, Bajo=verde)
-    * Estilo Dark Mode integrado
-    * Botón "Exportar CSV" funcional
-  - **Backend**:
-    * Nuevo modelo `PivotConfig` para almacenar configuración de pivot
-    * Campos agregados a `DashboardVistaCreate/Update`: `pivot_config`, `active_tab`
-    * Nueva función `_get_datos_unificados_pivot()` que retorna datos de Vulnerabilidades + Hallazgos normalizados
-    * Endpoint `/api/dashboard/data` ahora incluye `datos_unificados` 
-  - **Integración con Guardado de Vistas**:
-    * La configuración de pivot (filas, columnas, aggregator, renderer) se guarda con la vista
-    * Al cargar vista guardada, se restaura la configuración de pivot y la pestaña activa
-  - **Verificado**: 450 registros cargados, gráfico de barras apiladas funcionando
+- **FEATURE: Análisis Avanzado con Pivot Tables SEPARADOS (2026-07-06)**:
+  - **Rediseño completo por requerimiento del usuario**: Separación estricta de datos
+  - **Frontend** (`PivotAnalysis.jsx`):
+    * DOS tabs independientes: "PIVOT VULNERABILIDADES" (266) y "PIVOT HALLAZGOS" (184)
+    * Tab Vulnerabilidades: campos de Pentest (codigo, vulnerabilidad, severidad, nivel_riesgo, estatus, responsable, institucion, aplicacion, informe_pentest, proveedor, dominio, mes_deteccion, resultado_retest, veces_retest)
+    * Tab Hallazgos: campos de Auditoría/GRC (codigo, brecha, nivel_riesgo, estado, responsable, dominio, control, mes_deteccion, probabilidad, impacto, riesgo_inherente)
+    * Selector de layout: Paralelo / Solo Tabla / Solo Gráfico
+    * CSS ultra-agresivo con selectores comodín (!important) para Dark Mode
+    * Botón "Exportar CSV" funcional por módulo
+  - **Backend** (`dashboard.py`):
+    * Endpoint `/api/dashboard/data` retorna `datos_vulnerabilidades` y `datos_hallazgos` como arrays SEPARADOS
+    * Función `_get_datos_vulnerabilidades_pivot()` - campos técnicos de Pentest
+    * Función `_get_datos_hallazgos_pivot()` - campos normativos de Auditoría
+    * Schemas estrictamente disjuntos (sin mezcla de campos)
+  - **Verificado**: Testing agent iteration_30 - 100% backend (6/6 pytest), 100% frontend
 
 - **BUGFIX: Modal de Confirmación - Dominio faltante y Scroll (2026-07-01)**:
   - **Problema 1**: El Dominio seleccionado no aparecía en el modal de confirmación

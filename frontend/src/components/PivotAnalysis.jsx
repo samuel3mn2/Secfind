@@ -65,6 +65,16 @@ const FORCED_DARK_MODE_CSS = `
     font-family: inherit !important;
 }
 
+/* FORZAR FONDO OSCURO EN TODAS LAS CELDAS DE LA TABLA INTERNA */
+.pvtUi table,
+.pvtUi table td,
+.pvtUi table th,
+.pvtUi > tbody > tr > td,
+table.pvtUi > tbody > tr > td {
+    background: #18181b !important;
+    background-color: #18181b !important;
+}
+
 /* ============================================================================
    SELECTORES Y DROPDOWNS - SOLUCIÓN DEFINITIVA
    ============================================================================ */
