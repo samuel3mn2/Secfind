@@ -932,7 +932,7 @@ export function PivotAnalysis({
   loading = false 
 }) {
   const [activeModule, setActiveModule] = useState("vulnerabilidades");
-  const [layoutMode, setLayoutMode] = useState(LAYOUT_TYPES.SPLIT);
+  const [layoutMode, setLayoutMode] = useState(LAYOUT_TYPES.TABLE_ONLY);
   
   // Estados separados para cada módulo
   const [vulnTableState, setVulnTableState] = useState({
@@ -1117,6 +1117,47 @@ export function PivotAnalysis({
     return () => observer.disconnect();
   }, []);
 
+  // Listener para cerrar FilterBox con ESC y click fuera
+  useEffect(() => {
+    const closeFilterBox = () => {
+      const filterBoxes = document.querySelectorAll('.pvtFilterBox');
+      filterBoxes.forEach(fb => {
+        fb.style.display = 'none';
+      });
+    };
+
+    // Handler para tecla ESC
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        closeFilterBox();
+      }
+    };
+
+    // Handler para click fuera del FilterBox
+    const handleClickOutside = (e) => {
+      const filterBox = document.querySelector('.pvtFilterBox');
+      if (filterBox && filterBox.style.display !== 'none' && filterBox.offsetHeight > 0) {
+        // Verificar si el click fue fuera del FilterBox y fuera de los atributos
+        const isInsideFilterBox = filterBox.contains(e.target);
+        const isOnAttribute = e.target.closest('.pvtAttr') || e.target.closest('.pvtTriangle');
+        const isOnPvtDropdown = e.target.closest('.pvtDropdown');
+        
+        if (!isInsideFilterBox && !isOnAttribute && !isOnPvtDropdown) {
+          closeFilterBox();
+        }
+      }
+    };
+
+    // Añadir listeners
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   // Aplicar tema oscuro a gráficos de Plotly
   useEffect(() => {
     const applyDarkThemeToPlotly = () => {
@@ -1243,17 +1284,6 @@ export function PivotAnalysis({
               Vista:
             </span>
             <Button
-              variant={layoutMode === LAYOUT_TYPES.SPLIT ? "default" : "outline"}
-              size="sm"
-              onClick={() => setLayoutMode(LAYOUT_TYPES.SPLIT)}
-              className={layoutMode === LAYOUT_TYPES.SPLIT 
-                ? "bg-emerald-600 hover:bg-emerald-700 text-white" 
-                : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"}
-            >
-              <Columns className="w-4 h-4 mr-2" />
-              Paralelo
-            </Button>
-            <Button
               variant={layoutMode === LAYOUT_TYPES.TABLE_ONLY ? "default" : "outline"}
               size="sm"
               onClick={() => setLayoutMode(LAYOUT_TYPES.TABLE_ONLY)}
@@ -1274,6 +1304,17 @@ export function PivotAnalysis({
             >
               <BarChart3 className="w-4 h-4 mr-2" />
               Solo Gráfico
+            </Button>
+            <Button
+              variant={layoutMode === LAYOUT_TYPES.SPLIT ? "default" : "outline"}
+              size="sm"
+              onClick={() => setLayoutMode(LAYOUT_TYPES.SPLIT)}
+              className={layoutMode === LAYOUT_TYPES.SPLIT 
+                ? "bg-emerald-600 hover:bg-emerald-700 text-white" 
+                : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"}
+            >
+              <Columns className="w-4 h-4 mr-2" />
+              Paralelo
             </Button>
             
             <div className="flex-grow" />

@@ -4,12 +4,24 @@
 
 ### Cambios Recientes (Julio 2026)
 
+- **MEJORA: FilterBox cierre con ESC y Click Fuera + Orden de Vistas (2026-07-06)**:
+  - **Problema 1**: El popup de filtros (pvtFilterBox) no se podía cerrar con el botón X ni mover
+  - **Solución**:
+    * Añadido listener de teclado para cerrar con tecla ESC
+    * Añadido listener de click fuera del FilterBox para cerrarlo
+    * Ambos métodos funcionan simultáneamente para mejor UX
+  - **Problema 2**: El orden de los botones de vista no era el deseado
+  - **Solución**: Cambiado orden a "Solo Tabla" → "Solo Gráfico" → "Paralelo"
+  - **Configuración inicial**: Vista comienza en "Solo Tabla" por defecto
+  - **Verificado**: ESC cierra el FilterBox (confirmado via Playwright)
+
 - **BUGFIX: Dark Mode en Pivot Tables - Dropdowns pvtDropdown (2026-07-06)**:
   - **Problema reportado**: Los selectores "Table", "Stacked Bar Chart", "Count" tenían fondo blanco con texto gris claro casi invisible
   - **Causa**: React-pivottable usa componentes `div.pvtDropdown` personalizados (NO elementos `<select>` nativos) que no se estilizaban
   - **Solución**:
     * Agregados estilos CSS específicos para `.pvtDropdown`, `.pvtDropdownValue`, `.pvtDropdownCurrent`, `.pvtDropdownMenu`
     * MutationObserver modificado para aplicar estilos inline a los `.pvtDropdown` dinámicamente
+    * Añadido `overflow: visible !important` al contenedor `.pvtDropdown` para mostrar el menú desplegable
     * Estilos: fondo `#18181b`, texto `#ffffff`, borde `#6366f1`
   - **Verificado**: Screenshots y JavaScript confirman estilos aplicados correctamente
 
