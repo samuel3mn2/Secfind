@@ -17,6 +17,8 @@ import { toast } from "sonner";
 
 // Crear componente Plot con Plotly
 const Plot = createPlotlyComponent(Plotly);
+
+// Crear PlotlyRenderers normales
 const PlotlyRenderers = createPlotlyRenderers(Plot);
 
 // Escala de colores para nivel de riesgo
@@ -39,40 +41,227 @@ const LAYOUT_TYPES = {
 // ============================================================================
 const FORCED_DARK_MODE_CSS = `
 /* ============================================================================
-   REACT-PIVOTTABLE DARK MODE - SELECTORES COMODÍN IRREVOCABLES
-   Todos los elementos forzados a texto blanco sobre fondo oscuro
+   REACT-PIVOTTABLE DARK MODE - VERSIÓN ULTRA-AGRESIVA
+   Forzar FONDO OSCURO + TEXTO CLARO en absolutamente todos los elementos
    ============================================================================ */
 
-/* FORZAR TEXTO BLANCO EN TODOS LOS ELEMENTOS CON COMODÍN */
-.pvtUi *, 
-.pvtUi *::before, 
+/* MÁXIMA ESPECIFICIDAD - TODOS LOS ELEMENTOS DENTRO DE PIVOT-CONTAINER */
+.pivot-container .pvtUi,
+.pivot-container .pvtUi *,
+.pivot-container .pvtUi *::before,
+.pivot-container .pvtUi *::after,
+.pivot-container .pvtFilterBox,
+.pivot-container .pvtFilterBox *,
+.pivot-container .pvtDropdown,
+.pivot-container .pvtDropdown *,
+.pivot-container .pvtCheckContainer,
+.pivot-container .pvtCheckContainer * {
+    color: #e4e4e7 !important;
+    border-color: #3f3f46 !important;
+}
+
+/* RESET GLOBAL ADICIONAL */
+.pvtUi *,
+.pvtUi *::before,
 .pvtUi *::after,
-.pvtTable *, 
-.pvtVals *, 
-.pvtAxisContainer *, 
 .pvtFilterBox *,
 .pvtDropdown *,
-.pvtCheckContainer *,
-.pvtRenderers *,
-.pvtAggregator * {
-    color: #ffffff !important;
+.pvtCheckContainer * {
+    color: #e4e4e7 !important;
+    border-color: #3f3f46 !important;
 }
 
-/* CONTENEDOR PRINCIPAL */
-.pvtUi {
+/* CONTENEDOR PRINCIPAL - TRANSPARENTE */
+.pvtUi,
+.pivot-container .pvtUi {
     background: transparent !important;
-    color: #ffffff !important;
-    font-family: inherit !important;
+    background-color: transparent !important;
 }
 
-/* FORZAR FONDO OSCURO EN TODAS LAS CELDAS DE LA TABLA INTERNA */
-.pvtUi table,
-.pvtUi table td,
-.pvtUi table th,
-.pvtUi > tbody > tr > td,
-table.pvtUi > tbody > tr > td {
+/* ============================================================================
+   PVTCHECKCONTAINER - EL DROPDOWN DE FILTROS
+   Esta es la lista que aparece cuando haces clic en el triángulo ▼
+   ============================================================================ */
+.pvtCheckContainer,
+.pivot-container .pvtCheckContainer,
+div.pvtCheckContainer,
+.pvtFilterBox .pvtCheckContainer,
+.pvtFilterBox > .pvtCheckContainer {
+    background: #27272a !important;
+    background-color: #27272a !important;
+    border: 1px solid #3f3f46 !important;
+    border-radius: 8px !important;
+    padding: 8px !important;
+    max-height: 300px !important;
+    overflow-y: auto !important;
+}
+
+/* Items dentro del CheckContainer */
+.pvtCheckContainer > p,
+.pvtCheckContainer p,
+.pivot-container .pvtCheckContainer > p,
+.pivot-container .pvtCheckContainer p,
+.pvtFilterBox .pvtCheckContainer p {
+    background: transparent !important;
+    background-color: transparent !important;
+    color: #e4e4e7 !important;
+    padding: 6px 10px !important;
+    margin: 2px 0 !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    font-size: 13px !important;
+}
+
+/* Items seleccionados */
+.pvtCheckContainer > p.selected,
+.pvtCheckContainer p.selected,
+.pivot-container .pvtCheckContainer p.selected {
+    background: #3f3f46 !important;
+    background-color: #3f3f46 !important;
+}
+
+/* Hover en items */
+.pvtCheckContainer > p:hover,
+.pvtCheckContainer p:hover,
+.pivot-container .pvtCheckContainer p:hover {
+    background: #4f46e5 !important;
+    background-color: #4f46e5 !important;
+    color: #ffffff !important;
+}
+
+/* ÁREAS DE ARRASTRE - FONDO DISTINTIVO */
+.pvtAxisContainer,
+.pvtVals,
+.pvtRows,
+.pvtCols,
+.pvtUnused {
+    background: #27272a !important;
+    background-color: #27272a !important;
+    border: 2px dashed #52525b !important;
+    border-radius: 8px !important;
+    padding: 12px !important;
+    min-height: 60px !important;
+}
+
+/* ============================================================================
+   MENÚ DROPDOWN DE VALORES DE ATRIBUTO - SUPER AGRESIVO
+   El dropdown que aparece al hacer clic en ▼ del atributo
+   ============================================================================ */
+
+/* Contenedor del dropdown de atributos */
+.pvtAttrDropdown,
+.pvtDropdownMenu,
+.pvtFilterBox .pvtCheckContainer,
+.pvtUi .pvtAttrDropdown,
+.pvtUi .pvtAttr .pvtDropdown,
+.pvtUi ul.pvtAttrDropdown,
+table.pvtUi ul,
+.pvtUi table ul,
+.pivot-container ul,
+.pivot-container .pvtCheckContainer {
+    background: #27272a !important;
+    background-color: #27272a !important;
+    border: 2px solid #6366f1 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.9) !important;
+    padding: 8px !important;
+    margin: 0 !important;
+    list-style: none !important;
+    z-index: 99999 !important;
+    max-height: 350px !important;
+    overflow-y: auto !important;
+}
+
+/* Cada item en el dropdown */
+.pvtAttrDropdown li,
+.pvtDropdownMenu li,
+.pvtUi .pvtAttrDropdown li,
+.pvtUi ul li,
+table.pvtUi ul li,
+.pvtCheckContainer p,
+.pivot-container ul li,
+.pivot-container .pvtCheckContainer p {
+    background: transparent !important;
+    background-color: transparent !important;
+    color: #e4e4e7 !important;
+    padding: 8px 12px !important;
+    margin: 2px 0 !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    list-style: none !important;
+}
+
+/* Hover en items */
+.pvtAttrDropdown li:hover,
+.pvtUi .pvtAttrDropdown li:hover,
+.pvtUi ul li:hover,
+table.pvtUi ul li:hover,
+.pvtCheckContainer p:hover,
+.pivot-container ul li:hover {
+    background: #4f46e5 !important;
+    background-color: #4f46e5 !important;
+    color: #ffffff !important;
+}
+
+/* Item seleccionado */
+.pvtCheckContainer p.selected,
+.pvtAttrDropdown li.selected {
+    background: #3f3f46 !important;
+    background-color: #3f3f46 !important;
+}
+
+/* Links dentro de los items (como "only") */
+.pvtCheckContainer a,
+.pvtAttrDropdown a,
+.pvtOnly,
+.pvtOnlySpacer {
+    color: #a5b4fc !important;
+    text-decoration: none !important;
+}
+
+.pvtCheckContainer a:hover,
+.pvtOnly:hover {
+    color: #c7d2fe !important;
+    text-decoration: underline !important;
+}
+
+/* TABLA PRINCIPAL DE DATOS */
+.pvtUi table.pvtTable,
+table.pvtTable,
+.pvtTable {
     background: #18181b !important;
     background-color: #18181b !important;
+}
+
+.pvtTable td,
+.pvtTable th,
+table.pvtTable td,
+table.pvtTable th {
+    background: #27272a !important;
+    background-color: #27272a !important;
+    color: #e4e4e7 !important;
+    border: 1px solid #3f3f46 !important;
+    padding: 10px 14px !important;
+}
+
+.pvtTable th,
+table.pvtTable th {
+    background: #3f3f46 !important;
+    background-color: #3f3f46 !important;
+    font-weight: 700 !important;
+}
+
+/* TOTALES */
+.pvtTotal,
+.pvtGrandTotal,
+td.pvtTotal,
+td.pvtGrandTotal {
+    background: #1f1f23 !important;
+    background-color: #1f1f23 !important;
+    color: #a5b4fc !important;
+    font-weight: 700 !important;
 }
 
 /* ============================================================================
@@ -301,143 +490,211 @@ li.pvtAttr {
 }
 
 /* ============================================================================
-   FILTER BOX (POPUP DE FILTROS)
+   FILTER BOX (POPUP DE FILTROS) - SOLUCIÓN DEFINITIVA
    ============================================================================ */
-.pvtFilterBox {
-    background: #18181b !important;
-    background-color: #18181b !important;
+.pvtFilterBox,
+div.pvtFilterBox,
+.pvtUi .pvtFilterBox {
+    background: #1f1f23 !important;
+    background-color: #1f1f23 !important;
     border: 2px solid #6366f1 !important;
     border-radius: 12px !important;
-    color: #ffffff !important;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7) !important;
-    padding: 20px !important;
+    color: #e4e4e7 !important;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9) !important;
+    padding: 16px !important;
     z-index: 99999 !important;
+}
+
+.pvtFilterBox *,
+div.pvtFilterBox * {
+    color: #e4e4e7 !important;
+    background-color: transparent !important;
 }
 
 .pvtFilterBox h4,
 .pvtFilterBox p,
 .pvtFilterBox span,
-.pvtFilterBox label {
-    color: #ffffff !important;
+.pvtFilterBox label,
+.pvtFilterBox a {
+    color: #e4e4e7 !important;
+    background: transparent !important;
 }
 
 .pvtFilterBox h4 {
     font-weight: 700 !important;
-    font-size: 16px !important;
-    margin-bottom: 14px !important;
-    padding-bottom: 10px !important;
-    border-bottom: 2px solid #3f3f46 !important;
-}
-
-.pvtFilterBox button {
-    background: #4f46e5 !important;
+    font-size: 15px !important;
+    margin-bottom: 12px !important;
+    padding-bottom: 8px !important;
+    border-bottom: 1px solid #3f3f46 !important;
     color: #ffffff !important;
-    border: none !important;
-    border-radius: 8px !important;
-    padding: 10px 18px !important;
-    font-weight: 600 !important;
-    cursor: pointer !important;
-    transition: all 0.2s !important;
-    margin: 5px !important;
 }
 
-.pvtFilterBox button:hover {
-    background: #6366f1 !important;
-    transform: translateY(-1px) !important;
-}
-
-/* CHECKBOX CONTAINER */
-.pvtCheckContainer {
+/* INPUT DE BÚSQUEDA EN FILTER */
+.pvtFilterBox input,
+.pvtFilterBox input[type="text"],
+.pvtSearch,
+.pvtSearch input {
     background: #27272a !important;
     background-color: #27272a !important;
-    color: #ffffff !important;
-    max-height: 300px !important;
-    overflow-y: auto !important;
-    border-radius: 8px !important;
-    border: 2px solid #3f3f46 !important;
-    padding: 10px !important;
+    color: #e4e4e7 !important;
+    border: 1px solid #52525b !important;
+    border-radius: 6px !important;
+    padding: 8px 12px !important;
+    width: 100% !important;
+    margin-bottom: 10px !important;
 }
 
+.pvtFilterBox input::placeholder {
+    color: #71717a !important;
+}
+
+/* BOTONES SELECT ALL / DESELECT ALL */
+.pvtFilterBox button,
+.pvtFilterBox .pvtButton,
+.pvtFilterBox a[role="button"] {
+    background: #4f46e5 !important;
+    background-color: #4f46e5 !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 6px !important;
+    padding: 6px 12px !important;
+    font-weight: 600 !important;
+    font-size: 12px !important;
+    cursor: pointer !important;
+    margin: 4px !important;
+    display: inline-block !important;
+}
+
+.pvtFilterBox button:hover,
+.pvtFilterBox a[role="button"]:hover {
+    background: #6366f1 !important;
+    background-color: #6366f1 !important;
+}
+
+/* CHECKBOX CONTAINER - LA LISTA DE OPCIONES */
+.pvtCheckContainer,
+.pvtFilterBox .pvtCheckContainer {
+    background: #27272a !important;
+    background-color: #27272a !important;
+    color: #e4e4e7 !important;
+    max-height: 250px !important;
+    overflow-y: auto !important;
+    border-radius: 6px !important;
+    border: 1px solid #3f3f46 !important;
+    padding: 8px !important;
+    margin-top: 8px !important;
+}
+
+/* CADA OPCIÓN EN LA LISTA */
 .pvtCheckContainer p,
 .pvtCheckContainer label,
-.pvtCheckContainer span {
-    color: #ffffff !important;
+.pvtCheckContainer > p,
+.pvtFilterBox .pvtCheckContainer p {
+    color: #e4e4e7 !important;
+    background: transparent !important;
+    background-color: transparent !important;
     display: flex !important;
     align-items: center !important;
-    padding: 8px 12px !important;
+    padding: 6px 10px !important;
     cursor: pointer !important;
-    border-radius: 6px !important;
-    font-size: 14px !important;
+    border-radius: 4px !important;
+    font-size: 13px !important;
     font-weight: 500 !important;
+    margin: 2px 0 !important;
 }
 
 .pvtCheckContainer p:hover,
 .pvtCheckContainer label:hover {
     background: #3f3f46 !important;
+    background-color: #3f3f46 !important;
 }
 
-.pvtCheckContainer input[type="checkbox"] {
+/* CHECKBOX INPUT */
+.pvtCheckContainer input[type="checkbox"],
+.pvtFilterBox input[type="checkbox"] {
     accent-color: #6366f1 !important;
-    width: 18px !important;
-    height: 18px !important;
-    margin-right: 12px !important;
+    width: 16px !important;
+    height: 16px !important;
+    margin-right: 10px !important;
+    background: #27272a !important;
 }
 
-/* CLOSE BUTTON */
+/* CLOSE BUTTON (X) */
 .pvtCloseX,
 a.pvtCloseX,
-button.pvtCloseX {
+button.pvtCloseX,
+.pvtFilterBox .pvtCloseX {
     color: #ffffff !important;
     background: #ef4444 !important;
+    background-color: #ef4444 !important;
     border-radius: 50% !important;
-    width: 28px !important;
-    height: 28px !important;
+    width: 24px !important;
+    height: 24px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    font-size: 16px !important;
+    font-size: 14px !important;
     cursor: pointer !important;
     text-decoration: none !important;
     font-weight: bold !important;
+    position: absolute !important;
+    top: 8px !important;
+    right: 8px !important;
 }
 
 .pvtCloseX:hover {
     background: #dc2626 !important;
+    background-color: #dc2626 !important;
 }
 
 /* ============================================================================
-   DROPDOWN MENU DE ATRIBUTOS
+   DROPDOWN MENU DE ATRIBUTOS - ULTRA-AGRESIVO
    ============================================================================ */
 .pvtDropdown,
 .pvtAttrDropdown,
-ul.pvtDropdown {
-    background: #18181b !important;
-    background-color: #18181b !important;
-    color: #ffffff !important;
+ul.pvtDropdown,
+.pvtUi .pvtDropdown,
+.pvtUi ul,
+.pvtFilterBox ul {
+    background: #1f1f23 !important;
+    background-color: #1f1f23 !important;
+    color: #e4e4e7 !important;
     border: 2px solid #6366f1 !important;
-    border-radius: 10px !important;
-    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.8) !important;
     z-index: 99999 !important;
     overflow: hidden !important;
+    list-style: none !important;
+    padding: 4px !important;
+    margin: 0 !important;
 }
 
 .pvtDropdown li,
-.pvtAttrDropdown li {
+.pvtAttrDropdown li,
+.pvtUi ul li,
+.pvtFilterBox ul li,
+.pvtDropdown > li,
+.pvtAttrDropdown > li {
     background: transparent !important;
-    color: #ffffff !important;
-    padding: 12px 18px !important;
+    background-color: transparent !important;
+    color: #e4e4e7 !important;
+    padding: 10px 14px !important;
     cursor: pointer !important;
     border: none !important;
     box-shadow: none !important;
-    margin: 0 !important;
-    border-radius: 0 !important;
+    margin: 2px 0 !important;
+    border-radius: 4px !important;
     font-weight: 500 !important;
+    font-size: 13px !important;
+    list-style: none !important;
 }
 
 .pvtDropdown li:hover,
-.pvtAttrDropdown li:hover {
+.pvtAttrDropdown li:hover,
+.pvtUi ul li:hover {
     background: #4f46e5 !important;
-    transform: none !important;
+    background-color: #4f46e5 !important;
+    color: #ffffff !important;
 }
 
 /* ============================================================================
@@ -469,9 +726,25 @@ td.pvtVal {
 }
 
 /* ============================================================================
-   PLOTLY DARK MODE
+   PLOTLY DARK MODE - FORZAR FONDO OSCURO
    ============================================================================ */
+.js-plotly-plot,
 .js-plotly-plot .plotly,
+.js-plotly-plot .plot-container,
+.js-plotly-plot .svg-container,
+.plotly,
+.plot-container {
+    background: #18181b !important;
+    background-color: #18181b !important;
+}
+
+/* Fondo del área del gráfico */
+.js-plotly-plot .main-svg,
+.js-plotly-plot .main-svg .bg,
+.js-plotly-plot rect.bg {
+    fill: #18181b !important;
+}
+
 .js-plotly-plot .plotly .modebar {
     background: transparent !important;
 }
@@ -484,11 +757,27 @@ td.pvtVal {
     fill: #ffffff !important;
 }
 
+/* Textos del gráfico */
 .js-plotly-plot text,
 .js-plotly-plot .xtick text,
 .js-plotly-plot .ytick text,
-.js-plotly-plot .gtitle {
-    fill: #ffffff !important;
+.js-plotly-plot .gtitle,
+.js-plotly-plot .g-xtitle text,
+.js-plotly-plot .g-ytitle text,
+.js-plotly-plot .legendtext {
+    fill: #e4e4e7 !important;
+}
+
+/* Grid lines */
+.js-plotly-plot .gridlayer line,
+.js-plotly-plot .zerolinelayer line {
+    stroke: #3f3f46 !important;
+}
+
+/* Axis lines */
+.js-plotly-plot .xlines-above line,
+.js-plotly-plot .ylines-above line {
+    stroke: #52525b !important;
 }
 
 /* ============================================================================
@@ -582,6 +871,82 @@ export function PivotAnalysis({
       if (s) s.remove();
     };
   }, []);
+
+  // Forzar estilos oscuros en dropdowns y filtros que aparezcan dinámicamente
+  useEffect(() => {
+    const applyDarkStyles = () => {
+      // Aplicar a pvtCheckContainer (lista de opciones de filtro)
+      document.querySelectorAll('.pvtCheckContainer').forEach(el => {
+        el.style.cssText = 'background-color: #27272a !important; border: 1px solid #3f3f46 !important; border-radius: 8px !important;';
+      });
+      
+      // Aplicar a pvtFilterBox (popup de filtros)
+      document.querySelectorAll('.pvtFilterBox').forEach(el => {
+        el.style.cssText = 'background-color: #1f1f23 !important; border: 2px solid #6366f1 !important; border-radius: 12px !important; color: #e4e4e7 !important;';
+      });
+      
+      // Aplicar a todos los párrafos dentro de pvtCheckContainer
+      document.querySelectorAll('.pvtCheckContainer p').forEach(el => {
+        el.style.cssText = 'background-color: transparent !important; color: #e4e4e7 !important;';
+      });
+      
+      // Aplicar a elementos seleccionados
+      document.querySelectorAll('.pvtCheckContainer p.selected').forEach(el => {
+        el.style.cssText = 'background-color: #3f3f46 !important; color: #e4e4e7 !important; border-radius: 4px !important;';
+      });
+    };
+
+    // Crear MutationObserver para detectar cambios en el DOM
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.addedNodes.length > 0) {
+          applyDarkStyles();
+        }
+      });
+    });
+
+    // Observar cambios en el DOM
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    // Aplicar estilos iniciales
+    applyDarkStyles();
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Aplicar tema oscuro a gráficos de Plotly
+  useEffect(() => {
+    const applyDarkThemeToPlotly = () => {
+      const plotContainers = document.querySelectorAll('.js-plotly-plot');
+      plotContainers.forEach(container => {
+        if (container && window.Plotly) {
+          try {
+            window.Plotly.relayout(container, {
+              paper_bgcolor: '#18181b',
+              plot_bgcolor: '#18181b',
+              'font.color': '#e4e4e7',
+              'xaxis.color': '#e4e4e7',
+              'xaxis.gridcolor': '#3f3f46',
+              'yaxis.color': '#e4e4e7',
+              'yaxis.gridcolor': '#3f3f46',
+              'legend.font.color': '#e4e4e7'
+            });
+          } catch (e) {
+            // Silently fail if relayout not available
+          }
+        }
+      });
+    };
+
+    // Aplicar después de un breve delay para que Plotly termine de renderizar
+    const timer = setTimeout(applyDarkThemeToPlotly, 500);
+    
+    // Re-aplicar cuando cambie el estado
+    return () => clearTimeout(timer);
+  }, [vulnChartState, hallChartState, layoutMode, activeModule]);
 
   // Exportar CSV
   const handleExportCSV = (data, filename) => {
