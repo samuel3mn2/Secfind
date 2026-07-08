@@ -3667,6 +3667,82 @@ async def get_historial_seguimiento(
         "historial": historial_ordenado,
         "total_registros": len(historial_ordenado)
     }
+
+@api_router.post("/vulnerabilidades/fix-retest-bug")
+async def fix_retest_bug(
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Corrige las vulnerabilidades afectadas por el bug donde 'Nota de Seguimiento'
+    sobrescribía el resultado_re_test. Restaura 'Para Re Test' a las que corresponde.
+    Solo administradores pueden ejecutar esto.
+    """
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden ejecutar esta corrección")
+    
+    # Buscar vulnerabilidades afectadas:
+    # 1. Tienen resultado_re_test = "Nota de Seguimiento"
+    # 2. No están cerradas
+    # 3. Tienen en su historial una entrada con "Para Re Test"
+    
+    affected = []
+    
+    # Caso 1: resultado_re_test = "Nota de Seguimiento" con historial de "Para Re Test"
+    query1 = {
+        "resultado_re_test": "Nota de Seguimiento",
+        "estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]},
+        "historial_impedimentos_seguimiento.resultado_retest": "Para Re Test"
+    }
+    affected1 = await db.vulnerabilidades.find(query1, {"_id": 0, "id": 1, "codigo": 1, "vulnerabilidad": 1}).to_list(length=1000)
+    affected.extend([v["id"] for v in affected1])
+    
+    # Caso 2: Buscar vulnerabilidades cuya última acción relevante fue "Para Re Test"
+    # pero su resultado_re_test actual no es "Para Re Test"
+    query2 = {
+        "estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]},
+        "resultado_re_test": {"$nin": ["Para Re Test", "Corregido", "Desestimado", None]},
+        "historial_impedimentos_seguimiento": {"$exists": True, "$ne": []}
+    }
+    
+    candidates = await db.vulnerabilidades.find(query2, {"_id": 0, "id": 1, "historial_impedimentos_seguimiento": 1}).to_list(length=1000)
+    
+    for v in candidates:
+        historial = v.get("historial_impedimentos_seguimiento", [])
+        # Buscar la última entrada que NO sea "Nota de Seguimiento"
+        for h in reversed(historial):
+            resultado = h.get("resultado_retest")
+            if resultado and resultado != "Nota de Seguimiento":
+                if resultado == "Para Re Test":
+                    affected.append(v["id"])
+                break
+    
+    # Eliminar duplicados
+    affected_ids = list(set(affected))
+    
+    if not affected_ids:
+        return {
+            "message": "No se encontraron vulnerabilidades afectadas por el bug",
+            "fixed_count": 0,
+            "affected_ids": []
+        }
+    
+    # Aplicar corrección
+    result = await db.vulnerabilidades.update_many(
+        {"id": {"$in": affected_ids}},
+        {
+            "$set": {
+                "resultado_re_test": "Para Re Test",
+                "fecha_compromiso": None  # Limpiar fecha para que aparezcan en vista en_retest
+            }
+        }
+    )
+    
+    return {
+        "message": f"Corregidas {result.modified_count} vulnerabilidades",
+        "fixed_count": result.modified_count,
+        "affected_ids": affected_ids
+    }
+
 async def export_csv(
     request: Request,
     search: Optional[str] = None,
