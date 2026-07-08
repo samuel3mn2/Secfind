@@ -4,6 +4,20 @@
 
 ### Cambios Recientes (Julio 2026)
 
+- **FEATURE: Endpoint de corrección histórica para bug de "En Retest" (2026-07-08)**:
+  - **Contexto**: El bug de "Nota de Seguimiento" sobrescribiendo "Para Re Test" fue corregido, pero vulnerabilidades previamente afectadas quedaban con estado incorrecto en BD
+  - **Solución**: Creado endpoint `POST /api/vulnerabilidades/fix-retest-bug` (solo admin)
+  - **Lógica**: Busca vulnerabilidades con `resultado_re_test="Nota de Seguimiento"` que tienen "Para Re Test" en su historial, y las restaura
+  - **Resultado**: 3 vulnerabilidades corregidas automáticamente (incluyendo "Clickjacking")
+  - **Verificado**: curl exitoso con token admin
+
+- **FEATURE: Reordenamiento de "Descripción del Riesgo" en formulario (2026-07-08)**:
+  - **Solicitud del usuario**: Mover el campo "Descripción del Riesgo" para que aparezca ANTES de "Recomendaciones"
+  - **Archivo modificado**: `/app/frontend/src/pages/Vulnerabilidades.jsx`
+  - **Nuevo orden en formulario**: Vulnerabilidad → Descripción del Riesgo → Recomendaciones → Responsable
+  - **Parser IA**: Verificado que NO se afecta - `descripcion_riesgo` es un campo MANUAL, no extraído por IA
+  - **Verificado**: Screenshot confirma nuevo orden de campos
+
 - **BUGFIX CRÍTICO: Vulnerabilidades desaparecen de "En Retest" al agregar notas (2026-07-08)**:
   - **Problema reportado**: Las vulnerabilidades en "Para Re Test" desaparecían del módulo Seguimiento después de agregarles una "Nota de Seguimiento"
   - **Causa raíz**: En `POST /api/seguimiento/{id}/registrar`, el código actualizaba `resultado_re_test` con el valor del resultado para TODOS los casos, incluyendo "Nota de Seguimiento". Esto sobrescribía "Para Re Test" con "Nota de Seguimiento", y la vista "en_retest" filtra por `resultado_re_test='Para Re Test'`

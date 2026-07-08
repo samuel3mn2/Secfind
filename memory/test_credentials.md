@@ -21,4 +21,4 @@
 - Configuración (Admin only)
 
 ## Last Updated
-2026-06-19
+2026-07-08

@@ -1780,6 +1780,17 @@ export default function Vulnerabilidades() {
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
+                  <Label className="text-zinc-400">Descripción del Riesgo</Label>
+                  <Textarea
+                    value={formData.descripcion_riesgo || ""}
+                    onChange={(e) => setFormData({ ...formData, descripcion_riesgo: e.target.value })}
+                    className="bg-black/20 border-zinc-700 text-white min-h-[60px]"
+                    placeholder="Describa el impacto y contexto del riesgo para el negocio..."
+                    data-testid="input-descripcion-riesgo"
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
                   <Label className="text-zinc-400">Recomendaciones</Label>
                   <Textarea
                     value={formData.recomendaciones || ""}
@@ -1805,16 +1816,6 @@ export default function Vulnerabilidades() {
                     allowCreate={true}
                     onCreateNew={(name) => setFormData({ ...formData, responsable: name })}
                     data-testid="input-responsable"
-                  />
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label className="text-zinc-400">Descripción del Riesgo</Label>
-                  <Textarea
-                    value={formData.descripcion_riesgo || ""}
-                    onChange={(e) => setFormData({ ...formData, descripcion_riesgo: e.target.value })}
-                    className="bg-black/20 border-zinc-700 text-white min-h-[60px]"
-                    data-testid="input-descripcion-riesgo"
                   />
                 </div>
 
