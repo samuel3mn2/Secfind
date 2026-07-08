@@ -562,15 +562,17 @@ export default function HallazgosAuditoria() {
               <Download className="w-4 h-4 mr-2" />
               Plantilla
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => setShowImportModal(true)}
-              className="border-teal-500/50 text-teal-400 hover:bg-teal-500/10"
-              data-testid="btn-importar-hallazgos"
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Importar
-            </Button>
+            {isAdmin && (
+              <Button
+                variant="outline"
+                onClick={() => setShowImportModal(true)}
+                className="border-teal-500/50 text-teal-400 hover:bg-teal-500/10"
+                data-testid="btn-importar-hallazgos"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Importar
+              </Button>
+            )}
             <Button
               onClick={openCreateModal}
               className="bg-teal-600 hover:bg-teal-700"

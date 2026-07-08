@@ -82,6 +82,7 @@ import {
   AlertTriangle,
   Shield,
   History,
+  Loader2,
 } from "lucide-react";
 import ImportarPDF from "@/pages/ImportarPDF";
 import BulkEntryModal from "@/components/BulkEntryModal";
@@ -322,6 +323,11 @@ export default function Vulnerabilidades() {
   const [showConfirmChangesModal, setShowConfirmChangesModal] = useState(false);
   const [originalDataForDiff, setOriginalDataForDiff] = useState(null);
   const [savingChanges, setSavingChanges] = useState(false);
+  
+  // Import confirmation modal
+  const [showImportConfirmModal, setShowImportConfirmModal] = useState(false);
+  const [pendingImportFile, setPendingImportFile] = useState(null);
+  const [pendingImportFormat, setPendingImportFormat] = useState(null);
 
   // Toggle column visibility
   const toggleColumn = (columnId) => {
@@ -710,16 +716,28 @@ export default function Vulnerabilidades() {
     }
   };
 
-  const handleImport = async (e, format) => {
+  // Handler para mostrar confirmación antes de importar
+  const handleImportClick = (e, format) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    setPendingImportFile(file);
+    setPendingImportFormat(format);
+    setShowImportConfirmModal(true);
+    e.target.value = ""; // Reset input
+  };
+
+  // Handler real de importación (después de confirmación)
+  const handleImport = async () => {
+    if (!pendingImportFile || !pendingImportFormat) return;
 
     setUploading(true);
+    setShowImportConfirmModal(false);
     const formDataUpload = new FormData();
-    formDataUpload.append("file", file);
+    formDataUpload.append("file", pendingImportFile);
 
     try {
-      const response = await axios.post(`${API}/import/${format}`, formDataUpload, {
+      const response = await axios.post(`${API}/import/${pendingImportFormat}`, formDataUpload, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       toast.success(response.data.message);
@@ -729,8 +747,16 @@ export default function Vulnerabilidades() {
       toast.error(error.response?.data?.detail || "Error al importar archivo");
     } finally {
       setUploading(false);
-      e.target.value = "";
+      setPendingImportFile(null);
+      setPendingImportFormat(null);
     }
+  };
+  
+  // Cancelar importación
+  const cancelImport = () => {
+    setShowImportConfirmModal(false);
+    setPendingImportFile(null);
+    setPendingImportFormat(null);
   };
 
   // Helper to display applications
@@ -1005,14 +1031,14 @@ export default function Vulnerabilidades() {
 
               {/* Import/Export */}
               <div className="flex gap-2 ml-auto">
-                {canAdd && (
+                {isAdmin && (
                   <>
                     <label className="cursor-pointer">
                       <input
                         type="file"
                         accept=".xlsx,.xls"
                         className="hidden"
-                        onChange={(e) => handleImport(e, "excel")}
+                        onChange={(e) => handleImportClick(e, "excel")}
                         disabled={uploading}
                       />
                       <Button variant="outline" size="sm" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800" asChild>
@@ -1027,7 +1053,7 @@ export default function Vulnerabilidades() {
                         type="file"
                         accept=".csv"
                         className="hidden"
-                        onChange={(e) => handleImport(e, "csv")}
+                        onChange={(e) => handleImportClick(e, "csv")}
                         disabled={uploading}
                       />
                       <Button variant="outline" size="sm" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800" asChild>
@@ -2282,6 +2308,60 @@ export default function Vulnerabilidades() {
               data-testid="confirm-duplicate-btn"
             >
               Crear de todas formas
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Import Confirmation Dialog */}
+      <AlertDialog open={showImportConfirmModal} onOpenChange={setShowImportConfirmModal}>
+        <AlertDialogContent className="bg-zinc-900 border-zinc-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-amber-400 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5" />
+              Confirmar Importación
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-zinc-400 space-y-3">
+              <p>
+                Está a punto de importar vulnerabilidades desde un archivo <strong className="text-white">{pendingImportFormat?.toUpperCase()}</strong>.
+              </p>
+              {pendingImportFile && (
+                <p className="text-sm">
+                  <span className="text-zinc-500">Archivo:</span>{" "}
+                  <span className="text-white">{pendingImportFile.name}</span>
+                </p>
+              )}
+              <div className="bg-amber-900/20 border border-amber-800/50 rounded-lg p-3 mt-2">
+                <p className="text-amber-300 text-sm">
+                  <strong>Importante:</strong> Esta acción creará nuevos registros de vulnerabilidades en el sistema.
+                  Asegúrese de que el archivo tiene el formato correcto antes de continuar.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={cancelImport}
+              className="bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border-zinc-700"
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleImport}
+              className="bg-indigo-600 hover:bg-indigo-700"
+              disabled={uploading}
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Importando...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Confirmar Importación
+                </>
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

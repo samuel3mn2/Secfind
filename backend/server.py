@@ -237,6 +237,7 @@ class VulnerabilidadBase(BaseModel):
     descripcion_riesgo: Optional[str] = None
     responsable: Optional[str] = None
     fecha_compromiso: Optional[str] = None
+    fecha_cierre: Optional[str] = None  # Fecha cuando se cerró/desestimó la vulnerabilidad
     estatus: Optional[str] = None
     resultado_re_test: Optional[str] = None
     veces_en_retest: Optional[int] = 0
@@ -400,16 +401,19 @@ class Responsable(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     nombre: str
     email: Optional[str] = None
+    area: Optional[str] = None
     activo: bool = True
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class ResponsableCreate(BaseModel):
     nombre: str
     email: Optional[str] = None
+    area: Optional[str] = None
 
 class ResponsableUpdate(BaseModel):
     nombre: Optional[str] = None
     email: Optional[str] = None
+    area: Optional[str] = None
     activo: Optional[bool] = None
 
 class DropdownOptions(BaseModel):
@@ -421,7 +425,7 @@ class DropdownOptions(BaseModel):
     informes_pentest: List[str]
     años: List[int]
     proveedores: List[str]
-    responsables: List[dict]  # [{nombre, email}]
+    responsables: List[dict]  # [{nombre, email, area}]
 
 class DashboardStats(BaseModel):
     total_vulnerabilidades: int
@@ -2531,13 +2535,22 @@ async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate, c
     update_dict = vuln_data.model_dump(exclude_unset=True)
     
     # Sincronizar estatus basado en resultado de retest
-    # Mapeo: Corregido/Desestimado -> Cerrado, Vulnerable/Impedimento -> Pendiente
+    # Mapeo: Corregido/Desestimado -> Cerrado, Vulnerable/Impedimento/Para Re Test -> Pendiente
     if "resultado_re_test" in update_dict:
         resultado_retest = (update_dict.get("resultado_re_test") or "").strip().lower()
         if resultado_retest in ["corregido", "desestimado"]:
             update_dict["estatus"] = "Cerrado"
-        elif resultado_retest in ["vulnerable", "impedimento"]:
+            # Establecer fecha_cierre si no está ya definida
+            if not update_dict.get("fecha_cierre") and not existing.get("fecha_cierre"):
+                update_dict["fecha_cierre"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        elif resultado_retest in ["vulnerable", "impedimento", "para re test"]:
             update_dict["estatus"] = "Pendiente"
+            # Si es "Para Re Test", limpiar fecha_compromiso para que aparezca en vista en_retest
+            if resultado_retest == "para re test":
+                update_dict["fecha_compromiso"] = None
+            # Si se reabre la vulnerabilidad, limpiar fecha_cierre
+            if existing.get("estatus") == "Cerrado":
+                update_dict["fecha_cierre"] = None
     
     # Calcular cambios antes de actualizar
     cambios = calcular_cambios(existing, update_dict)
@@ -3496,7 +3509,9 @@ async def registrar_seguimiento(
         # - SÍ incrementa veces_en_retest
         # - NO incrementa veces_cambiada_fecha
         # - Fecha en bitácora forzada a null (ya hecho arriba)
+        # - Establece fecha_cierre a la fecha actual
         update_ops["$set"]["estatus"] = "Cerrado"
+        update_ops["$set"]["fecha_cierre"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         inc_ops["veces_en_retest"] = 1
         
     elif es_impedimento:
@@ -3533,11 +3548,13 @@ async def registrar_seguimiento(
             
     elif es_para_retest:
         # CASO D: Para Re Test
-        # - CONSERVA fecha_compromiso actual (se congela - no se modifica)
+        # - LIMPIA fecha_compromiso a null para que aparezca en vista "En Retest"
         # - NO incrementa veces_en_retest ni veces_cambiada_fecha
-        # - Mantiene estatus "Pendiente"
+        # - Mantiene estatus "Pendiente" (para compatibilidad)
         update_ops["$set"]["estatus"] = "Pendiente"
-        # NO modificar fecha_compromiso - se conserva la actual
+        # Limpiar fecha_compromiso para que aparezca en vista "en_retest"
+        update_ops["$set"]["fecha_compromiso"] = None
+        fecha_limpiada = True
         
     elif es_pendiente:
         # CASO E: Pendiente (Prórroga o Transición)

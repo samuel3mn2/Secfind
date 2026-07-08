@@ -4,6 +4,26 @@
 
 ### Cambios Recientes (Julio 2026)
 
+- **FEATURE/BUGFIX: Múltiples mejoras y correcciones (2026-07-08)**:
+  - **BUG #1: "En Retest" no funciona con vulnerabilidades activas con fecha**:
+    * Problema: Cuando una vulnerabilidad activa con fecha se ponía "Para Re Test", no aparecía en vista "En Retest"
+    * Causa: La lógica conservaba la fecha_compromiso, pero la vista "En Retest" requiere fecha_compromiso = null
+    * Solución: Modificado para que "Para Re Test" LIMPIE la fecha_compromiso
+  - **BUG #2: Status "En Retest" no se guarda al editar**:
+    * Problema: Al editar vulnerabilidad y cambiar a "Para Re Test", no se aplicaba correctamente
+    * Solución: Añadida lógica para manejar "para re test" en endpoint PUT de vulnerabilidades
+  - **FEATURE #3: Campo "Área" en Responsables**:
+    * Backend: Añadido campo `area` en modelos Responsable, ResponsableCreate, ResponsableUpdate
+    * Frontend: Actualizado Responsables.jsx con columna "Área" y campo en formulario
+  - **FEATURE #4: Campo "Fecha de Cierre" en Vulnerabilidades y Hallazgos**:
+    * Backend Vulnerabilidades: Añadido campo `fecha_cierre`, se establece automáticamente cuando resultado_re_test = Corregido/Desestimado
+    * Backend Hallazgos: Añadido campo `fecha_cierre`, se establece cuando estado = "Cerrado"
+    * Lógica: Si se reabre (cambia de Cerrado a otro estado), se limpia fecha_cierre
+  - **FEATURE #5: Botón "Importar" solo para Administradores**:
+    * Vulnerabilidades: Cambiado de `canAdd` a `isAdmin` + modal de confirmación
+    * HallazgosAuditoria: Envuelto botón Importar con `{isAdmin && ...}`
+    * CatalogoRiesgos: Ya estaba correctamente con `isAdmin`
+
 - **BUGFIX: Selección de Dropdown en Pivot Tables no funcionaba (2026-07-08)**:
   - **Problema**: Al hacer clic en opciones del dropdown (Table, Table Heatmap, etc.) no se seleccionaban
   - **Causa 1**: `rendererName="Table"` estaba forzado DESPUÉS de `{...vulnTableState}` en PivotTableUI, sobrescribiendo cualquier cambio del usuario

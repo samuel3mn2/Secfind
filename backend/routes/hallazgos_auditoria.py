@@ -472,13 +472,23 @@ def create_hallazgos_router(db, get_current_user: Callable) -> APIRouter:
         impact = update_data.get("impacto", existing.get("impacto", 1))
         update_data["riesgo_inherente"] = prob * impact
         
+        # Handle fecha_cierre based on estado changes
+        old_estado = existing.get("estado")
+        new_estado = update_data.get("estado", old_estado)
+        
+        if new_estado == "Cerrado" and old_estado != "Cerrado":
+            # Establecer fecha_cierre si no está ya definida
+            if not update_data.get("fecha_cierre") and not existing.get("fecha_cierre"):
+                update_data["fecha_cierre"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        elif new_estado != "Cerrado" and old_estado == "Cerrado":
+            # Si se reabre el hallazgo, limpiar fecha_cierre
+            update_data["fecha_cierre"] = None
+        
         update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
         
         # Calculate changes for audit
         cambios = []
         estado_changed = False
-        old_estado = existing.get("estado")
-        new_estado = update_data.get("estado", old_estado)
         
         for campo, valor_nuevo in update_data.items():
             if campo in ["updated_at"]:

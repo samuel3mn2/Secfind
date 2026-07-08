@@ -92,6 +92,7 @@ class HallazgoAuditoriaBase(BaseModel):
     responsable: Optional[str] = None  # Nombre del responsable (del catálogo)
     fecha_hallazgo: Optional[str] = None  # Fecha de identificación (DD-MM-YYYY)
     fecha_compromiso: Optional[str] = None  # Fecha límite de remediación (DD-MM-YYYY)
+    fecha_cierre: Optional[str] = None  # Fecha cuando se cerró el hallazgo
     observaciones: Optional[str] = None
 
 class HallazgoAuditoriaCreate(HallazgoAuditoriaBase):
@@ -108,6 +109,7 @@ class HallazgoAuditoriaUpdate(BaseModel):
     responsable: Optional[str] = None
     fecha_hallazgo: Optional[str] = None
     fecha_compromiso: Optional[str] = None
+    fecha_cierre: Optional[str] = None
     observaciones: Optional[str] = None
 
 class HallazgoAuditoria(HallazgoAuditoriaBase):

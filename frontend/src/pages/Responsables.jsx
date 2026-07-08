@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, Plus, Pencil, Trash2, UserCircle, Mail, Search } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, UserCircle, Mail, Search, Building2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { DeleteWithJustificationModal } from "@/components/DeleteWithJustificationModal";
 
@@ -27,6 +27,7 @@ export default function Responsables() {
   const [formData, setFormData] = useState({
     nombre: "",
     email: "",
+    area: "",
     activo: true
   });
 
@@ -81,10 +82,10 @@ export default function Responsables() {
   const handleOpenModal = (item = null) => {
     if (item) {
       setEditingItem(item);
-      setFormData({ nombre: item.nombre, email: item.email || "", activo: item.activo });
+      setFormData({ nombre: item.nombre, email: item.email || "", area: item.area || "", activo: item.activo });
     } else {
       setEditingItem(null);
-      setFormData({ nombre: "", email: "", activo: true });
+      setFormData({ nombre: "", email: "", area: "", activo: true });
     }
     setShowModal(true);
   };
@@ -92,12 +93,13 @@ export default function Responsables() {
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingItem(null);
-    setFormData({ nombre: "", email: "", activo: true });
+    setFormData({ nombre: "", email: "", area: "", activo: true });
   };
 
   const filteredResponsables = responsables.filter(r => 
     r.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (r.email && r.email.toLowerCase().includes(searchTerm.toLowerCase()))
+    (r.email && r.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (r.area && r.area.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const canModify = isAdmin || canCreate("configuracion") || canEdit("configuracion");
@@ -157,6 +159,7 @@ export default function Responsables() {
               <TableHeader>
                 <TableRow className="border-zinc-800 hover:bg-transparent">
                   <TableHead className="text-zinc-400">Nombre</TableHead>
+                  <TableHead className="text-zinc-400">Área</TableHead>
                   <TableHead className="text-zinc-400">Email</TableHead>
                   <TableHead className="text-zinc-400">Estado</TableHead>
                   <TableHead className="text-zinc-400 text-right">Acciones</TableHead>
@@ -165,7 +168,7 @@ export default function Responsables() {
               <TableBody>
                 {filteredResponsables.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-zinc-500 py-8">
+                    <TableCell colSpan={5} className="text-center text-zinc-500 py-8">
                       {searchTerm ? "No se encontraron resultados" : "No hay responsables registrados"}
                     </TableCell>
                   </TableRow>
@@ -177,6 +180,16 @@ export default function Responsables() {
                           <UserCircle className="w-4 h-4 text-zinc-500" />
                           {item.nombre}
                         </div>
+                      </TableCell>
+                      <TableCell className="text-zinc-400">
+                        {item.area ? (
+                          <div className="flex items-center gap-2">
+                            <Building2 className="w-4 h-4 text-zinc-500" />
+                            {item.area}
+                          </div>
+                        ) : (
+                          <span className="text-zinc-600 italic">Sin área</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-zinc-400">
                         {item.email ? (
@@ -258,6 +271,19 @@ export default function Responsables() {
                 className="bg-zinc-900 border-zinc-700 text-white"
                 data-testid="responsable-nombre-input"
               />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-zinc-400">Área</Label>
+              <Input
+                value={formData.area}
+                onChange={(e) => setFormData(prev => ({ ...prev, area: e.target.value }))}
+                placeholder="Ej: Seguridad IT, Desarrollo, Infraestructura..."
+                className="bg-zinc-900 border-zinc-700 text-white"
+                data-testid="responsable-area-input"
+              />
+              <p className="text-xs text-zinc-500">
+                Área o departamento del responsable
+              </p>
             </div>
             <div className="space-y-2">
               <Label className="text-zinc-400">Email</Label>
