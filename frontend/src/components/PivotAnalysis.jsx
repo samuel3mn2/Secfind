@@ -1071,11 +1071,10 @@ export function PivotAnalysis({
       });
 
       document.querySelectorAll('.pvtDropdownMenu .pvtDropdownValue').forEach(el => {
-        el.style.cssText = `
-          background-color: transparent !important;
-          color: #e4e4e7 !important;
-          padding: 10px 14px !important;
-        `;
+        // Aplicar estilos individualmente para no sobrescribir event handlers
+        el.style.backgroundColor = 'transparent';
+        el.style.color = '#e4e4e7';
+        el.style.padding = '10px 14px';
       });
 
       // Añadir event listener al botón de cerrar para asegurar que funcione
@@ -1097,12 +1096,17 @@ export function PivotAnalysis({
     };
 
     // Crear MutationObserver para detectar cambios en el DOM
+    let debounceTimer = null;
     const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.addedNodes.length > 0) {
-          applyDarkStyles();
-        }
-      });
+      // Debounce para evitar aplicar estilos repetidamente
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        mutations.forEach((mutation) => {
+          if (mutation.addedNodes.length > 0) {
+            applyDarkStyles();
+          }
+        });
+      }, 100);
     });
 
     // Observar cambios en el DOM
@@ -1137,24 +1141,27 @@ export function PivotAnalysis({
     const handleClickOutside = (e) => {
       const filterBox = document.querySelector('.pvtFilterBox');
       if (filterBox && filterBox.style.display !== 'none' && filterBox.offsetHeight > 0) {
-        // Verificar si el click fue fuera del FilterBox y fuera de los atributos
+        // Verificar si el click fue fuera del FilterBox y fuera de elementos interactivos del pivot
         const isInsideFilterBox = filterBox.contains(e.target);
         const isOnAttribute = e.target.closest('.pvtAttr') || e.target.closest('.pvtTriangle');
         const isOnPvtDropdown = e.target.closest('.pvtDropdown');
+        const isOnPvtDropdownMenu = e.target.closest('.pvtDropdownMenu');
+        const isOnPvtDropdownValue = e.target.closest('.pvtDropdownValue');
         
-        if (!isInsideFilterBox && !isOnAttribute && !isOnPvtDropdown) {
+        // No cerrar si el click es en cualquier elemento interactivo del pivot
+        if (!isInsideFilterBox && !isOnAttribute && !isOnPvtDropdown && !isOnPvtDropdownMenu && !isOnPvtDropdownValue) {
           closeFilterBox();
         }
       }
     };
 
-    // Añadir listeners
+    // Añadir listeners - usar 'click' en lugar de 'mousedown' para no interferir con selecciones
     document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('click', handleClickOutside);
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('click', handleClickOutside);
     };
   }, []);
 
@@ -1212,21 +1219,27 @@ export function PivotAnalysis({
 
   // Sincronizar cambios
   const handleVulnTableChange = (s) => {
+    // IMPORTANTE: Eliminar 'data' del state para evitar que sobrescriba los datos actuales
+    // Ver: https://github.com/plotly/react-pivottable/issues/57
+    delete s.data;
     setVulnTableState(s);
     setVulnChartState(prev => ({ ...prev, rows: s.rows, cols: s.cols, aggregatorName: s.aggregatorName, vals: s.vals }));
   };
   
   const handleVulnChartChange = (s) => {
+    delete s.data;
     setVulnChartState(s);
     setVulnTableState(prev => ({ ...prev, rows: s.rows, cols: s.cols, aggregatorName: s.aggregatorName, vals: s.vals }));
   };
   
   const handleHallTableChange = (s) => {
+    delete s.data;
     setHallTableState(s);
     setHallChartState(prev => ({ ...prev, rows: s.rows, cols: s.cols, aggregatorName: s.aggregatorName, vals: s.vals }));
   };
   
   const handleHallChartChange = (s) => {
+    delete s.data;
     setHallChartState(s);
     setHallTableState(prev => ({ ...prev, rows: s.rows, cols: s.cols, aggregatorName: s.aggregatorName, vals: s.vals }));
   };
@@ -1374,9 +1387,8 @@ export function PivotAnalysis({
                       data={vulnerabilidadesData}
                       onChange={handleVulnTableChange}
                       renderers={TableRenderers}
-                      {...vulnTableState}
-                      rendererName="Table"
                       unusedOrientationCutoff={Infinity}
+                      {...vulnTableState}
                     />
                   </div>
                 ) : (
@@ -1450,9 +1462,8 @@ export function PivotAnalysis({
                       data={hallazgosData}
                       onChange={handleHallTableChange}
                       renderers={TableRenderers}
-                      {...hallTableState}
-                      rendererName="Table"
                       unusedOrientationCutoff={Infinity}
+                      {...hallTableState}
                     />
                   </div>
                 ) : (

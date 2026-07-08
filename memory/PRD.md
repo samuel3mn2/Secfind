@@ -1,8 +1,17 @@
 # SecFind - Sistema de Gestión de Vulnerabilidades
 
-## Última Actualización: 2026-07-06
+## Última Actualización: 2026-07-08
 
 ### Cambios Recientes (Julio 2026)
+
+- **BUGFIX: Selección de Dropdown en Pivot Tables no funcionaba (2026-07-08)**:
+  - **Problema**: Al hacer clic en opciones del dropdown (Table, Table Heatmap, etc.) no se seleccionaban
+  - **Causa 1**: `rendererName="Table"` estaba forzado DESPUÉS de `{...vulnTableState}` en PivotTableUI, sobrescribiendo cualquier cambio del usuario
+  - **Causa 2**: El prop `data` no se estaba eliminando en los handlers `onChange`, causando problemas de re-render (issue conocido de react-pivottable)
+  - **Solución**:
+    * Movido `{...vulnTableState}` y `{...hallTableState}` al final de los props para que el state controle el renderer
+    * Añadido `delete s.data` en todos los handlers onChange (handleVulnTableChange, handleVulnChartChange, etc.)
+  - **Verificado**: Playwright confirma `Renderer after click: ×Table Heatmap` - selección funciona correctamente
 
 - **MEJORA: FilterBox cierre con ESC y Click Fuera + Orden de Vistas (2026-07-06)**:
   - **Problema 1**: El popup de filtros (pvtFilterBox) no se podía cerrar con el botón X ni mover
