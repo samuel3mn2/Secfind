@@ -3485,10 +3485,14 @@ async def registrar_seguimiento(
     update_ops = {
         "$push": {"historial_impedimentos_seguimiento": entrada_bitacora},
         "$set": {
-            "resultado_re_test": resultado,
             "updated_at": datetime.now(timezone.utc).isoformat()
         }
     }
+    
+    # Solo actualizar resultado_re_test si NO es una "Nota de Seguimiento"
+    # Las notas de seguimiento son solo comentarios, no deben cambiar el estado de retest
+    if not es_nota_seguimiento:
+        update_ops["$set"]["resultado_re_test"] = resultado
     
     # Inicializar $inc si se va a usar
     inc_ops = {}

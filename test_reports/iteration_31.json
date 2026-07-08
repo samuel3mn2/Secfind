@@ -1,0 +1,45 @@
+{
+  "summary": "Iteration 31 (both): Regression testing of the critical bug 'Vulnerabilities in Para Re Test disappearing from Seguimiento en_retest view after adding a Nota de Seguimiento'. Verified end-to-end that the fix at server.py lines 3492-3495 works correctly. Backend: created /app/backend/tests/test_nota_seguimiento_retest_bug.py (pytest) with 5 tests — ALL PASS. Frontend: reproduced the exact user flow via Playwright — created a new vuln, put it in 'Para Re Test' via /api/seguimiento/{id}/registrar, verified it appeared in the 'En Retest' tab (1 registro), clicked view (Eye icon), opened 'Registrar Seguimiento / Impedimento' form, selected 'Nota de Seguimiento - Comentario' option, saved. Post-save the vuln STILL appears in the 'En Retest' tab (1 registro), and API GET /api/seguimiento-riesgos?vista=en_retest returns it. Confirmed resultado_re_test remains 'Para Re Test' (not overwritten) and historial_impedimentos_seguimiento contains 2 entries. Sanity: switching to 'Vulnerable' via same endpoint DOES update resultado_re_test correctly.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "Backend test_1_vuln_starts_in_en_retest_view: PASS — after initial POST /api/seguimiento/{id}/registrar with resultado_retest='Para Re Test', GET returns resultado_re_test='Para Re Test' AND the vuln appears in GET /api/seguimiento-riesgos?vista=en_retest",
+    "Backend test_2_adding_nota_seguimiento_does_not_change_resultado_re_test: PASS — POST with resultado_retest='Nota de Seguimiento' keeps resultado_re_test='Para Re Test' AND appends entry to historial_impedimentos_seguimiento",
+    "Backend test_3_vuln_still_appears_in_en_retest_view: PASS — vulnerability remains in en_retest list after Nota de Seguimiento (the exact bug the user reported)",
+    "Backend test_4_multiple_notes_still_keep_vuln_in_en_retest: PASS — 3 consecutive notes all keep the vuln in en_retest",
+    "Backend test_5_changing_to_vulnerable_does_update_resultado_re_test: PASS — sanity check: non-note resultados still correctly update resultado_re_test to 'Vulnerable'",
+    "Frontend UI: Route /seguimiento-riesgos loads, [data-testid=tab-en-retest] clickable, search filter works",
+    "Frontend UI: Newly created vuln with resultado_re_test='Para Re Test' visible in 'En Retest' tab (1 registro shown, Ult: Para Re Test badge)",
+    "Frontend UI: [data-testid=view-vuln-btn-{id}] opens detail modal; [data-testid=btn-registrar-seguimiento] opens the seguimiento form; [data-testid=select-resultado-retest] dropdown works and shows 'Nota de Seguimiento - Comentario' option; [data-testid=btn-guardar-seguimiento] persists successfully",
+    "Frontend UI (BUG FIX VERIFIED): After saving 'Nota de Seguimiento', the vulnerability STILL appears in the En Retest tab (1 registro before and 1 after). Screenshot: /app/.screenshots/en_retest_after_note.png"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_nota_seguimiento_retest_bug.py",
+    "/app/test_reports/pytest/nota_seguimiento_retest.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py lines 3492-3495: Fix is correctly implemented — `if not es_nota_seguimiento: update_ops['$set']['resultado_re_test'] = resultado`. This preserves the previous retest state when logging a comment-only entry. Recommendation OK.",
+    "server.py lines 3235-3243 (en_retest query): filter is `resultado_re_test == 'Para Re Test'` AND estatus not in cerrados AND fecha_compromiso empty/absent. This is the exact filter the bug was breaking. With the fix, notes no longer disrupt this filter.",
+    "MINOR/CONSISTENCY: The public REST paths documented in the review request (`POST /api/vulnerabilidades/{id}/seguimiento` and `GET /api/vulnerabilidades/seguimiento?vista=en_retest`) do NOT match the actual server routes (`POST /api/seguimiento/{id}/registrar` and `GET /api/seguimiento-riesgos?vista=en_retest`). This is not a bug — tests were adjusted to the actual routes — but documentation/URL naming could be aligned for clarity.",
+    "MINOR: server.py is 5078 lines. Recommend splitting Seguimiento logic into routes/seguimiento.py — file exceeds the 700-line best-practice threshold significantly.",
+    "PRE-EXISTING (non-blocking, from prior iteration): Plotly console warnings 'width(-1) and height(-1)' still fire on the Dashboard when charts mount hidden — not related to this bug."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_nota_seguimiento_retest_bug.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (5/5 pytest cases passing)",
+    "frontend": "100% (full E2E user flow reproduced and verified via Playwright)"
+  },
+  "test_credentials": { "user": "admin", "password": "admin123" },
+  "seed_data_creation": "Each test creates a TEST_UIRetest_* / TEST_NotaSeguimiento_* vulnerability and cleans it up via DELETE at the end. No residual test data left in DB.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Critical bug is FIXED and verified end-to-end. The fix is at /app/backend/server.py lines 3492-3495 (skip updating resultado_re_test when resultado_retest is 'Nota de Seguimiento'). Regression test: /app/backend/tests/test_nota_seguimiento_retest_bug.py — 5 tests all PASS. Frontend selectors used: [data-testid=tab-en-retest], [data-testid=search-vulnerabilidades], [data-testid=vuln-row-{id}], [data-testid=view-vuln-btn-{id}], [data-testid=btn-registrar-seguimiento], [data-testid=select-resultado-retest], [data-testid=textarea-notas-impedimento], [data-testid=btn-guardar-seguimiento]. Route path is /seguimiento-riesgos (not /seguimiento).",
+  "rca of the issue": "ROOT CAUSE: In POST /api/seguimiento/{vuln_id}/registrar (server.py), the code unconditionally set update_ops['$set']['resultado_re_test'] = resultado for every incoming resultado_retest value, including 'Nota de Seguimiento'. When a user viewed a vuln in 'Para Re Test' state and added a note, resultado_re_test was overwritten to 'Nota de Seguimiento'. The 'en_retest' view (GET /api/seguimiento-riesgos?vista=en_retest, lines 3235-3243) filters by resultado_re_test='Para Re Test', so the vuln silently dropped out of the view. FIX APPLIED (server.py 3492-3495): added `if not es_nota_seguimiento:` guard so 'Nota de Seguimiento' only appends to the historial without touching resultado_re_test. REPRODUCTION: 1) Create vuln, 2) Register seguimiento with 'Para Re Test' (vuln appears in En Retest tab), 3) Add 'Nota de Seguimiento' via the same endpoint, 4) Before fix: vuln disappears from En Retest; after fix: vuln remains. MITIGATION: applied fix + added regression tests in test_nota_seguimiento_retest_bug.py."
+}
