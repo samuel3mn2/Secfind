@@ -4,6 +4,13 @@
 
 ### Cambios Recientes (Julio 2026)
 
+- **BUGFIX CRÍTICO: Vulnerabilidades desaparecen de "En Retest" al agregar notas (2026-07-08)**:
+  - **Problema reportado**: Las vulnerabilidades en "Para Re Test" desaparecían del módulo Seguimiento después de agregarles una "Nota de Seguimiento"
+  - **Causa raíz**: En `POST /api/seguimiento/{id}/registrar`, el código actualizaba `resultado_re_test` con el valor del resultado para TODOS los casos, incluyendo "Nota de Seguimiento". Esto sobrescribía "Para Re Test" con "Nota de Seguimiento", y la vista "en_retest" filtra por `resultado_re_test='Para Re Test'`
+  - **Solución**: Añadida condición `if not es_nota_seguimiento:` antes de actualizar `resultado_re_test` (server.py líneas 3492-3495)
+  - **Verificado**: Testing agent iteration_31 - 100% backend (5/5 pytest), 100% frontend (E2E Playwright)
+  - **Regresión**: Test file creado `/app/backend/tests/test_nota_seguimiento_retest_bug.py`
+
 - **FEATURE/BUGFIX: Múltiples mejoras y correcciones (2026-07-08)**:
   - **BUG #1: "En Retest" no funciona con vulnerabilidades activas con fecha**:
     * Problema: Cuando una vulnerabilidad activa con fecha se ponía "Para Re Test", no aparecía en vista "En Retest"
