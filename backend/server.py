@@ -2558,6 +2558,9 @@ async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate, c
     estaba_cerrada = existing.get("estatus") == "Cerrado" or existing.get("resultado_re_test") in ["Corregido", "Desestimado"]
     fecha_cierre_anterior = existing.get("fecha_cierre")
     
+    # Verificar si el usuario CAMBIÓ el resultado_re_test
+    resultado_re_test_cambio = "resultado_re_test" in update_dict and update_dict.get("resultado_re_test") != existing.get("resultado_re_test")
+    
     # Determinar nuevo resultado (normalizado a minúsculas)
     nuevo_resultado = update_dict.get("resultado_re_test", existing.get("resultado_re_test"))
     if nuevo_resultado:
@@ -2568,44 +2571,41 @@ async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate, c
     es_resultado_reapertura = nuevo_resultado in ["vulnerable", "impedimento", "para re test", "pendiente"]
     
     # ==========================================================================
-    # LÓGICA DE CIERRE: Establecer fecha_cierre automáticamente
+    # LÓGICA DE SINCRONIZACIÓN AUTOMÁTICA (solo si cambió resultado_re_test)
     # ==========================================================================
-    if es_resultado_cierre:
-        update_dict["estatus"] = "Cerrado"
-        # Establecer fecha_cierre si no está ya definida
-        if not update_dict.get("fecha_cierre") and not existing.get("fecha_cierre"):
-            update_dict["fecha_cierre"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    
-    # ==========================================================================
-    # LÓGICA DE REAPERTURA: Limpiar fecha_cierre y agregar nota automática
-    # ==========================================================================
-    elif es_resultado_reapertura:
-        update_dict["estatus"] = "Pendiente"
-        
-        if nuevo_resultado == "para re test":
-            update_dict["fecha_compromiso"] = None
-        
-        # Si estaba cerrada, limpiar fecha_cierre y agregar nota
-        if estaba_cerrada and fecha_cierre_anterior:
-            update_dict["fecha_cierre"] = None
-            nota_reapertura = {
-                "id_accion": str(uuid.uuid4()),
-                "fecha_registro_nota": datetime.now(timezone.utc).isoformat(),
-                "resultado_retest": "Nota de Seguimiento",
-                "fecha_compromiso_asignada": None,
-                "notas_impedimento": f"⚠️ Vulnerabilidad reabierta. Fecha de cierre previa cancelada (Era: {fecha_cierre_anterior})",
-                "usuario_registro": current_user.nombre or current_user.username
-            }
-            # Inicializar historial si no existe
-            if existing.get("historial_impedimentos_seguimiento") is None:
+    if resultado_re_test_cambio:
+        if es_resultado_cierre:
+            update_dict["estatus"] = "Cerrado"
+            # Establecer fecha_cierre si no está ya definida
+            if not update_dict.get("fecha_cierre") and not existing.get("fecha_cierre"):
+                update_dict["fecha_cierre"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        elif es_resultado_reapertura:
+            update_dict["estatus"] = "Pendiente"
+            
+            if nuevo_resultado == "para re test":
+                update_dict["fecha_compromiso"] = None
+            
+            # Si estaba cerrada, limpiar fecha_cierre y agregar nota
+            if estaba_cerrada and fecha_cierre_anterior:
+                update_dict["fecha_cierre"] = None
+                nota_reapertura = {
+                    "id_accion": str(uuid.uuid4()),
+                    "fecha_registro_nota": datetime.now(timezone.utc).isoformat(),
+                    "resultado_retest": "Nota de Seguimiento",
+                    "fecha_compromiso_asignada": None,
+                    "notas_impedimento": f"⚠️ Vulnerabilidad reabierta. Fecha de cierre previa cancelada (Era: {fecha_cierre_anterior})",
+                    "usuario_registro": current_user.nombre or current_user.username
+                }
+                # Inicializar historial si no existe
+                if existing.get("historial_impedimentos_seguimiento") is None:
+                    await db.vulnerabilidades.update_one(
+                        {"id": vuln_id},
+                        {"$set": {"historial_impedimentos_seguimiento": []}}
+                    )
                 await db.vulnerabilidades.update_one(
                     {"id": vuln_id},
-                    {"$set": {"historial_impedimentos_seguimiento": []}}
+                    {"$push": {"historial_impedimentos_seguimiento": nota_reapertura}}
                 )
-            await db.vulnerabilidades.update_one(
-                {"id": vuln_id},
-                {"$push": {"historial_impedimentos_seguimiento": nota_reapertura}}
-            )
     
     # Calcular cambios antes de actualizar
     cambios = calcular_cambios(existing, update_dict)

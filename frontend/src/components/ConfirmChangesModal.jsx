@@ -37,15 +37,16 @@ export function ConfirmChangesModal({
   fieldLabels = {},
   lookupMaps = {},
 }) {
-  // Campos a ignorar en la comparación
+  // Campos a ignorar en la comparación (campos internos/automáticos)
   const IGNORED_FIELDS = [
     "id", "_id", "created_at", "updated_at", "timestamp",
-    "historial_impedimentos_seguimiento", "codigo", "veces_cambiada_fecha"
+    "historial_impedimentos_seguimiento", "veces_cambiada_fecha"
   ];
 
   // Mapeo de nombres de campo a etiquetas legibles por defecto
   const DEFAULT_LABELS = {
     // Vulnerabilidades
+    codigo: "Código",
     vulnerabilidad: "Vulnerabilidad",
     severidad: "Severidad",
     estatus: "Estatus",
