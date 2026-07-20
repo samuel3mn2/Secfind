@@ -2665,6 +2665,13 @@ async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate, c
     
     update_dict['updated_at'] = datetime.now(timezone.utc).isoformat()
     
+    # IMPORTANTE: Excluir campos que no deben ser sobrescritos por el frontend
+    # para no perder las entradas que acabamos de agregar con $push
+    campos_a_excluir = ['historial_impedimentos_seguimiento', 'veces_cambiada_fecha', 'created_at', 'id', '_id']
+    for campo in campos_a_excluir:
+        if campo in update_dict:
+            del update_dict[campo]
+    
     await db.vulnerabilidades.update_one(
         {"id": vuln_id},
         {"$set": update_dict}

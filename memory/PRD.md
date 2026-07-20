@@ -4,6 +4,15 @@
 
 ### Cambios Recientes (Julio 2026)
 
+- **BUGFIX CRÍTICO: Bitácora no mostraba ediciones desde UI (2026-07-20)**:
+  - **Problema reportado**: Al editar una vulnerabilidad desde la UI, el cambio se guardaba pero NO aparecía en la Bitácora de Seguimiento
+  - **Causa raíz #1 (Backend)**: El frontend enviaba `historial_impedimentos_seguimiento` en el payload del PUT. El backend primero hacía `$push` para agregar la nueva entrada, pero luego el `$set` con `update_dict` (que incluía el historial anterior) sobrescribía el historial completo, perdiendo la nueva entrada.
+  - **Causa raíz #2 (Frontend)**: El `bitacoraRefreshKey` se incrementaba al guardar (cuando el modal estaba cerrado), no cuando el usuario reabría el modal para ver los cambios.
+  - **Solución Backend**: Excluir `historial_impedimentos_seguimiento`, `veces_cambiada_fecha`, `created_at`, `id`, `_id` del `update_dict` antes del `$set`
+  - **Solución Frontend**: Incrementar `bitacoraRefreshKey` en `handleView()` para forzar fetch de datos frescos cada vez que se abre el modal
+  - **Archivos modificados**: `/app/backend/server.py`, `/app/frontend/src/pages/Vulnerabilidades.jsx`
+  - **Verificado**: Screenshot confirma que la bitácora ahora muestra 10 registros (incrementó de 9) con la última edición visible
+
 - **FEATURE: Auditoría completa de ediciones en Bitácora (2026-07-20)**:
   - **Solicitud**: Cualquier edición a una vulnerabilidad debe ser visible en la bitácora
   - **Implementación**: El endpoint PUT /api/vulnerabilidades/{id} ahora registra automáticamente TODAS las ediciones en el historial_impedimentos_seguimiento
