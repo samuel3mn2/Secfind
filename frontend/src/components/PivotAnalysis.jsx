@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import PivotTableUI from "react-pivottable/PivotTableUI";
 import "react-pivottable/pivottable.css";
 import TableRenderers from "react-pivottable/TableRenderers";
@@ -11,9 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   RefreshCw, Download, BarChart3, Table2, Info, Shield, 
-  AlertTriangle, Columns, Maximize2, LayoutGrid, Target, ClipboardList
+  AlertTriangle, Columns, Maximize2, LayoutGrid, Target, ClipboardList,
+  Image, FileText
 } from "lucide-react";
 import { toast } from "sonner";
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 
 // Crear componente Plot con Plotly
 const Plot = createPlotlyComponent(Plotly);
@@ -967,6 +970,12 @@ export function PivotAnalysis({
     rendererName: "Stacked Bar Chart"
   });
 
+  // Referencias para exportación de gráficos
+  const vulnChartRef = useRef(null);
+  const hallChartRef = useRef(null);
+  const vulnTableRef = useRef(null);
+  const hallTableRef = useRef(null);
+
   // ============================================================================
   // SINCRONIZACIÓN CON PADRE (VISTAS GUARDADAS)
   // ============================================================================
@@ -1271,6 +1280,118 @@ export function PivotAnalysis({
     }
   };
 
+  // Exportar gráfico a PNG
+  const handleExportPNG = async () => {
+    const elementRef = activeModule === "vulnerabilidades" 
+      ? (layoutMode === LAYOUT_TYPES.TABLE_ONLY ? vulnTableRef : vulnChartRef)
+      : (layoutMode === LAYOUT_TYPES.TABLE_ONLY ? hallTableRef : hallChartRef);
+    
+    if (!elementRef.current) {
+      toast.error("No hay contenido para exportar");
+      return;
+    }
+    
+    try {
+      toast.info("Generando imagen...");
+      
+      // Configurar html2canvas para mejor calidad
+      const canvas = await html2canvas(elementRef.current, {
+        backgroundColor: "#18181b",
+        scale: 2, // Mayor resolución
+        useCORS: true,
+        logging: false,
+        allowTaint: true
+      });
+      
+      // Descargar imagen
+      const link = document.createElement("a");
+      const moduleName = activeModule === "vulnerabilidades" ? "vulnerabilidades" : "hallazgos";
+      const viewType = layoutMode === LAYOUT_TYPES.TABLE_ONLY ? "tabla" : "grafico";
+      link.download = `pivot_${moduleName}_${viewType}_${new Date().toISOString().split("T")[0]}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+      
+      toast.success("Imagen exportada correctamente");
+    } catch (error) {
+      console.error("Error exportando PNG:", error);
+      toast.error("Error al exportar imagen");
+    }
+  };
+
+  // Exportar gráfico a PDF
+  const handleExportPDF = async () => {
+    const elementRef = activeModule === "vulnerabilidades" 
+      ? (layoutMode === LAYOUT_TYPES.TABLE_ONLY ? vulnTableRef : vulnChartRef)
+      : (layoutMode === LAYOUT_TYPES.TABLE_ONLY ? hallTableRef : hallChartRef);
+    
+    if (!elementRef.current) {
+      toast.error("No hay contenido para exportar");
+      return;
+    }
+    
+    try {
+      toast.info("Generando PDF...");
+      
+      // Capturar el elemento con html2canvas
+      const canvas = await html2canvas(elementRef.current, {
+        backgroundColor: "#18181b",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        allowTaint: true
+      });
+      
+      const imgData = canvas.toDataURL("image/png");
+      
+      // Calcular dimensiones para el PDF
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      
+      // Crear PDF en orientación landscape si es más ancho que alto
+      const isLandscape = imgWidth > imgHeight;
+      const pdf = new jsPDF({
+        orientation: isLandscape ? "landscape" : "portrait",
+        unit: "mm"
+      });
+      
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      // Escalar imagen para que quepa en la página manteniendo aspecto
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight) * 0.9;
+      const scaledWidth = imgWidth * ratio;
+      const scaledHeight = imgHeight * ratio;
+      
+      // Centrar imagen
+      const x = (pdfWidth - scaledWidth) / 2;
+      const y = 10;
+      
+      // Agregar título
+      const moduleName = activeModule === "vulnerabilidades" ? "Vulnerabilidades" : "Hallazgos";
+      const viewType = layoutMode === LAYOUT_TYPES.TABLE_ONLY ? "Tabla" : "Gráfico";
+      pdf.setFontSize(16);
+      pdf.setTextColor(80, 80, 80);
+      pdf.text(`Análisis Pivot - ${moduleName} (${viewType})`, pdfWidth / 2, 8, { align: "center" });
+      
+      // Agregar imagen
+      pdf.addImage(imgData, "PNG", x, y + 5, scaledWidth, scaledHeight);
+      
+      // Agregar footer con fecha
+      pdf.setFontSize(8);
+      pdf.setTextColor(150, 150, 150);
+      pdf.text(`Generado: ${new Date().toLocaleString()}`, 10, pdfHeight - 5);
+      
+      // Descargar PDF
+      const fileName = `pivot_${activeModule}_${viewType.toLowerCase()}_${new Date().toISOString().split("T")[0]}.pdf`;
+      pdf.save(fileName);
+      
+      toast.success("PDF exportado correctamente");
+    } catch (error) {
+      console.error("Error exportando PDF:", error);
+      toast.error("Error al exportar PDF");
+    }
+  };
+
   // Sincronizar cambios
   const handleVulnTableChange = (s) => {
     // IMPORTANTE: Eliminar 'data' del state para evitar que sobrescriba los datos actuales
@@ -1398,6 +1519,26 @@ export function PivotAnalysis({
               <Download className="w-4 h-4 mr-2" />
               Exportar CSV
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportPNG}
+              className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+              data-testid="export-png-btn"
+            >
+              <Image className="w-4 h-4 mr-2" />
+              PNG
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportPDF}
+              className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+              data-testid="export-pdf-btn"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              PDF
+            </Button>
           </div>
 
           {/* Leyenda */}
@@ -1436,7 +1577,7 @@ export function PivotAnalysis({
               </CardHeader>
               <CardContent className="p-4 overflow-x-auto">
                 {vulnerabilidadesData.length > 0 ? (
-                  <div className="pivot-container">
+                  <div className="pivot-container" ref={vulnTableRef}>
                     <PivotTableUI
                       data={vulnerabilidadesData}
                       onChange={handleVulnTableChange}
@@ -1468,7 +1609,7 @@ export function PivotAnalysis({
               </CardHeader>
               <CardContent className="p-4 overflow-x-auto">
                 {vulnerabilidadesData.length > 0 ? (
-                  <div className="pivot-container">
+                  <div className="pivot-container" ref={vulnChartRef}>
                     <PivotTableUI
                       data={vulnerabilidadesData}
                       onChange={handleVulnChartChange}
@@ -1511,7 +1652,7 @@ export function PivotAnalysis({
               </CardHeader>
               <CardContent className="p-4 overflow-x-auto">
                 {hallazgosData.length > 0 ? (
-                  <div className="pivot-container">
+                  <div className="pivot-container" ref={hallTableRef}>
                     <PivotTableUI
                       data={hallazgosData}
                       onChange={handleHallTableChange}
@@ -1543,7 +1684,7 @@ export function PivotAnalysis({
               </CardHeader>
               <CardContent className="p-4 overflow-x-auto">
                 {hallazgosData.length > 0 ? (
-                  <div className="pivot-container">
+                  <div className="pivot-container" ref={hallChartRef}>
                     <PivotTableUI
                       data={hallazgosData}
                       onChange={handleHallChartChange}

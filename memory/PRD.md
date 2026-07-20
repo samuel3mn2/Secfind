@@ -4,6 +4,21 @@
 
 ### Cambios Recientes (Julio 2026)
 
+- **FEATURE: Exportación de Gráficos Pivot a PNG/PDF (2026-07-20)**:
+  - Agregados botones "PNG" y "PDF" junto al botón "Exportar CSV" en el módulo de Análisis Avanzado (Pivot)
+  - Usa `html2canvas` para capturar el contenedor del gráfico/tabla con alta resolución (scale: 2)
+  - Exportación PDF incluye: título con módulo y tipo de vista, imagen centrada, footer con fecha de generación
+  - Detecta automáticamente orientación (landscape si ancho > alto) para mejor visualización
+  - Funciona para ambos módulos (Vulnerabilidades y Hallazgos) y todos los modos de visualización (Tabla, Gráfico, Paralelo)
+  - Dependencias agregadas: `html2canvas`, `jspdf`
+  - **Archivo modificado**: `/app/frontend/src/components/PivotAnalysis.jsx`
+
+- **FEATURE: Filtros Avanzados del Pivot se guardan en Vistas (2026-07-20)**:
+  - Los filtros específicos del PivotTableUI (valueFilter) ya se incluyen automáticamente en el estado que se propaga al padre
+  - Cuando el usuario filtra valores específicos (ej: solo mostrar severidad "Crítica"), ese filtro se guarda junto con la vista
+  - Estados completos guardados: `rows`, `cols`, `aggregatorName`, `vals`, `rendererName`, `valueFilter`, `rowOrder`, `colOrder`
+  - **Sin cambios adicionales necesarios** - la implementación previa de sincronización ya manejaba esto
+
 - **FEATURE: Vistas Guardadas capturan configuración de Pivot Tables (2026-07-20)**:
   - **Solicitud**: Las Vistas Guardadas en Dashboard GRC debían preservar la configuración de Pivot (modo de visualización, estados de tabla/gráfico, módulo activo)
   - **Problema encontrado**: El componente `PivotAnalysis` recibía `pivotState` y `onPivotStateChange` como props pero NUNCA los usaba - los estados se manejaban solo internamente
