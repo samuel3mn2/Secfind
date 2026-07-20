@@ -297,40 +297,365 @@ Permite asociar vulnerabilidades a Dominios y Riesgos del catálogo usando un ar
 
 ## Requisitos e Instalación
 
-### Software necesario
-| Software | Versión Mínima |
-|----------|----------------|
-| Python | 3.9+ |
-| Node.js | 18+ |
-| Yarn | 1.22+ |
-| MongoDB | 6.0+ |
+### Software Necesario
 
-### Instalación Rápida
+| Software | Versión Mínima | Descarga |
+|----------|----------------|----------|
+| Python | 3.9+ | [python.org](https://www.python.org/downloads/) |
+| Node.js | 18+ | [nodejs.org](https://nodejs.org/) |
+| MongoDB | 6.0+ | [mongodb.com](https://www.mongodb.com/try/download/community) |
+| Git | 2.30+ | [git-scm.com](https://git-scm.com/downloads) |
+
+---
+
+## 🪟 Instalación en Windows
+
+### Paso 1: Instalar Prerequisitos
+
+1. **Python 3.9+**
+   - Descargar desde [python.org](https://www.python.org/downloads/windows/)
+   - **IMPORTANTE**: Marcar ✅ "Add Python to PATH" durante la instalación
+   - Verificar: Abrir CMD y ejecutar `python --version`
+
+2. **Node.js 18+**
+   - Descargar LTS desde [nodejs.org](https://nodejs.org/)
+   - Instalar con opciones por defecto
+   - Verificar: `node --version` y `npm --version`
+
+3. **MongoDB 6.0+**
+   - Descargar Community Server desde [mongodb.com](https://www.mongodb.com/try/download/community)
+   - Seleccionar "Complete" durante instalación
+   - Marcar ✅ "Install MongoDB as a Service"
+   - El servicio inicia automáticamente en `localhost:27017`
+
+4. **Yarn (Gestor de paquetes)**
+   ```cmd
+   npm install -g yarn
+   ```
+
+### Paso 2: Clonar el Repositorio
+
+```cmd
+git clone https://github.com/TU_USUARIO/secfind.git
+cd secfind
+```
+
+### Paso 3: Configurar Backend
+
+```cmd
+cd backend
+
+:: Crear entorno virtual
+python -m venv venv
+
+:: Activar entorno virtual (Windows CMD)
+venv\Scripts\activate.bat
+
+:: Activar entorno virtual (Windows PowerShell)
+.\venv\Scripts\Activate.ps1
+
+:: Instalar dependencias
+pip install -r requirements.txt
+```
+
+### Paso 4: Configurar Variables de Entorno (Backend)
+
+Crear archivo `backend/.env`:
+```env
+MONGO_URL=mongodb://localhost:27017
+DB_NAME=secfind
+SECRET_KEY=tu_clave_secreta_aqui_cambiar_en_produccion
+```
+
+### Paso 5: Configurar Frontend
+
+```cmd
+cd ..\frontend
+
+:: Instalar dependencias
+yarn install
+```
+
+### Paso 6: Configurar Variables de Entorno (Frontend)
+
+Crear archivo `frontend/.env`:
+```env
+REACT_APP_BACKEND_URL=http://localhost:8001
+```
+
+### Paso 7: Ejecutar la Aplicación
+
+**Terminal 1 - Backend:**
+```cmd
+cd backend
+venv\Scripts\activate.bat
+uvicorn server:app --host 0.0.0.0 --port 8001 --reload
+```
+
+**Terminal 2 - Frontend:**
+```cmd
+cd frontend
+yarn start
+```
+
+### Paso 8: Acceder a la Aplicación
+
+- **Frontend**: http://localhost:3000
+- **API Docs**: http://localhost:8001/docs
+- **Credenciales**: `admin` / `admin123`
+
+---
+
+## 🍎 Instalación en macOS
+
+### Paso 1: Instalar Prerequisitos con Homebrew
+
 ```bash
+# Instalar Homebrew si no lo tienes
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Instalar dependencias
+brew install python@3.11 node@18 mongodb-community@7.0 git
+
+# Iniciar MongoDB
+brew services start mongodb-community@7.0
+
+# Instalar Yarn
+npm install -g yarn
+```
+
+### Paso 2: Clonar y Configurar
+
+```bash
+# Clonar repositorio
+git clone https://github.com/TU_USUARIO/secfind.git
+cd secfind
+
 # Backend
 cd backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
+# Crear .env
+cat > .env << EOF
+MONGO_URL=mongodb://localhost:27017
+DB_NAME=secfind
+SECRET_KEY=tu_clave_secreta_aqui
+EOF
+
 # Frontend
 cd ../frontend
 yarn install
+
+# Crear .env
+cat > .env << EOF
+REACT_APP_BACKEND_URL=http://localhost:8001
+EOF
 ```
 
-### Ejecutar
+### Paso 3: Ejecutar
+
 ```bash
-# Backend (Terminal 1)
+# Terminal 1 - Backend
 cd backend && source venv/bin/activate
 uvicorn server:app --host 0.0.0.0 --port 8001 --reload
 
-# Frontend (Terminal 2)
+# Terminal 2 - Frontend
 cd frontend && yarn start
 ```
 
-### Credenciales por Defecto
-- **Usuario**: `admin`
-- **Contraseña**: `admin123`
+---
+
+## 🐧 Instalación en Linux (Ubuntu/Debian)
+
+### Paso 1: Instalar Prerequisitos
+
+```bash
+# Actualizar sistema
+sudo apt update && sudo apt upgrade -y
+
+# Instalar Python
+sudo apt install python3.11 python3.11-venv python3-pip -y
+
+# Instalar Node.js 18
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt install nodejs -y
+
+# Instalar MongoDB
+curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
+echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] http://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+sudo apt update
+sudo apt install mongodb-org -y
+
+# Iniciar MongoDB
+sudo systemctl start mongod
+sudo systemctl enable mongod
+
+# Instalar Yarn
+npm install -g yarn
+
+# Instalar Git
+sudo apt install git -y
+```
+
+### Paso 2: Clonar y Configurar
+
+```bash
+# Clonar repositorio
+git clone https://github.com/TU_USUARIO/secfind.git
+cd secfind
+
+# Backend
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Crear .env
+cat > .env << EOF
+MONGO_URL=mongodb://localhost:27017
+DB_NAME=secfind
+SECRET_KEY=tu_clave_secreta_aqui
+EOF
+
+# Frontend
+cd ../frontend
+yarn install
+
+# Crear .env
+cat > .env << EOF
+REACT_APP_BACKEND_URL=http://localhost:8001
+EOF
+```
+
+### Paso 3: Ejecutar
+
+```bash
+# Terminal 1 - Backend
+cd backend && source venv/bin/activate
+uvicorn server:app --host 0.0.0.0 --port 8001 --reload
+
+# Terminal 2 - Frontend
+cd frontend && yarn start
+```
+
+---
+
+## 🐳 Instalación con Docker (Recomendado para Producción)
+
+### docker-compose.yml
+
+```yaml
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: secfind-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: secfind-backend
+    ports:
+      - "8001:8001"
+    environment:
+      - MONGO_URL=mongodb://mongodb:27017
+      - DB_NAME=secfind
+      - SECRET_KEY=${SECRET_KEY:-cambiar_en_produccion}
+    depends_on:
+      - mongodb
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: secfind-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_BACKEND_URL=http://localhost:8001
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+```
+
+### Ejecutar con Docker
+
+```bash
+# Construir y ejecutar
+docker-compose up -d
+
+# Ver logs
+docker-compose logs -f
+
+# Detener
+docker-compose down
+```
+
+---
+
+## ⚠️ Solución de Problemas Comunes
+
+### Windows: "python no se reconoce como comando"
+- Reinstalar Python marcando "Add Python to PATH"
+- O agregar manualmente: `C:\Users\TU_USUARIO\AppData\Local\Programs\Python\Python311` al PATH
+
+### Windows: Error de ejecución de scripts en PowerShell
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+### MongoDB no inicia (Windows)
+- Abrir "Servicios" (services.msc)
+- Buscar "MongoDB Server"
+- Click derecho → Iniciar
+
+### Error: "EACCES permission denied" (macOS/Linux)
+```bash
+sudo chown -R $(whoami) ~/.npm
+sudo chown -R $(whoami) /usr/local/lib/node_modules
+```
+
+### Puerto 3000 o 8001 ya en uso
+```bash
+# Linux/macOS
+lsof -i :3000
+kill -9 <PID>
+
+# Windows
+netstat -ano | findstr :3000
+taskkill /PID <PID> /F
+```
+
+### Problemas de conexión a MongoDB
+```bash
+# Verificar que MongoDB está corriendo
+# Linux
+sudo systemctl status mongod
+
+# macOS
+brew services list
+
+# Windows - Buscar "MongoDB" en Servicios (services.msc)
+```
+
+---
+
+## 🔑 Credenciales por Defecto
+
+| Usuario | Contraseña | Rol |
+|---------|------------|-----|
+| admin | admin123 | Administrador |
+
+**⚠️ IMPORTANTE**: Cambiar las credenciales en producción.
 
 ---
 
