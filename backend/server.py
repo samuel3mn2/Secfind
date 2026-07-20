@@ -263,7 +263,8 @@ ResultadoRetestLiteral = Literal[
     "Impedimento",    # CASO B: Bloqueo operativo
     "Vulnerable",     # CASO C: Retest ejecutado, vulnerabilidad persiste
     "Desestimado",    # CASO A: Cierre por falso positivo/riesgo aceptado
-    "Para Re Test",   # CASO D: En proceso de validación con proveedor
+    "Para Re Test",   # CASO D: En proceso de validación con proveedor (legacy)
+    "En Retest",      # CASO D: En proceso de validación (nueva nomenclatura, normaliza a "Para Re Test" en BD)
     "Nota de Seguimiento"  # CASO F: Comentario puro sin alterar contadores
 ]
 

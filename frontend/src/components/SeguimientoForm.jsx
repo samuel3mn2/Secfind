@@ -84,7 +84,17 @@ export const SeguimientoForm = ({
       }
     } catch (error) {
       console.error("Error registrando seguimiento:", error);
-      toast.error(error.response?.data?.detail || "Error al registrar seguimiento");
+      // Manejar errores de validación Pydantic (422) que devuelven un array de objetos
+      const detail = error.response?.data?.detail;
+      let errorMsg = "Error al registrar seguimiento";
+      if (Array.isArray(detail)) {
+        errorMsg = detail.map(d => d.msg || d.message || JSON.stringify(d)).join(', ');
+      } else if (typeof detail === 'string') {
+        errorMsg = detail;
+      } else if (detail && typeof detail === 'object') {
+        errorMsg = detail.msg || detail.message || JSON.stringify(detail);
+      }
+      toast.error(errorMsg);
     } finally {
       setSaving(false);
     }

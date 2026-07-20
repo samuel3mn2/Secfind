@@ -1,8 +1,45 @@
 # SecFind - Sistema de Gestión de Vulnerabilidades
 
-## Última Actualización: 2026-07-08
+## Última Actualización: 2026-07-20
 
 ### Cambios Recientes (Julio 2026)
+
+- **FEATURE: Formulario de Seguimiento integrado en modal de Detalle (2026-07-20)**:
+  - **Solicitud**: Habilitar registro de seguimiento directamente desde la pestaña "Bitácora de Seguimiento" del modal
+  - **Implementación**: 
+    * Creado componente reutilizable `/app/frontend/src/components/SeguimientoForm.jsx`
+    * Actualizado `TimelineSeguimiento.jsx` para integrar el formulario con props `allowCreate`, `onSeguimientoCreated`
+    * El formulario se muestra compacto dentro del modal, con refresh automático sin cerrar
+  - **Verificado**: E2E con Playwright - funciona sin crashes
+
+- **FEATURE: Filtro "Resultado Retest" en panel de Vulnerabilidades (2026-07-20)**:
+  - **Solicitud**: Agregar dropdown para filtrar vulnerabilidades por resultado de retest
+  - **Implementación**:
+    * Frontend: Nuevo filtro `MultiSelectFilter` con opciones: Corregido, Pendiente, Impedimento, Vulnerable, Desestimado, En Retest, Nota de Seguimiento
+    * Backend: Añadido parámetro `resultado_retest` en GET /api/vulnerabilidades con normalización
+  - **Verificado**: Screenshot confirma filtro funcional
+
+- **FEATURE: Homologación "Para Re Test" → "En Retest" (2026-07-20)**:
+  - **Solicitud**: Unificar nomenclatura globalmente
+  - **Implementación**:
+    * Frontend muestra "En Retest" en todos los dropdowns, KPIs y badges
+    * Backend mantiene "Para Re Test" en BD para compatibilidad
+    * Normalización bidireccional: Frontend envía "En Retest" → Backend guarda "Para Re Test"
+    * Pydantic `ResultadoRetestLiteral` actualizado para aceptar ambos valores
+  - **Archivos modificados**: Dashboard.jsx, Vulnerabilidades.jsx, SeguimientoRiesgos.jsx, BulkEntryModal.jsx, TimelineSeguimiento.jsx, server.py
+  - **Verificado**: Testing agent iteration_32
+
+- **FEATURE: Lógica de reapertura con nota automática (2026-07-20)**:
+  - **Solicitud**: Al reabrir una vulnerabilidad cerrada, limpiar fecha_cierre y agregar nota explicativa
+  - **Implementación**:
+    * PUT /api/vulnerabilidades/{id}: Si vulnerabilidad cerrada cambia a Pendiente/Vulnerable/etc., limpia fecha_cierre y agrega nota "⚠️ Vulnerabilidad reabierta. Fecha de cierre previa cancelada (Era: YYYY-MM-DD)"
+    * POST /api/seguimiento/{id}/registrar: Misma lógica al registrar seguimiento que reabre
+  - **Verificado**: pytest test_reabrir_vuln_cerrada_agrega_nota_automatica
+
+- **BUGFIX: Error handler de SeguimientoForm (2026-07-20)**:
+  - **Problema**: Al recibir error 422, el toast intentaba renderizar un array de objetos Pydantic como React child, causando crash
+  - **Solución**: Coercer `error.response?.data?.detail` a string antes de pasarlo a `toast.error()`
+  - **Verificado**: E2E sin crashes
 
 - **FEATURE: Endpoint de corrección histórica para bug de "En Retest" (2026-07-08)**:
   - **Contexto**: El bug de "Nota de Seguimiento" sobrescribiendo "Para Re Test" fue corregido, pero vulnerabilidades previamente afectadas quedaban con estado incorrecto en BD
