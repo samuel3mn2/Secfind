@@ -271,6 +271,7 @@ ResultadoRetestLiteral = Literal[
 class RegistroSeguimientoRequest(BaseModel):
     resultado_retest: ResultadoRetestLiteral
     fecha_compromiso_asignada: Optional[str] = None
+    fecha_cierre: Optional[str] = None  # Fecha de cierre para Corregido/Desestimado
     notas_impedimento: Optional[str] = None
 
 class VulnerabilidadCreate(VulnerabilidadBase):
@@ -3632,9 +3633,13 @@ async def registrar_seguimiento(
         # - SÍ incrementa veces_en_retest
         # - NO incrementa veces_cambiada_fecha
         # - Fecha en bitácora forzada a null (ya hecho arriba)
-        # - Establece fecha_cierre a la fecha actual
+        # - Establece fecha_cierre (del request o fecha actual)
         update_ops["$set"]["estatus"] = "Cerrado"
-        update_ops["$set"]["fecha_cierre"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        # Usar fecha_cierre del request si viene, sino fecha actual
+        if data.fecha_cierre:
+            update_ops["$set"]["fecha_cierre"] = data.fecha_cierre
+        else:
+            update_ops["$set"]["fecha_cierre"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         inc_ops["veces_en_retest"] = 1
         
     elif es_impedimento:

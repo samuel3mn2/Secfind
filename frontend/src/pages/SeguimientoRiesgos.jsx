@@ -408,6 +408,7 @@ export default function SeguimientoRiesgos() {
   const [seguimientoForm, setSeguimientoForm] = useState({
     resultado_retest: "",
     fecha_compromiso_asignada: "",
+    fecha_cierre: "",
     notas_impedimento: ""
   });
   const [savingSeguimiento, setSavingSeguimiento] = useState(false);
@@ -1335,7 +1336,7 @@ export default function SeguimientoRiesgos() {
         setShowViewModal(open);
         if (!open) {
           setShowSeguimientoForm(false);
-          setSeguimientoForm({ resultado_retest: "", fecha_compromiso_asignada: "", notas_impedimento: "" });
+          setSeguimientoForm({ resultado_retest: "", fecha_compromiso_asignada: "", fecha_cierre: "", notas_impedimento: "" });
         }
       }}>
         <DialogContent className="bg-[#18181b] border-[#27272a] text-white max-w-4xl max-h-[90vh]">
@@ -1472,13 +1473,18 @@ export default function SeguimientoRiesgos() {
                               <Select
                                 value={seguimientoForm.resultado_retest}
                                 onValueChange={(v) => {
-                                  // Estados que fuerzan limpieza de fecha
-                                  const estadosSinFecha = ["Corregido", "Desestimado", "En Retest", "Nota de Seguimiento"];
-                                  const limpiarFecha = estadosSinFecha.includes(v);
+                                  // Estados que fuerzan limpieza de fecha compromiso
+                                  const estadosSinFechaCompromiso = ["Corregido", "Desestimado", "En Retest", "Nota de Seguimiento"];
+                                  const estadosConFechaCierre = ["Corregido", "Desestimado"];
+                                  const limpiarFechaCompromiso = estadosSinFechaCompromiso.includes(v);
+                                  const mostrarFechaCierre = estadosConFechaCierre.includes(v);
+                                  
                                   setSeguimientoForm(prev => ({ 
                                     ...prev, 
                                     resultado_retest: v,
-                                    fecha_compromiso_asignada: limpiarFecha ? "" : prev.fecha_compromiso_asignada
+                                    fecha_compromiso_asignada: limpiarFechaCompromiso ? "" : prev.fecha_compromiso_asignada,
+                                    // Pre-llenar fecha de cierre con hoy si es Corregido/Desestimado
+                                    fecha_cierre: mostrarFechaCierre ? (prev.fecha_cierre || new Date().toISOString().split('T')[0]) : ""
                                   }));
                                 }}
                               >
@@ -1499,20 +1505,41 @@ export default function SeguimientoRiesgos() {
                             
                             <div className="space-y-2">
                               {(() => {
-                                const estadosSinFecha = ["Corregido", "Desestimado", "En Retest", "Nota de Seguimiento"];
-                                const deshabilitarFecha = estadosSinFecha.includes(seguimientoForm.resultado_retest);
-                                const mensajeEstado = seguimientoForm.resultado_retest === "Corregido" || seguimientoForm.resultado_retest === "Desestimado"
-                                  ? "(No aplica para cierre)"
-                                  : seguimientoForm.resultado_retest === "En Retest"
-                                    ? "(Se congela fecha - En validación)"
-                                    : seguimientoForm.resultado_retest === "Nota de Seguimiento"
-                                      ? "(No altera fecha)"
-                                      : "";
+                                const estadosSinFechaCompromiso = ["Corregido", "Desestimado", "En Retest", "Nota de Seguimiento"];
+                                const estadosConFechaCierre = ["Corregido", "Desestimado"];
+                                const deshabilitarFechaCompromiso = estadosSinFechaCompromiso.includes(seguimientoForm.resultado_retest);
+                                const mostrarFechaCierre = estadosConFechaCierre.includes(seguimientoForm.resultado_retest);
+                                
+                                // Mostrar campo de Fecha de Cierre para Corregido/Desestimado
+                                if (mostrarFechaCierre) {
+                                  return (
+                                    <>
+                                      <Label className="text-green-400">
+                                        Fecha de Cierre *
+                                      </Label>
+                                      <Input
+                                        type="date"
+                                        value={seguimientoForm.fecha_cierre}
+                                        onChange={(e) => setSeguimientoForm(prev => ({ ...prev, fecha_cierre: e.target.value }))}
+                                        className="bg-zinc-900 border-zinc-700 border-green-500/30"
+                                        data-testid="input-fecha-cierre"
+                                      />
+                                      <p className="text-xs text-green-500/70">Se vinculará a la vulnerabilidad</p>
+                                    </>
+                                  );
+                                }
+                                
+                                // Mostrar campo de Fecha Compromiso para otros estados
+                                const mensajeEstado = seguimientoForm.resultado_retest === "En Retest"
+                                  ? "(Se congela fecha - En validación)"
+                                  : seguimientoForm.resultado_retest === "Nota de Seguimiento"
+                                    ? "(No altera fecha)"
+                                    : "";
                                 return (
                                   <>
-                                    <Label className={deshabilitarFecha ? "text-zinc-600" : "text-zinc-400"}>
+                                    <Label className={deshabilitarFechaCompromiso ? "text-zinc-600" : "text-zinc-400"}>
                                       Nueva Fecha Compromiso
-                                      {deshabilitarFecha && (
+                                      {deshabilitarFechaCompromiso && (
                                         <span className="text-xs text-zinc-500 ml-2">{mensajeEstado}</span>
                                       )}
                                     </Label>
@@ -1520,13 +1547,13 @@ export default function SeguimientoRiesgos() {
                                       type="date"
                                       value={seguimientoForm.fecha_compromiso_asignada}
                                       onChange={(e) => setSeguimientoForm(prev => ({ ...prev, fecha_compromiso_asignada: e.target.value }))}
-                                      className={`bg-zinc-900 border-zinc-700 ${deshabilitarFecha ? "opacity-50 cursor-not-allowed" : ""}`}
-                                      disabled={deshabilitarFecha}
+                                      className={`bg-zinc-900 border-zinc-700 ${deshabilitarFechaCompromiso ? "opacity-50 cursor-not-allowed" : ""}`}
+                                      disabled={deshabilitarFechaCompromiso}
                                       data-testid="input-fecha-compromiso"
                                     />
                                     {seguimientoForm.fecha_compromiso_asignada && 
                                      seguimientoForm.fecha_compromiso_asignada !== viewingItem.fecha_compromiso &&
-                                     !deshabilitarFecha && (
+                                     !deshabilitarFechaCompromiso && (
                                       <p className="text-xs text-amber-400">⚠️ Se incrementará el contador de reprogramaciones</p>
                                     )}
                                   </>
@@ -1560,7 +1587,7 @@ export default function SeguimientoRiesgos() {
                               variant="outline"
                               onClick={() => {
                                 setShowSeguimientoForm(false);
-                                setSeguimientoForm({ resultado_retest: "", fecha_compromiso_asignada: "", notas_impedimento: "" });
+                                setSeguimientoForm({ resultado_retest: "", fecha_compromiso_asignada: "", fecha_cierre: "", notas_impedimento: "" });
                               }}
                               className="border-zinc-600"
                             >

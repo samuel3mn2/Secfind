@@ -36,19 +36,27 @@ export const SeguimientoForm = ({
   const [formData, setFormData] = useState({
     resultado_retest: "",
     fecha_compromiso_asignada: "",
+    fecha_cierre: "",
     notas_impedimento: ""
   });
   const [saving, setSaving] = useState(false);
 
-  // Estados que NO requieren fecha (la limpian o congelan)
-  const ESTADOS_SIN_FECHA = ["Corregido", "Desestimado", "En Retest", "Nota de Seguimiento"];
+  // Estados que NO requieren fecha compromiso (la limpian o congelan)
+  const ESTADOS_SIN_FECHA_COMPROMISO = ["Corregido", "Desestimado", "En Retest", "Nota de Seguimiento"];
+  
+  // Estados que requieren fecha de cierre
+  const ESTADOS_CON_FECHA_CIERRE = ["Corregido", "Desestimado"];
 
   const handleResultadoChange = (value) => {
-    const limpiarFecha = ESTADOS_SIN_FECHA.includes(value);
+    const limpiarFechaCompromiso = ESTADOS_SIN_FECHA_COMPROMISO.includes(value);
+    const mostrarFechaCierre = ESTADOS_CON_FECHA_CIERRE.includes(value);
+    
     setFormData(prev => ({
       ...prev,
       resultado_retest: value,
-      fecha_compromiso_asignada: limpiarFecha ? "" : prev.fecha_compromiso_asignada
+      fecha_compromiso_asignada: limpiarFechaCompromiso ? "" : prev.fecha_compromiso_asignada,
+      // Pre-llenar fecha de cierre con hoy si es Corregido/Desestimado
+      fecha_cierre: mostrarFechaCierre ? (prev.fecha_cierre || new Date().toISOString().split('T')[0]) : ""
     }));
   };
 
@@ -75,6 +83,7 @@ export const SeguimientoForm = ({
       setFormData({
         resultado_retest: "",
         fecha_compromiso_asignada: "",
+        fecha_cierre: "",
         notas_impedimento: ""
       });
 
@@ -100,11 +109,12 @@ export const SeguimientoForm = ({
     }
   };
 
-  const deshabilitarFecha = ESTADOS_SIN_FECHA.includes(formData.resultado_retest);
+  const deshabilitarFechaCompromiso = ESTADOS_SIN_FECHA_COMPROMISO.includes(formData.resultado_retest);
+  const mostrarFechaCierre = ESTADOS_CON_FECHA_CIERRE.includes(formData.resultado_retest);
   const mensajeEstado = getMensajeEstado();
   const mostrarWarningFecha = formData.fecha_compromiso_asignada && 
     formData.fecha_compromiso_asignada !== currentFechaCompromiso && 
-    !deshabilitarFecha;
+    !deshabilitarFechaCompromiso;
 
   return (
     <div className={`space-y-4 bg-zinc-800/50 ${compact ? 'p-3' : 'p-4'} rounded-lg border border-zinc-700`}>
@@ -139,26 +149,45 @@ export const SeguimientoForm = ({
           </Select>
         </div>
         
-        {/* Fecha Compromiso */}
-        <div className="space-y-2">
-          <Label className={`${deshabilitarFecha ? 'text-zinc-600' : 'text-zinc-400'} ${compact ? 'text-xs' : ''}`}>
-            Nueva Fecha Compromiso
-            {deshabilitarFecha && (
-              <span className="text-xs text-zinc-500 ml-2">{mensajeEstado}</span>
+        {/* Fecha Compromiso - Solo si NO es cierre */}
+        {!mostrarFechaCierre && (
+          <div className="space-y-2">
+            <Label className={`${deshabilitarFechaCompromiso ? 'text-zinc-600' : 'text-zinc-400'} ${compact ? 'text-xs' : ''}`}>
+              Nueva Fecha Compromiso
+              {deshabilitarFechaCompromiso && (
+                <span className="text-xs text-zinc-500 ml-2">{mensajeEstado}</span>
+              )}
+            </Label>
+            <Input
+              type="date"
+              value={formData.fecha_compromiso_asignada}
+              onChange={(e) => setFormData(prev => ({ ...prev, fecha_compromiso_asignada: e.target.value }))}
+              className={`bg-zinc-900 border-zinc-700 ${deshabilitarFechaCompromiso ? 'opacity-50 cursor-not-allowed' : ''} ${compact ? 'h-8 text-xs' : ''}`}
+              disabled={deshabilitarFechaCompromiso}
+              data-testid="seguimiento-form-fecha"
+            />
+            {mostrarWarningFecha && (
+              <p className="text-xs text-amber-400">Se incrementará el contador de reprogramaciones</p>
             )}
-          </Label>
-          <Input
-            type="date"
-            value={formData.fecha_compromiso_asignada}
-            onChange={(e) => setFormData(prev => ({ ...prev, fecha_compromiso_asignada: e.target.value }))}
-            className={`bg-zinc-900 border-zinc-700 ${deshabilitarFecha ? 'opacity-50 cursor-not-allowed' : ''} ${compact ? 'h-8 text-xs' : ''}`}
-            disabled={deshabilitarFecha}
-            data-testid="seguimiento-form-fecha"
-          />
-          {mostrarWarningFecha && (
-            <p className="text-xs text-amber-400">Se incrementará el contador de reprogramaciones</p>
-          )}
-        </div>
+          </div>
+        )}
+        
+        {/* Fecha de Cierre - Solo para Corregido/Desestimado */}
+        {mostrarFechaCierre && (
+          <div className="space-y-2">
+            <Label className={`text-green-400 ${compact ? 'text-xs' : ''}`}>
+              Fecha de Cierre *
+            </Label>
+            <Input
+              type="date"
+              value={formData.fecha_cierre}
+              onChange={(e) => setFormData(prev => ({ ...prev, fecha_cierre: e.target.value }))}
+              className={`bg-zinc-900 border-zinc-700 border-green-500/30 ${compact ? 'h-8 text-xs' : ''}`}
+              data-testid="seguimiento-form-fecha-cierre"
+            />
+            <p className="text-xs text-green-500/70">Se vinculará a la vulnerabilidad</p>
+          </div>
+        )}
       </div>
 
       {/* Notas */}
