@@ -491,7 +491,9 @@ export default function Vulnerabilidades() {
   }, [fetchVulnerabilidades]);
 
   const handleView = (vuln) => {
-    setViewingVuln(vuln);
+    // Buscar la vulnerabilidad más reciente de la lista para tener datos actualizados
+    const vulnActualizada = vulnerabilidades.find(v => v.id === vuln.id) || vuln;
+    setViewingVuln(vulnActualizada);
     setShowViewModal(true);
   };
 
@@ -1615,7 +1617,9 @@ export default function Vulnerabilidades() {
 
                   <TabsContent value="bitacora" className="mt-4">
                     {/* Timeline con formulario integrado para crear seguimiento */}
+                    {/* Key incluye timestamp para forzar refresh al abrir el modal */}
                     <TimelineSeguimiento 
+                      key={`timeline-${viewingVuln.id}-${viewingVuln.updated_at || Date.now()}`}
                       vulnId={viewingVuln.id} 
                       allowCreate={canModify}
                       currentFechaCompromiso={viewingVuln.fecha_compromiso}
