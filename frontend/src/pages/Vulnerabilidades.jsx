@@ -497,7 +497,8 @@ export default function Vulnerabilidades() {
 
   const handleOpenModal = (vuln = null) => {
     if (vuln) {
-      setEditingVuln(vuln);
+      // Guardar copia profunda de datos originales para comparación posterior
+      setEditingVuln(JSON.parse(JSON.stringify(vuln)));
       // Find dominio_id from control if exists
       const control = controles.find(c => c.id === vuln.control_id);
       const dominioId = control?.dominio_id || "";
