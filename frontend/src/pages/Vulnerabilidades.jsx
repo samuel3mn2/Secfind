@@ -1867,6 +1867,21 @@ export default function Vulnerabilidades() {
                   </Select>
                 </div>
 
+                {/* Campo Fecha de Cierre - Solo visible cuando estatus = Cerrado o resultado = Corregido/Desestimado */}
+                {(formData.estatus === "Cerrado" || ["Corregido", "Desestimado"].includes(formData.resultado_re_test)) && (
+                  <div className="space-y-2">
+                    <Label className="text-zinc-400">Fecha de Cierre</Label>
+                    <Input
+                      type="date"
+                      value={formData.fecha_cierre || ""}
+                      onChange={(e) => setFormData({ ...formData, fecha_cierre: e.target.value })}
+                      className="bg-black/20 border-zinc-700 text-white"
+                      data-testid="input-fecha-cierre"
+                    />
+                    <p className="text-xs text-zinc-500">Se establece automáticamente al cerrar</p>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label className="text-zinc-400">Veces en Retest</Label>
                   <Input

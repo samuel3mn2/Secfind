@@ -4,6 +4,26 @@
 
 ### Cambios Recientes (Julio 2026)
 
+- **FEATURE: Auditoría completa de ediciones en Bitácora (2026-07-20)**:
+  - **Solicitud**: Cualquier edición a una vulnerabilidad debe ser visible en la bitácora
+  - **Implementación**: El endpoint PUT /api/vulnerabilidades/{id} ahora registra automáticamente TODAS las ediciones en el historial_impedimentos_seguimiento
+  - **Formato**: "📝 Edición de vulnerabilidad:\n• Campo: 'valor_anterior' → 'valor_nuevo'"
+  - **Verificado**: Screenshot muestra notas de edición con detalle de cambios
+
+- **FEATURE: Campo Fecha de Cierre visible en formulario (2026-07-20)**:
+  - **Solicitud**: Mostrar campo fecha_cierre cuando estatus = Cerrado
+  - **Implementación**: Campo date picker aparece condicionalmente cuando estatus="Cerrado" o resultado_re_test="Corregido"/"Desestimado"
+  - **Mensaje**: "Se establece automáticamente al cerrar"
+  - **Archivo**: `/app/frontend/src/pages/Vulnerabilidades.jsx`
+
+- **BUGFIX: Lógica de reapertura mejorada (2026-07-20)**:
+  - **Problema**: La nota de reapertura no se generaba correctamente al cambiar resultado_re_test
+  - **Causa**: La lógica dependía de múltiples condiciones complejas que no evaluaban correctamente
+  - **Solución**: Simplificada la lógica con `es_resultado_cierre` y `es_resultado_reapertura`
+  - **Comportamiento**: Al reabrir una vulnerabilidad cerrada:
+    * Limpia fecha_cierre
+    * Genera nota: "⚠️ Vulnerabilidad reabierta. Fecha de cierre previa cancelada (Era: YYYY-MM-DD)"
+
 - **FEATURE: Formulario de Seguimiento integrado en modal de Detalle (2026-07-20)**:
   - **Solicitud**: Habilitar registro de seguimiento directamente desde la pestaña "Bitácora de Seguimiento" del modal
   - **Implementación**: 
