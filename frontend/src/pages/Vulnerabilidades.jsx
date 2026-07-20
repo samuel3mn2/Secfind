@@ -287,6 +287,7 @@ export default function Vulnerabilidades() {
   const [uploading, setUploading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [showPdfImport, setShowPdfImport] = useState(false);
+  const [bitacoraRefreshKey, setBitacoraRefreshKey] = useState(0); // Key para forzar refresh de bitácora
   const itemsPerPage = 15;
 
   // Bulk selection state
@@ -494,6 +495,8 @@ export default function Vulnerabilidades() {
     // Buscar la vulnerabilidad más reciente de la lista para tener datos actualizados
     const vulnActualizada = vulnerabilidades.find(v => v.id === vuln.id) || vuln;
     setViewingVuln(vulnActualizada);
+    // Siempre incrementar el key al abrir el modal para garantizar datos frescos en la bitácora
+    setBitacoraRefreshKey(prev => prev + 1);
     setShowViewModal(true);
   };
 
@@ -655,6 +658,8 @@ export default function Vulnerabilidades() {
       if (editingVuln) {
         await axios.put(`${API}/vulnerabilidades/${editingVuln.id}`, formData);
         toast.success("Vulnerabilidad actualizada exitosamente");
+        // Incrementar key para forzar refresh de bitácora cuando se abra
+        setBitacoraRefreshKey(prev => prev + 1);
       } else {
         await axios.post(`${API}/vulnerabilidades`, formData);
         toast.success("Vulnerabilidad creada exitosamente");
@@ -1617,15 +1622,16 @@ export default function Vulnerabilidades() {
 
                   <TabsContent value="bitacora" className="mt-4">
                     {/* Timeline con formulario integrado para crear seguimiento */}
-                    {/* Key incluye timestamp para forzar refresh al abrir el modal */}
+                    {/* Key incluye refreshKey para forzar refresh después de ediciones */}
                     <TimelineSeguimiento 
-                      key={`timeline-${viewingVuln.id}-${viewingVuln.updated_at || Date.now()}`}
+                      key={`timeline-${viewingVuln.id}-${bitacoraRefreshKey}`}
                       vulnId={viewingVuln.id} 
                       allowCreate={canModify}
                       currentFechaCompromiso={viewingVuln.fecha_compromiso}
                       onSeguimientoCreated={(updatedVuln) => {
                         setViewingVuln(updatedVuln);
                         fetchVulnerabilidades(false);
+                        setBitacoraRefreshKey(prev => prev + 1);
                       }}
                     />
                   </TabsContent>
