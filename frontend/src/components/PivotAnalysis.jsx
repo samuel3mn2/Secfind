@@ -967,6 +967,60 @@ export function PivotAnalysis({
     rendererName: "Stacked Bar Chart"
   });
 
+  // ============================================================================
+  // SINCRONIZACIÓN CON PADRE (VISTAS GUARDADAS)
+  // ============================================================================
+  
+  // Usar refs para evitar loops infinitos
+  const isLoadingFromParent = React.useRef(false);
+  const isInitialMount = React.useRef(true);
+  
+  // Cargar configuración desde pivotState cuando se proporciona (al cargar una vista guardada)
+  useEffect(() => {
+    if (pivotState) {
+      // Marcar que estamos cargando desde el padre para evitar propagar de vuelta
+      isLoadingFromParent.current = true;
+      
+      if (pivotState.vulnTableState) setVulnTableState(pivotState.vulnTableState);
+      if (pivotState.vulnChartState) setVulnChartState(pivotState.vulnChartState);
+      if (pivotState.hallTableState) setHallTableState(pivotState.hallTableState);
+      if (pivotState.hallChartState) setHallChartState(pivotState.hallChartState);
+      if (pivotState.activeModule) setActiveModule(pivotState.activeModule);
+      if (pivotState.layoutMode) setLayoutMode(pivotState.layoutMode);
+      
+      // Resetear el flag después de un tick para permitir que los estados se estabilicen
+      setTimeout(() => {
+        isLoadingFromParent.current = false;
+      }, 100);
+    }
+  }, [pivotState]);
+
+  // Propagar cambios al padre cuando cambian los estados internos (solo por interacción del usuario)
+  useEffect(() => {
+    // Skip en el primer render
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    
+    // Skip si estamos cargando desde el padre (evita loop infinito)
+    if (isLoadingFromParent.current) {
+      return;
+    }
+    
+    if (onPivotStateChange) {
+      const currentConfig = {
+        vulnTableState,
+        vulnChartState,
+        hallTableState,
+        hallChartState,
+        activeModule,
+        layoutMode
+      };
+      onPivotStateChange(currentConfig);
+    }
+  }, [vulnTableState, vulnChartState, hallTableState, hallChartState, activeModule, layoutMode, onPivotStateChange]);
+
   // Inyectar CSS agresivo
   useEffect(() => {
     const styleId = "pivot-forced-dark-mode";

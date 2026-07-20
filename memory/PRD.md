@@ -4,6 +4,18 @@
 
 ### Cambios Recientes (Julio 2026)
 
+- **FEATURE: Vistas Guardadas capturan configuración de Pivot Tables (2026-07-20)**:
+  - **Solicitud**: Las Vistas Guardadas en Dashboard GRC debían preservar la configuración de Pivot (modo de visualización, estados de tabla/gráfico, módulo activo)
+  - **Problema encontrado**: El componente `PivotAnalysis` recibía `pivotState` y `onPivotStateChange` como props pero NUNCA los usaba - los estados se manejaban solo internamente
+  - **Solución implementada**:
+    * Agregar `useEffect` para cargar configuración desde `pivotState` cuando se proporciona (al cargar vista guardada)
+    * Agregar `useEffect` para propagar cambios al padre via `onPivotStateChange` cuando el usuario modifica la configuración
+    * Usar `useRef` (`isLoadingFromParent`) para evitar loops infinitos de actualización React
+    * Estados que se guardan/restauran: `vulnTableState`, `vulnChartState`, `hallTableState`, `hallChartState`, `activeModule`, `layoutMode`
+  - **Backend ya funcionaba**: El endpoint POST/PUT `/api/dashboard/vistas` ya guardaba `pivot_config`, solo faltaba que el frontend lo propagara
+  - **Archivos modificados**: `/app/frontend/src/components/PivotAnalysis.jsx`
+  - **Verificado**: Vista guardada con `layoutMode: chart` se restaura correctamente mostrando pestaña Pivot y modo Solo Gráfico
+
 - **BUGFIX CRÍTICO: Bitácora no mostraba ediciones desde UI (2026-07-20)**:
   - **Problema reportado**: Al editar una vulnerabilidad desde la UI, el cambio se guardaba pero NO aparecía en la Bitácora de Seguimiento
   - **Causa raíz #1 (Backend)**: El frontend enviaba `historial_impedimentos_seguimiento` en el payload del PUT. El backend primero hacía `$push` para agregar la nueva entrada, pero luego el `$set` con `update_dict` (que incluía el historial anterior) sobrescribía el historial completo, perdiendo la nueva entrada.
