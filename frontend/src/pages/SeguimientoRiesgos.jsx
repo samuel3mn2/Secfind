@@ -613,6 +613,7 @@ export default function SeguimientoRiesgos() {
     setCurrentPage(1);
   }, [debouncedSearch, vistaActiva]);
 
+  // Carga inicial (solo una vez)
   useEffect(() => {
     setLoading(true);
     Promise.all([
@@ -621,7 +622,17 @@ export default function SeguimientoRiesgos() {
       fetchHallazgos(),
       fetchResumenHallazgos()
     ]).finally(() => setLoading(false));
-  }, [fetchVulnerabilidades, fetchHallazgos]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Solo carga inicial
+  
+  // Efecto separado para búsqueda y filtros (sin recargar resúmenes)
+  useEffect(() => {
+    // No ejecutar en la carga inicial
+    if (debouncedSearch !== undefined) {
+      fetchVulnerabilidades();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, filterEstado, filterSeveridad, filterInstitucion, filterInforme, filterAplicacion, filterResponsable, filterMes, filterAño, filterTipoFecha, vistaActiva]);
 
   useEffect(() => {
     setCurrentPage(1);
