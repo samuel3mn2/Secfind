@@ -276,6 +276,7 @@ export default function Vulnerabilidades() {
   const [filterControl, setFilterControl] = useState([]);
   const [filterNivelRiesgo, setFilterNivelRiesgo] = useState([]);
   const [filterProveedor, setFilterProveedor] = useState([]);
+  const [filterResultadoRetest, setFilterResultadoRetest] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showBulkEntryModal, setShowBulkEntryModal] = useState(false);
@@ -461,6 +462,7 @@ export default function Vulnerabilidades() {
       if (filterControl.length > 0) filterControl.forEach(v => params.append("control", v));
       if (filterNivelRiesgo.length > 0) filterNivelRiesgo.forEach(v => params.append("nivel_riesgo", v));
       if (filterProveedor.length > 0) filterProveedor.forEach(v => params.append("proveedor", v));
+      if (filterResultadoRetest.length > 0) filterResultadoRetest.forEach(v => params.append("resultado_retest", v));
 
       const response = await axios.get(`${API}/vulnerabilidades?${params.toString()}`);
       setVulnerabilidades(response.data);
@@ -473,7 +475,7 @@ export default function Vulnerabilidades() {
     } finally {
       setLoading(false);
     }
-  }, [search, filterSeveridad, filterEstatus, filterInstitucion, filterAño, filterAplicacion, filterInforme, filterResponsable, filterDominio, filterControl, filterNivelRiesgo, filterProveedor]);
+  }, [search, filterSeveridad, filterEstatus, filterInstitucion, filterAño, filterAplicacion, filterInforme, filterResponsable, filterDominio, filterControl, filterNivelRiesgo, filterProveedor, filterResultadoRetest]);
 
   useEffect(() => {
     fetchOptions();
@@ -1027,6 +1029,16 @@ export default function Vulnerabilidades() {
                 searchPlaceholder="Buscar proveedor..."
                 allLabel="Todos los proveedores"
                 data-testid="filter-proveedor"
+              />
+
+              <MultiSelectFilter
+                options={options?.resultado_retest || ["Corregido", "Pendiente", "Impedimento", "Vulnerable", "Desestimado", "En Retest", "Nota de Seguimiento"]}
+                selected={filterResultadoRetest}
+                onChange={setFilterResultadoRetest}
+                placeholder="Resultado Retest"
+                searchPlaceholder="Buscar resultado..."
+                allLabel="Todos los resultados"
+                data-testid="filter-resultado-retest"
               />
 
               {/* Import/Export */}
@@ -1592,8 +1604,16 @@ export default function Vulnerabilidades() {
                   </TabsContent>
 
                   <TabsContent value="bitacora" className="mt-4">
-                    {/* Timeline en modo solo lectura */}
-                    <TimelineSeguimiento vulnId={viewingVuln.id} readOnly={true} />
+                    {/* Timeline con formulario integrado para crear seguimiento */}
+                    <TimelineSeguimiento 
+                      vulnId={viewingVuln.id} 
+                      allowCreate={canModify}
+                      currentFechaCompromiso={viewingVuln.fecha_compromiso}
+                      onSeguimientoCreated={(updatedVuln) => {
+                        setViewingVuln(updatedVuln);
+                        fetchVulnerabilidades(false);
+                      }}
+                    />
                   </TabsContent>
                 </Tabs>
               </div>

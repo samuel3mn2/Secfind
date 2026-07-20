@@ -148,7 +148,7 @@ export default function BulkEntryModal({ open, onClose, options, onSuccess }) {
     if (normalized.includes('pend')) return 'Pendiente';
     if (normalized.includes('cerr') || normalized.includes('corr')) return 'Cerrado';
     if (normalized.includes('proceso')) return 'En Proceso';
-    if (normalized.includes('retest') || normalized.includes('re-test') || normalized.includes('re test')) return 'Para Re Test';
+    if (normalized.includes('retest') || normalized.includes('re-test') || normalized.includes('re test')) return 'En Retest';
     return 'Pendiente';
   };
 
@@ -207,7 +207,7 @@ export default function BulkEntryModal({ open, onClose, options, onSuccess }) {
   const validRowsCount = rows.filter(r => r.isValid).length;
 
   const severidadOptions = ['Critica', 'Alta', 'Media', 'Baja'];
-  const estatusOptions = ['Pendiente', 'En Proceso', 'Para Re Test', 'Cerrado'];
+  const estatusOptions = ['Pendiente', 'En Proceso', 'En Retest', 'Cerrado'];
 
   return (
     <Dialog open={open} onOpenChange={onClose}>

@@ -1,0 +1,89 @@
+{
+  "summary": "Iteration 32 (both): Tested the new SeguimientoForm.jsx integration in the Vulnerability Detail modal (Bitácora tab), the 'En Retest' rename, the resultado_retest filter and the reopening logic. Backend: 7/8 pytest cases pass. FOUND CRITICAL BUG: POST /api/seguimiento/{id}/registrar rejects 'En Retest' with 422 because the Pydantic `ResultadoRetestLiteral` (server.py lines 260-268) does NOT include 'En Retest' — only 'Para Re Test'. The normalization at server.py lines 3476-3478 is dead code (never reached). Frontend SeguimientoForm.jsx sends 'En Retest' string, so every time a user picks 'En Retest' from the modal and clicks Guardar the request fails, and — SECOND BUG — SeguimientoForm.jsx line 87 does `toast.error(error.response?.data?.detail || ...)` which tries to render Pydantic's validation array (list of objects) as a React child, crashing the whole component tree with 'Objects are not valid as a React child'. All other features work: filter present + functional, Dashboard KPI renamed to 'En Retest', reopening logic produces automatic note in historial, Bitácora tab shows the button 'Registrar Seguimiento / Impedimento', form fields all present with correct data-testids, dropdown shows the 7 correct options.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/seguimiento/{vuln_id}/registrar",
+        "issue": "Rejects 'En Retest' with 422 literal_error. Pydantic model `RegistroSeguimientoRequest.resultado_retest: ResultadoRetestLiteral` (server.py L260-268, L270-273) does NOT include 'En Retest' in its literal list. The in-body normalization at L3476-3478 (`if resultado == 'En Retest': resultado = 'Para Re Test'`) is UNREACHABLE — request fails validation before entering the handler. This breaks the entire user flow the iteration was meant to enable.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "DELETE /api/vulnerabilidades/{id}",
+        "issue": "Requires `justificacion` query param (returns 422 without it). Not a new bug — test cleanup had to be adjusted."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "SeguimientoForm.jsx (line 87)",
+        "issue": "toast.error(error.response?.data?.detail || 'Error al registrar seguimiento') — when the backend returns 422, `detail` is a list of Pydantic validation objects. Sonner passes the value to React and it crashes with 'Objects are not valid as a React child (found: object with keys {type, loc, msg, input, ctx, url})'. This takes down the entire vulnerability-detail modal (uncaught runtime error overlay shown to user).",
+        "selector": "[data-testid='seguimiento-form-guardar']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Register Seguimiento from Vulnerability Detail modal → Bitácora → 'En Retest'",
+        "issue": "End-to-end blocked by the backend 422 + the frontend toast crash. Save NEVER succeeds when 'En Retest' is selected in the modal. Other resultados (Corregido, Pendiente, Impedimento, Vulnerable, Desestimado, Nota de Seguimiento, Para Re Test) work fine.",
+        "affected_selectors": ["[data-testid='seguimiento-form-resultado']", "[data-testid='seguimiento-form-guardar']"]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "Dashboard",
+        "issues": ["Pre-existing plotly console warnings 'width(-1) and height(-1)' — non-blocking, not a regression"]
+      },
+      {
+        "screen": "Vulnerability Detail Dialog",
+        "issues": ["Missing `Description` / `aria-describedby` on DialogContent (Radix a11y warning) — non-blocking"]
+      }
+    ]
+  },
+  "passed_tests": [
+    "Backend PUT /api/vulnerabilidades/{id} normalizes 'En Retest' -> 'Para Re Test' (test_update_vuln_en_retest_normalizes_to_para_re_test)",
+    "Backend POST /api/seguimiento/{id}/registrar with raw 'Para Re Test' works (test_registrar_seguimiento_para_re_test_still_works)",
+    "Backend GET /api/vulnerabilidades?resultado_retest=En Retest correctly filters records where resultado_re_test='Para Re Test' (test_filter_en_retest_returns_para_re_test_records)",
+    "Backend GET filter also accepts raw 'Para Re Test' (backwards compat) (test_filter_para_re_test_still_works)",
+    "Backend reopening logic: closing with Corregido then setting Vulnerable clears fecha_cierre AND appends automatic 'Nota de Seguimiento' with '⚠️ Vulnerabilidad reabierta' to historial (test_reabrir_vuln_cerrada_agrega_nota_automatica)",
+    "Backend reopening logic works with 'En Retest' as reopener too (test_reabrir_con_en_retest_tambien_agrega_nota)",
+    "Backend GET /api/dashboard/stats returns 200 (test_dashboard_stats_endpoint_works)",
+    "Frontend Vulnerabilidades page: [data-testid='filter-resultado-retest'] present in header",
+    "Frontend Vulnerability Detail modal → Bitácora tab: [data-testid='btn-nuevo-seguimiento'] button present when user has edit permissions",
+    "Frontend SeguimientoForm: all four data-testids present (seguimiento-form-resultado, seguimiento-form-fecha, seguimiento-form-notas, seguimiento-form-guardar)",
+    "Frontend SeguimientoForm dropdown: 7 options, includes 'En Retest - En validación con proveedor', does NOT include legacy 'Para Re Test' label",
+    "Frontend Dashboard KPI: label 'En Retest' present (no legacy 'Para Re Test' visible)"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_iteration32_en_retest.py",
+    "/app/test_reports/pytest/pytest_iteration32.xml"
+  ],
+  "action_items": [
+    "CRITICAL — Add 'En Retest' to `ResultadoRetestLiteral` in /app/backend/server.py L260-268 so the Pydantic validator accepts both values. The normalization block at L3476-3478 will then take effect.",
+    "HIGH — Fix /app/frontend/src/components/SeguimientoForm.jsx L87: coerce error.response?.data?.detail to a string before passing to toast.error. E.g.: `const detail = error.response?.data?.detail; const msg = Array.isArray(detail) ? detail.map(d => d.msg).join(', ') : (typeof detail === 'string' ? detail : 'Error al registrar seguimiento'); toast.error(msg);` — this prevents the React 'Objects are not valid as a React child' crash on any 422.",
+    "OPTIONAL — Once the two above are fixed, re-verify end-to-end: open a vuln → Bitácora → pick 'En Retest' → save → confirm the timeline refreshes without closing the modal (onSeguimientoCreated fires), and that the vuln shows up in the Seguimiento 'En Retest' tab."
+  ],
+  "critical_code_review_comments": [
+    "server.py L260-268 vs L3476-3478: DEAD CODE — the Literal doesn't allow 'En Retest' so the normalization if-branch is never reached. Either add 'En Retest' to the Literal OR relax the model to `resultado_retest: str` and validate manually inside the handler.",
+    "SeguimientoForm.jsx L85-90: error handler is naive. Any Pydantic 422 from the backend gives `detail` as a list-of-objects; rendering it via sonner crashes the tree. This same pattern exists in other components that call toast.error(err.response?.data?.detail) — recommend a small utility `getErrorMessage(err)` shared across the frontend.",
+    "server.py L2544-2591 (PUT vulnerabilidad): reopening logic is fine, but the automatic reopen note is pushed BEFORE the main $set update to update_dict. If the update fails later, we've already added the note to the historial, causing state drift. Recommend wrapping in a transaction or moving the $push after the $set succeeds.",
+    "server.py file size ~5228 lines — still exceeds 700-line threshold. Suggest extracting a /routes/seguimiento.py module.",
+    "TimelineSeguimiento.jsx L37: `readOnly` prop is 'deprecated, usar allowCreate' but both are still checked in `canShowForm = allowCreate && !readOnly`. Consider removing the deprecated prop entirely or documenting migration path.",
+    "SeguimientoForm.jsx L44 hardcodes ESTADOS_SIN_FECHA — should ideally be shared with backend or provided by /api/config."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration32_en_retest.py (new)"
+  ],
+  "success_rate": {
+    "backend": "87.5% (7/8 pytest cases). 1 critical failure on POST /seguimiento/{id}/registrar with 'En Retest'.",
+    "frontend": "80% (form, filter, dashboard, reopen all render correctly; end-to-end save with 'En Retest' fails due to backend 422 + toast crash)"
+  },
+  "test_credentials": {"user": "admin", "password": "admin123"},
+  "seed_data_creation": "Tests create TEST_Iter32_* vulnerabilities and clean up via DELETE at teardown; some cleanups return 422 because DELETE requires ?justificacion — leftover TEST_ rows may remain but are clearly namespaced.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The critical bug is a 3-line fix: add 'En Retest' to ResultadoRetestLiteral (server.py L260-268). Also fix SeguimientoForm.jsx L87 to stringify Pydantic detail arrays. Once both are done, re-run /app/backend/tests/test_iteration32_en_retest.py — all 8 tests should PASS. Frontend selectors verified: [data-testid='filter-resultado-retest'], [data-testid='view-btn-{id}'], [data-testid='btn-nuevo-seguimiento'], [data-testid='seguimiento-form-resultado'], [data-testid='seguimiento-form-fecha'], [data-testid='seguimiento-form-notas'], [data-testid='seguimiento-form-guardar']. Repro steps: /vulnerabilidades → click any view-btn → click Bitácora tab → click 'Registrar Seguimiento / Impedimento' → open dropdown → 'En Retest - En validación con proveedor' → fill notas → Guardar → runtime error overlay appears.",
+  "rca of the issue": "ROOT CAUSE: E1 implemented the 'En Retest' rename UI-side and added a normalization block in server.py at L3476-3478 for POST /seguimiento/{id}/registrar. However, the corresponding Pydantic model `RegistroSeguimientoRequest.resultado_retest: ResultadoRetestLiteral` at L260-273 was NOT updated to include 'En Retest'. FastAPI validates the request body against the Literal BEFORE the handler runs, so the request is rejected with 422 and the normalization block never executes. Compounding bug: SeguimientoForm.jsx line 87 passes the 422 body's `detail` field (a list of Pydantic error objects) directly to sonner's toast.error(), which passes it to React, which throws 'Objects are not valid as a React child'. REPRODUCTION: Open the Vulnerability Detail modal → Bitácora tab → click 'Registrar Seguimiento / Impedimento' → select 'En Retest - En validación con proveedor' → fill notes → Guardar → 422 in network + full-screen React error overlay. MITIGATION: (1) Add 'En Retest' to ResultadoRetestLiteral in server.py. (2) Harden the toast.error call in SeguimientoForm.jsx to coerce arrays/objects to strings."
+}

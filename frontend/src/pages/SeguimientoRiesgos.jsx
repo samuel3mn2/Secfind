@@ -1473,7 +1473,7 @@ export default function SeguimientoRiesgos() {
                                 value={seguimientoForm.resultado_retest}
                                 onValueChange={(v) => {
                                   // Estados que fuerzan limpieza de fecha
-                                  const estadosSinFecha = ["Corregido", "Desestimado", "Para Re Test", "Nota de Seguimiento"];
+                                  const estadosSinFecha = ["Corregido", "Desestimado", "En Retest", "Nota de Seguimiento"];
                                   const limpiarFecha = estadosSinFecha.includes(v);
                                   setSeguimientoForm(prev => ({ 
                                     ...prev, 
@@ -1491,7 +1491,7 @@ export default function SeguimientoRiesgos() {
                                   <SelectItem value="Impedimento">Impedimento - Bloqueo operativo</SelectItem>
                                   <SelectItem value="Vulnerable">Vulnerable - Persiste tras validación</SelectItem>
                                   <SelectItem value="Desestimado">Desestimado - Falso positivo / Riesgo aceptado</SelectItem>
-                                  <SelectItem value="Para Re Test">Para Re Test - En validación con proveedor</SelectItem>
+                                  <SelectItem value="En Retest">En Retest - En validación con proveedor</SelectItem>
                                   <SelectItem value="Nota de Seguimiento">Nota de Seguimiento - Comentario</SelectItem>
                                 </SelectContent>
                               </Select>
@@ -1499,11 +1499,11 @@ export default function SeguimientoRiesgos() {
                             
                             <div className="space-y-2">
                               {(() => {
-                                const estadosSinFecha = ["Corregido", "Desestimado", "Para Re Test", "Nota de Seguimiento"];
+                                const estadosSinFecha = ["Corregido", "Desestimado", "En Retest", "Nota de Seguimiento"];
                                 const deshabilitarFecha = estadosSinFecha.includes(seguimientoForm.resultado_retest);
                                 const mensajeEstado = seguimientoForm.resultado_retest === "Corregido" || seguimientoForm.resultado_retest === "Desestimado"
                                   ? "(No aplica para cierre)"
-                                  : seguimientoForm.resultado_retest === "Para Re Test"
+                                  : seguimientoForm.resultado_retest === "En Retest"
                                     ? "(Se congela fecha - En validación)"
                                     : seguimientoForm.resultado_retest === "Nota de Seguimiento"
                                       ? "(No altera fecha)"

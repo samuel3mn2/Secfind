@@ -47,8 +47,8 @@ api_router = APIRouter(prefix="/api")
 
 # Default predefined values (fallback)
 DEFAULT_SEVERIDADES = ["Critica", "Alta", "Media", "Baja"]
-DEFAULT_ESTATUS = ["En Proceso", "Cerrado", "Pendiente", "Para Re Test"]
-DEFAULT_RESULTADO_RETEST = ["Corregido", "Pendiente", "Impedimento", "Vulnerable", "Desestimado"]
+DEFAULT_ESTATUS = ["En Proceso", "Cerrado", "Pendiente", "En Retest"]
+DEFAULT_RESULTADO_RETEST = ["Corregido", "Pendiente", "Impedimento", "Vulnerable", "Desestimado", "En Retest", "Nota de Seguimiento"]
 
 # ============ PERMISSION MODELS ============
 
@@ -2362,6 +2362,7 @@ async def get_vulnerabilidades(
     controles_filter = request.query_params.getlist("control")
     nivel_riesgo_filter = request.query_params.getlist("nivel_riesgo")
     proveedores_filter = request.query_params.getlist("proveedor")
+    resultado_retest_filter = request.query_params.getlist("resultado_retest")
     
     query = {}
     if severidades:
@@ -2380,6 +2381,15 @@ async def get_vulnerabilidades(
         query["responsable"] = {"$in": responsables}
     if nivel_riesgo_filter:
         query["nivel_riesgo"] = {"$in": nivel_riesgo_filter}
+    if resultado_retest_filter:
+        # Normalizar: "En Retest" en frontend = "Para Re Test" en BD
+        normalized = []
+        for r in resultado_retest_filter:
+            if r.lower() == "en retest":
+                normalized.append("Para Re Test")
+            else:
+                normalized.append(r)
+        query["resultado_re_test"] = {"$in": normalized}
     if años:
         # Multiple years - use $or with regex for each year
         year_conditions = [{"fecha_hallazgo": {"$regex": f"^{año}"}} for año in años]
@@ -2534,23 +2544,51 @@ async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate, c
     
     update_dict = vuln_data.model_dump(exclude_unset=True)
     
+    # NORMALIZACIÓN: "En Retest" del frontend -> "Para Re Test" en BD
+    if "resultado_re_test" in update_dict:
+        resultado_raw = (update_dict.get("resultado_re_test") or "").strip()
+        if resultado_raw.lower() == "en retest":
+            update_dict["resultado_re_test"] = "Para Re Test"
+    
     # Sincronizar estatus basado en resultado de retest
     # Mapeo: Corregido/Desestimado -> Cerrado, Vulnerable/Impedimento/Para Re Test -> Pendiente
     if "resultado_re_test" in update_dict:
         resultado_retest = (update_dict.get("resultado_re_test") or "").strip().lower()
+        estaba_cerrada = existing.get("estatus") == "Cerrado" or existing.get("resultado_re_test") in ["Corregido", "Desestimado"]
+        fecha_cierre_anterior = existing.get("fecha_cierre")
+        
         if resultado_retest in ["corregido", "desestimado"]:
             update_dict["estatus"] = "Cerrado"
             # Establecer fecha_cierre si no está ya definida
             if not update_dict.get("fecha_cierre") and not existing.get("fecha_cierre"):
                 update_dict["fecha_cierre"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        elif resultado_retest in ["vulnerable", "impedimento", "para re test"]:
+        elif resultado_retest in ["vulnerable", "impedimento", "para re test", "pendiente"]:
             update_dict["estatus"] = "Pendiente"
             # Si es "Para Re Test", limpiar fecha_compromiso para que aparezca en vista en_retest
             if resultado_retest == "para re test":
                 update_dict["fecha_compromiso"] = None
-            # Si se reabre la vulnerabilidad, limpiar fecha_cierre
-            if existing.get("estatus") == "Cerrado":
+            # Si se reabre la vulnerabilidad, limpiar fecha_cierre y agregar nota
+            if estaba_cerrada and fecha_cierre_anterior:
                 update_dict["fecha_cierre"] = None
+                # Agregar nota automática de reapertura al historial
+                nota_reapertura = {
+                    "id_accion": str(uuid.uuid4()),
+                    "fecha_registro_nota": datetime.now(timezone.utc).isoformat(),
+                    "resultado_retest": "Nota de Seguimiento",
+                    "fecha_compromiso_asignada": None,
+                    "notas_impedimento": f"⚠️ Vulnerabilidad reabierta. Fecha de cierre previa cancelada (Era: {fecha_cierre_anterior})",
+                    "usuario_registro": current_user.nombre or current_user.username
+                }
+                # Inicializar historial si no existe
+                if existing.get("historial_impedimentos_seguimiento") is None:
+                    await db.vulnerabilidades.update_one(
+                        {"id": vuln_id},
+                        {"$set": {"historial_impedimentos_seguimiento": []}}
+                    )
+                await db.vulnerabilidades.update_one(
+                    {"id": vuln_id},
+                    {"$push": {"historial_impedimentos_seguimiento": nota_reapertura}}
+                )
     
     # Calcular cambios antes de actualizar
     cambios = calcular_cambios(existing, update_dict)
@@ -3435,6 +3473,17 @@ async def registrar_seguimiento(
     # Determinar el tipo de caso según el resultado_retest
     resultado = data.resultado_retest
     
+    # NORMALIZACIÓN: "En Retest" del frontend -> "Para Re Test" en BD
+    if resultado == "En Retest":
+        resultado = "Para Re Test"
+    
+    # ==========================================================================
+    # LÓGICA DE REAPERTURA: Si la vulnerabilidad estaba cerrada y se reabre
+    # ==========================================================================
+    estaba_cerrada = existing.get("estatus") == "Cerrado" or existing.get("resultado_re_test") in ["Corregido", "Desestimado"]
+    fecha_cierre_anterior = existing.get("fecha_cierre")
+    se_reabre = estaba_cerrada and resultado not in ["Corregido", "Desestimado", "Nota de Seguimiento"]
+    
     # ==========================================================================
     # LÓGICA DE NEGOCIO - 6 CASOS DE CICLO DE VIDA
     # ==========================================================================
@@ -3592,6 +3641,31 @@ async def registrar_seguimiento(
         # - NO cambia estatus
         # - Fecha en bitácora forzada a null (ya hecho arriba)
         pass  # No hacemos nada adicional
+    
+    # ==========================================================================
+    # LÓGICA DE REAPERTURA: Si se reabre una vulnerabilidad cerrada
+    # ==========================================================================
+    if se_reabre and fecha_cierre_anterior:
+        # Limpiar fecha_cierre
+        update_ops["$set"]["fecha_cierre"] = None
+        
+        # Crear nota automática de reapertura
+        nota_reapertura = {
+            "id_accion": str(uuid.uuid4()),
+            "fecha_registro_nota": datetime.now(timezone.utc).isoformat(),
+            "resultado_retest": "Nota de Seguimiento",
+            "fecha_compromiso_asignada": None,
+            "notas_impedimento": f"⚠️ Vulnerabilidad reabierta tras retest. Fecha de cierre previa cancelada (Era: {fecha_cierre_anterior})",
+            "usuario_registro": "Sistema"
+        }
+        # Agregar la nota de reapertura también al historial
+        update_ops["$push"]["historial_impedimentos_seguimiento"]["$each"] = [entrada_bitacora, nota_reapertura]
+        # Remover el push simple anterior si existe
+        if "$push" in update_ops and "historial_impedimentos_seguimiento" in update_ops["$push"]:
+            if isinstance(update_ops["$push"]["historial_impedimentos_seguimiento"], dict) and "$each" not in update_ops["$push"]["historial_impedimentos_seguimiento"]:
+                # Convertir push simple a push con $each
+                del update_ops["$push"]["historial_impedimentos_seguimiento"]
+        update_ops["$push"] = {"historial_impedimentos_seguimiento": {"$each": [entrada_bitacora, nota_reapertura]}}
     
     # Si hay operaciones de incremento, agregarlas
     if inc_ops:

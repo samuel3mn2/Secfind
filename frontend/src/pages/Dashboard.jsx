@@ -57,7 +57,7 @@ const STATUS_COLORS = {
   "En Proceso": "#f97316",
   Cerrado: "#22c55e",
   Pendiente: "#eab308",
-  "Para Re Test": "#3b82f6",
+  "En Retest": "#3b82f6",
   Corregido: "#22c55e",
   Desestimado: "#71717a",
 };
@@ -117,7 +117,7 @@ const StatusBadge = ({ status }) => {
   const getClass = (s) => {
     if (["Cerrado", "Corregido"].includes(s)) return "bg-green-500/15 text-green-500 border-green-500/30";
     if (["Pendiente", "En Proceso"].includes(s)) return "bg-yellow-500/15 text-yellow-500 border-yellow-500/30";
-    if (s === "Para Re Test") return "bg-blue-500/15 text-blue-500 border-blue-500/30";
+    if (s === "Para Re Test" || s === "En Retest") return "bg-blue-500/15 text-blue-500 border-blue-500/30";
     return "bg-zinc-500/15 text-zinc-400 border-zinc-500/30";
   };
   return (
@@ -632,7 +632,7 @@ export default function Dashboard() {
           <CardContent className="p-3">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-zinc-500 text-xs font-medium">Para Re Test</p>
+                <p className="text-zinc-500 text-xs font-medium">En Retest</p>
                 <p className="text-2xl font-bold text-blue-500 mt-1">
                   {stats?.para_retest || 0}
                 </p>
