@@ -2558,9 +2558,6 @@ async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate, c
     estaba_cerrada = existing.get("estatus") == "Cerrado" or existing.get("resultado_re_test") in ["Corregido", "Desestimado"]
     fecha_cierre_anterior = existing.get("fecha_cierre")
     
-    # Verificar si el usuario CAMBIÓ el resultado_re_test
-    resultado_re_test_cambio = "resultado_re_test" in update_dict and update_dict.get("resultado_re_test") != existing.get("resultado_re_test")
-    
     # Determinar nuevo resultado (normalizado a minúsculas)
     nuevo_resultado = update_dict.get("resultado_re_test", existing.get("resultado_re_test"))
     if nuevo_resultado:
@@ -2571,9 +2568,10 @@ async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate, c
     es_resultado_reapertura = nuevo_resultado in ["vulnerable", "impedimento", "para re test", "pendiente"]
     
     # ==========================================================================
-    # LÓGICA DE SINCRONIZACIÓN AUTOMÁTICA (solo si cambió resultado_re_test)
+    # LÓGICA DE SINCRONIZACIÓN AUTOMÁTICA estatus <-> resultado_re_test
+    # Solo aplica si resultado_re_test tiene valor (no está vacío)
     # ==========================================================================
-    if resultado_re_test_cambio:
+    if nuevo_resultado and nuevo_resultado.strip():
         if es_resultado_cierre:
             update_dict["estatus"] = "Cerrado"
             # Establecer fecha_cierre si no está ya definida
@@ -2606,6 +2604,7 @@ async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate, c
                     {"id": vuln_id},
                     {"$push": {"historial_impedimentos_seguimiento": nota_reapertura}}
                 )
+    # Si resultado_re_test está vacío, el usuario puede poner el estatus que quiera
     
     # Calcular cambios antes de actualizar
     cambios = calcular_cambios(existing, update_dict)

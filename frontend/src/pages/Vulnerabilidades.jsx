@@ -1783,12 +1783,24 @@ export default function Vulnerabilidades() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-zinc-400">Estatus</Label>
+                  <Label className="text-zinc-400">
+                    Estatus
+                    {formData.resultado_re_test && !["Nota de Seguimiento", ""].includes(formData.resultado_re_test) && (
+                      <span className="text-xs text-cyan-400 ml-2">(sincronizado con Resultado Re Test)</span>
+                    )}
+                  </Label>
                   <Select
                     value={formData.estatus || ""}
                     onValueChange={(v) => setFormData({ ...formData, estatus: v })}
+                    disabled={formData.resultado_re_test && !["Nota de Seguimiento", ""].includes(formData.resultado_re_test)}
                   >
-                    <SelectTrigger className="bg-black/20 border-zinc-700 text-white" data-testid="input-estatus">
+                    <SelectTrigger 
+                      className={`bg-black/20 border-zinc-700 text-white ${
+                        formData.resultado_re_test && !["Nota de Seguimiento", ""].includes(formData.resultado_re_test) 
+                          ? "opacity-60" : ""
+                      }`} 
+                      data-testid="input-estatus"
+                    >
                       <SelectValue placeholder="Seleccionar..." />
                     </SelectTrigger>
                     <SelectContent className="bg-zinc-900 border-zinc-700">
@@ -1864,7 +1876,32 @@ export default function Vulnerabilidades() {
                   <Label className="text-zinc-400">Resultado Re Test</Label>
                   <Select
                     value={formData.resultado_re_test || ""}
-                    onValueChange={(v) => setFormData({ ...formData, resultado_re_test: v })}
+                    onValueChange={(v) => {
+                      // Sincronizar estatus en tiempo real según resultado_re_test
+                      const estatusCierre = ["Corregido", "Desestimado"];
+                      const estatusPendiente = ["Vulnerable", "Impedimento", "En Retest", "Pendiente"];
+                      
+                      let nuevoEstatus = formData.estatus;
+                      let nuevaFechaCierre = formData.fecha_cierre;
+                      
+                      if (estatusCierre.includes(v)) {
+                        nuevoEstatus = "Cerrado";
+                        // Pre-llenar fecha de cierre con hoy si está vacía
+                        if (!nuevaFechaCierre) {
+                          nuevaFechaCierre = new Date().toISOString().split('T')[0];
+                        }
+                      } else if (estatusPendiente.includes(v)) {
+                        nuevoEstatus = "Pendiente";
+                      }
+                      // Si v está vacío o es "Nota de Seguimiento", mantener el estatus actual
+                      
+                      setFormData({ 
+                        ...formData, 
+                        resultado_re_test: v,
+                        estatus: nuevoEstatus,
+                        fecha_cierre: estatusCierre.includes(v) ? nuevaFechaCierre : formData.fecha_cierre
+                      });
+                    }}
                   >
                     <SelectTrigger className="bg-black/20 border-zinc-700 text-white" data-testid="input-resultado-retest">
                       <SelectValue placeholder="Seleccionar..." />
@@ -1875,6 +1912,15 @@ export default function Vulnerabilidades() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-zinc-500">
+                    {formData.resultado_re_test ? 
+                      (["Corregido", "Desestimado"].includes(formData.resultado_re_test) ? 
+                        "⚡ Estatus se sincroniza a 'Cerrado'" : 
+                        ["Vulnerable", "Impedimento", "En Retest", "Pendiente"].includes(formData.resultado_re_test) ?
+                          "⚡ Estatus se sincroniza a 'Pendiente'" : 
+                          "") : 
+                      "Sin resultado = estatus libre"}
+                  </p>
                 </div>
 
                 {/* Campo Fecha de Cierre - Solo visible cuando estatus = Cerrado o resultado = Corregido/Desestimado */}
