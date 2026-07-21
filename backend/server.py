@@ -644,12 +644,22 @@ def normalizar_resultados_por_aplicacion(vulnerabilidad: dict) -> dict:
         estatus_sugerido = "Pendiente"
         debe_tener_fecha_cierre = False
         
-        # Si todos los resultados son iguales y no resuelven, sincronizar
-        resultados_unicos = set(a["resultado_re_test"] for a in aplicaciones_normalizadas if a["resultado_re_test"])
-        if len(resultados_unicos) == 1:
-            resultado_unico = list(resultados_unicos)[0]
-            if resultado_unico not in RESULTADOS_QUE_CIERRAN:
-                resultado_global_sugerido = resultado_unico
+        # CORRECCIÓN: Si hay corrección parcial o apps no resueltas, el resultado global
+        # debe reflejar un estado que permita seguimiento
+        if es_correccion_parcial:
+            # Corrección parcial: algunas corregidas pero otras no
+            # El resultado global debe indicar que AÚN hay trabajo pendiente
+            resultado_global_sugerido = "Pendiente"
+        else:
+            # Si todos los resultados son iguales y no resuelven, sincronizar
+            resultados_unicos = set(a["resultado_re_test"] for a in aplicaciones_normalizadas if a["resultado_re_test"])
+            if len(resultados_unicos) == 1:
+                resultado_unico = list(resultados_unicos)[0]
+                if resultado_unico not in RESULTADOS_QUE_CIERRAN:
+                    resultado_global_sugerido = resultado_unico
+            elif len(resultados_unicos) > 1:
+                # Hay múltiples resultados diferentes, usar "Pendiente" como estado neutral
+                resultado_global_sugerido = "Pendiente"
     
     return {
         "aplicaciones": aplicaciones_normalizadas,
@@ -752,8 +762,17 @@ async def procesar_cambio_resultado_aplicacion(
     else:
         update_data["fecha_cierre"] = None
     
-    # Actualizar resultado global si hay sugerencia y está forzado o todas resueltas homogéneamente
-    if info_normalizacion["resultado_global_sugerido"] and (forzar_actualizacion_global or info_normalizacion["todas_resueltas"]):
+    # Actualizar resultado global:
+    # - Si está forzado
+    # - Si todas las apps están resueltas (para cierre consistente)
+    # - Si hay corrección parcial o apps no resueltas (para que aparezca en seguimiento)
+    debe_actualizar_global = (
+        forzar_actualizacion_global or 
+        info_normalizacion["todas_resueltas"] or 
+        info_normalizacion["es_correccion_parcial"] or
+        not info_normalizacion["todas_resueltas"]  # Hay al menos una no resuelta
+    )
+    if info_normalizacion["resultado_global_sugerido"] and debe_actualizar_global:
         update_data["resultado_re_test"] = info_normalizacion["resultado_global_sugerido"]
     
     # Registrar en la bitácora
@@ -3185,6 +3204,9 @@ async def get_resultados_por_aplicacion(
         "aplicaciones_corregidas": info["aplicaciones_corregidas"],
         "aplicaciones_total": info["aplicaciones_total"],
         "todas_resueltas": info["todas_resueltas"],
+        "resultado_global_sugerido": info["resultado_global_sugerido"],
+        "estatus_sugerido": info["estatus_sugerido"],
+        "debe_tener_fecha_cierre": info["debe_tener_fecha_cierre"],
         "aplicaciones": info["aplicaciones"]
     }
 

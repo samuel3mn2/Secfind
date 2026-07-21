@@ -4,6 +4,20 @@
 
 ### Cambios Recientes (Julio 2026)
 
+- **BUGFIX: Sincronización de resultado_re_test global al cambiar app individual (2026-07-21)**:
+  - **Problema reportado**: Si una vulnerabilidad estaba con resultado_re_test "Corregido" y se cambiaba una app individual a "Pendiente" o "Vulnerable", el estatus cambiaba a "Pendiente" pero el resultado_re_test global permanecía en "Corregido". Esto causaba que la vulnerabilidad no apareciera en el módulo de Seguimiento.
+  - **Causa raíz**: La función `normalizar_resultados_por_aplicacion()` no asignaba `resultado_global_sugerido` cuando había corrección parcial o apps no resueltas. El endpoint `PUT /aplicacion-resultado` solo actualizaba el resultado global cuando `todas_resueltas=True`.
+  - **Solución implementada**:
+    * `normalizar_resultados_por_aplicacion()` ahora asigna `resultado_global_sugerido = "Pendiente"` cuando `es_correccion_parcial=True` o hay apps con estados mixtos
+    * `procesar_cambio_resultado_aplicacion()` ahora aplica el `resultado_global_sugerido` siempre que haya corrección parcial o apps no resueltas
+    * Endpoint GET `/aplicaciones-resultados` ahora devuelve `resultado_global_sugerido`, `estatus_sugerido`, `debe_tener_fecha_cierre`
+  - **Comportamiento correcto después del fix**:
+    * Vuln cerrada (IBP=Corregido, IBE=Corregido) → Cambiar IBE a Vulnerable
+    * resultado_re_test: Corregido → Pendiente ✅
+    * estatus: Cerrado → Pendiente ✅
+    * fecha_cierre: 2026-07-21 → null ✅
+  - **Archivo modificado**: `/app/backend/server.py` (líneas ~628-662, ~757-775, ~3179-3211)
+
 - **FEATURE: Epic de Remediación Parcial Completada (2026-07-21)**:
   - **Integración del selector de aplicación en Formulario de Seguimiento**:
     * `SeguimientoForm.jsx` ahora muestra un selector de aplicación cuando la vulnerabilidad tiene >1 aplicación
