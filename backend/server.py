@@ -3927,6 +3927,7 @@ async def get_seguimiento_riesgos(
     # ==========================================================================
     
     query = {}
+    post_filter_vista = None  # Para aplicar filtro después de normalización
     
     if vista == "historico" or incluir_cerradas:
         # VISTA: Histórico Cerrado (Auditoría)
@@ -3943,19 +3944,22 @@ async def get_seguimiento_riesgos(
         query["resultado_re_test"] = "Para Re Test"
         
     elif vista == "en_analisis":
-        # VISTA: En Análisis - Sin fecha y último estado es Vulnerable o Impedimento
-        query["estatus"] = {"$nin": ["Cerrado", "Corregido", "Desestimado"]}
+        # VISTA: En Análisis - Sin fecha y estado pendiente
+        # NOTA: Traemos todas las vulnerabilidades sin fecha (incluyendo las que podrían 
+        # estar "Cerradas" en BD pero que tienen corrección parcial pendiente)
+        # El filtrado real se hace post-normalización
         query["$or"] = [
             {"fecha_compromiso": {"$exists": False}},
             {"fecha_compromiso": None},
             {"fecha_compromiso": ""}
         ]
-        query["resultado_re_test"] = {"$in": ["Vulnerable", "Impedimento"]}
+        post_filter_vista = "en_analisis"  # Filtrar después de normalizar
         
     elif vista == "activas_con_fecha":
         # VISTA: Activas con Fecha - Estatus abierto y con fecha asignada
-        query["estatus"] = {"$nin": ["Cerrado", "Corregido", "Desestimado"]}
+        # También traemos las cerradas que podrían tener corrección parcial
         query["fecha_compromiso"] = {"$exists": True, "$nin": [None, ""]}
+        post_filter_vista = "activas_con_fecha"  # Filtrar después de normalizar
         
     else:
         # Modo legacy/compatibilidad (sin parámetro vista)
@@ -4025,8 +4029,24 @@ async def get_seguimiento_riesgos(
     vulns = await db.vulnerabilidades.find(query, {"_id": 0}).to_list(10000)
     
     # Add computed status for each vulnerability
+    # IMPORTANTE: Normalizar resultados por aplicación para obtener el estado REAL
     result = []
     for v in vulns:
+        # Aplicar normalización de resultados por aplicación
+        info_apps = normalizar_resultados_por_aplicacion(v)
+        
+        # Sobrescribir estatus y resultado_re_test con los valores calculados si hay corrección parcial
+        if info_apps["tiene_resultados_personalizados"] or len(info_apps.get("aplicaciones", [])) > 1:
+            v["es_correccion_parcial"] = info_apps["es_correccion_parcial"]
+            v["aplicaciones_corregidas"] = info_apps["aplicaciones_corregidas"]
+            v["aplicaciones_total"] = info_apps["aplicaciones_total"]
+            
+            # Si hay corrección parcial o el estado sugerido difiere, usar el sugerido
+            if info_apps["estatus_sugerido"]:
+                v["estatus"] = info_apps["estatus_sugerido"]
+            if info_apps["resultado_global_sugerido"]:
+                v["resultado_re_test"] = info_apps["resultado_global_sugerido"]
+        
         fecha_comp = v.get("fecha_compromiso", "")
         dias_restantes = None
         estado_seguimiento = "sin_fecha"
@@ -4216,7 +4236,41 @@ async def registrar_seguimiento(
     fecha_limpiada = False  # Para casos donde se limpia la fecha a null
     
     # ==========================================================================
-    # PROCESAMIENTO POR CASO
+    # MANEJO DE APLICACIÓN ESPECÍFICA (Remediación Parcial)
+    # ==========================================================================
+    
+    # Si viene aplicacion_especifica, usar el flujo de procesar_cambio_resultado_aplicacion
+    # para actualizar solo esa app y recalcular el estado global correctamente
+    if data.aplicacion_especifica:
+        # Preparar datos para actualizar la app específica
+        fecha_correccion = None
+        if es_estado_cierre:
+            fecha_correccion = data.fecha_cierre or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        
+        # Usar la función centralizada para actualizar la app y recalcular estado global
+        # NOTA: Esta función ya agrega la entrada a la bitácora, no la duplicamos aquí
+        resultado_cambio = await procesar_cambio_resultado_aplicacion(
+            vuln_id=vuln_id,
+            aplicacion=data.aplicacion_especifica,
+            nuevo_resultado=resultado,
+            fecha_correccion=fecha_correccion,
+            notas=data.notas_impedimento,
+            usuario=current_user.nombre or current_user.username,
+            forzar_actualizacion_global=False  # Dejar que calcule automáticamente
+        )
+        
+        # Devolver la vulnerabilidad actualizada
+        vuln_actualizada = await db.vulnerabilidades.find_one({"id": vuln_id}, {"_id": 0})
+        
+        return {
+            "success": True,
+            "message": f"Seguimiento registrado para aplicación {data.aplicacion_especifica}",
+            "vulnerabilidad": vuln_actualizada,
+            "info_normalizacion": resultado_cambio.get("info_normalizacion", {})
+        }
+    
+    # ==========================================================================
+    # PROCESAMIENTO POR CASO (para cambios globales, sin aplicación específica)
     # ==========================================================================
     
     if es_estado_cierre:
