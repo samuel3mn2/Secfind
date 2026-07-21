@@ -22,6 +22,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
  * 
  * @param {string} vulnId - ID de la vulnerabilidad
  * @param {string} currentFechaCompromiso - Fecha compromiso actual de la vulnerabilidad
+ * @param {Array<string>} aplicaciones - Lista de aplicaciones de la vulnerabilidad (opcional)
  * @param {function} onSuccess - Callback cuando se guarda exitosamente (recibe la vuln actualizada)
  * @param {function} onCancel - Callback para cancelar (opcional, si no se pasa no muestra botón cancelar)
  * @param {boolean} compact - Modo compacto para espacios reducidos
@@ -29,6 +30,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 export const SeguimientoForm = ({ 
   vulnId, 
   currentFechaCompromiso,
+  aplicaciones = [],
   onSuccess, 
   onCancel,
   compact = false 
@@ -37,9 +39,13 @@ export const SeguimientoForm = ({
     resultado_retest: "",
     fecha_compromiso_asignada: "",
     fecha_cierre: "",
-    notas_impedimento: ""
+    notas_impedimento: "",
+    aplicacion_especifica: ""  // "" = General (todas las apps)
   });
   const [saving, setSaving] = useState(false);
+
+  // Mostrar selector de aplicación solo si hay más de una
+  const mostrarSelectorApp = aplicaciones && aplicaciones.length > 1;
 
   // Estados que NO requieren fecha compromiso (la limpian o congelan)
   const ESTADOS_SIN_FECHA_COMPROMISO = ["Corregido", "Desestimado", "En Retest", "Nota de Seguimiento"];
@@ -76,7 +82,12 @@ export const SeguimientoForm = ({
 
     setSaving(true);
     try {
-      const response = await axios.post(`${API}/seguimiento/${vulnId}/registrar`, formData);
+      // Preparar payload - enviar null en lugar de "" para aplicacion_especifica si es general
+      const payload = {
+        ...formData,
+        aplicacion_especifica: formData.aplicacion_especifica || null
+      };
+      const response = await axios.post(`${API}/seguimiento/${vulnId}/registrar`, payload);
       toast.success("Seguimiento registrado exitosamente");
       
       // Limpiar formulario
@@ -84,7 +95,8 @@ export const SeguimientoForm = ({
         resultado_retest: "",
         fecha_compromiso_asignada: "",
         fecha_cierre: "",
-        notas_impedimento: ""
+        notas_impedimento: "",
+        aplicacion_especifica: ""
       });
 
       // Callback de éxito
@@ -122,6 +134,33 @@ export const SeguimientoForm = ({
         <FileText className={compact ? "w-3 h-3" : "w-4 h-4"} />
         Registrar Seguimiento / Impedimento
       </h4>
+      
+      {/* Selector de Aplicación Específica - Solo si hay múltiples apps */}
+      {mostrarSelectorApp && (
+        <div className="space-y-2">
+          <Label className={`text-cyan-400 ${compact ? 'text-xs' : ''}`}>
+            Aplicación (opcional)
+            <span className="text-zinc-500 ml-2 font-normal">- Deja vacío para aplicar a todas</span>
+          </Label>
+          <Select
+            value={formData.aplicacion_especifica}
+            onValueChange={(value) => setFormData(prev => ({ ...prev, aplicacion_especifica: value === "_general_" ? "" : value }))}
+          >
+            <SelectTrigger 
+              className={`bg-zinc-900 border-zinc-700 border-cyan-500/30 ${compact ? 'h-8 text-xs' : ''}`} 
+              data-testid="seguimiento-form-aplicacion"
+            >
+              <SelectValue placeholder="General (todas las aplicaciones)" />
+            </SelectTrigger>
+            <SelectContent className="bg-zinc-900 border-zinc-700">
+              <SelectItem value="_general_">General (todas las aplicaciones)</SelectItem>
+              {aplicaciones.map((app) => (
+                <SelectItem key={app} value={app}>{app}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       
       <div className={`grid ${compact ? 'grid-cols-1 gap-3' : 'grid-cols-2 gap-4'}`}>
         {/* Resultado Retest */}

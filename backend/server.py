@@ -303,6 +303,7 @@ class RegistroSeguimientoRequest(BaseModel):
     fecha_compromiso_asignada: Optional[str] = None
     fecha_cierre: Optional[str] = None  # Fecha de cierre para Corregido/Desestimado
     notas_impedimento: Optional[str] = None
+    aplicacion_especifica: Optional[str] = None  # Para seguimiento por aplicación específica
 
 class VulnerabilidadCreate(VulnerabilidadBase):
     pass
@@ -2735,6 +2736,7 @@ async def get_vulnerabilidades(
     nivel_riesgo_filter = request.query_params.getlist("nivel_riesgo")
     proveedores_filter = request.query_params.getlist("proveedor")
     resultado_retest_filter = request.query_params.getlist("resultado_retest")
+    correccion_parcial_filter = request.query_params.get("correccion_parcial")  # "true" o "false"
     
     query = {}
     if severidades:
@@ -2814,11 +2816,25 @@ async def get_vulnerabilidades(
         v["codigo_control"] = codigo_control
         v["nombre_dominio"] = nombre_dominio
         
+        # Calcular información de corrección parcial
+        info_apps = normalizar_resultados_por_aplicacion(v)
+        v["es_correccion_parcial"] = info_apps["es_correccion_parcial"]
+        v["aplicaciones_corregidas"] = info_apps["aplicaciones_corregidas"]
+        v["aplicaciones_total"] = info_apps["aplicaciones_total"]
+        v["tiene_resultados_personalizados"] = info_apps["tiene_resultados_personalizados"]
+        
         # Apply dominio/control filters after enrichment
         if dominios_filter and nombre_dominio not in dominios_filter:
             continue
         if controles_filter and codigo_control not in controles_filter:
             continue
+        
+        # Apply correccion_parcial filter
+        if correccion_parcial_filter:
+            if correccion_parcial_filter.lower() == "true" and not info_apps["es_correccion_parcial"]:
+                continue
+            if correccion_parcial_filter.lower() == "false" and info_apps["es_correccion_parcial"]:
+                continue
         
         result.append(v)
     
@@ -4139,7 +4155,8 @@ async def registrar_seguimiento(
         "resultado_retest": resultado,
         "fecha_compromiso_asignada": fecha_para_bitacora,
         "notas_impedimento": data.notas_impedimento or "",
-        "usuario_registro": current_user.nombre or current_user.username
+        "usuario_registro": current_user.nombre or current_user.username,
+        "aplicacion_especifica": data.aplicacion_especifica  # Null si es general, o nombre de app específica
     }
     
     # Si el campo historial_impedimentos_seguimiento es null, inicializarlo primero
@@ -4677,7 +4694,20 @@ async def export_excel(
             vuln["control_codigo"] = controles_map.get(vuln["control_id"], "")
         if vuln.get("riesgo_id"):
             vuln["riesgo_catalogo"] = riesgos_map.get(vuln["riesgo_id"], "")
-    
+        
+        # Agregar columna de resultados por aplicación
+        info_apps = normalizar_resultados_por_aplicacion(vuln)
+        if info_apps["tiene_resultados_personalizados"] or len(info_apps["aplicaciones"]) > 1:
+            # Formato: "APP1: Corregido | APP2: Vulnerable"
+            detalles = []
+            for app_info in info_apps["aplicaciones"]:
+                resultado = app_info.get("resultado_re_test") or "Sin resultado"
+                detalles.append(f"{app_info['aplicacion']}: {resultado}")
+            vuln["resultados_por_aplicacion"] = " | ".join(detalles)
+            vuln["es_correccion_parcial"] = "Sí" if info_apps["es_correccion_parcial"] else "No"
+        else:
+            vuln["resultados_por_aplicacion"] = ""
+            vuln["es_correccion_parcial"] = ""
     df = pd.DataFrame(vulnerabilidades)
     
     # Remove internal columns

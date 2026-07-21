@@ -1,0 +1,76 @@
+{
+  "summary": "Iteration 33 (both) — Epic de Remediación Parcial por Aplicación. Backend: 9/10 pytest cases pass. Frontend end-to-end: LOGIN → Vulnerabilidad multi-app (VULN_PE_CE_1) → Bitácora → Registrar Seguimiento → selector de aplicación (opciones: General / IBP / MBP) → seleccionar IBP → Nota de Seguimiento → Guardar → toast 'Seguimiento registrado exitosamente' + timeline refreshed. Confirmed via API that historial[0].aplicacion_especifica == 'IBP' — persistencia OK. Excel export includes both new columns (resultados_por_aplicacion + es_correccion_parcial). PUT /vulnerabilidades/{id}/aplicacion-resultado works correctly and produces a partial-correction state that the correccion_parcial=true filter picks up. FOUND 2 issues: (1) `es_correccion_parcial`, `aplicaciones_corregidas`, `aplicaciones_total` are STRIPPED from GET /api/vulnerabilidades list response by the Pydantic `Vulnerabilidad` response_model — the filter still works because filtering happens before serialization, but downstream consumers cannot see the flag/counters. (2) The 'Corrección Parcial' filter UI is MISSING from the frontend Vulnerabilidades list — backend param works, frontend never sends it.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/vulnerabilidades",
+        "issue": "Server computes `es_correccion_parcial`, `aplicaciones_corregidas`, `aplicaciones_total`, `tiene_resultados_personalizados` on every row (server.py L2820-2824) but the response_model=List[Vulnerabilidad] (server.py L2716) uses model_config extra='ignore' and Vulnerabilidad/VulnerabilidadBase (L227-253) does NOT declare those fields — so they are stripped before returning. Filter correccion_parcial=true still works (in-memory filter happens before serialization). Add these 4 fields to Vulnerabilidad or use a dedicated response schema (e.g. VulnerabilidadListItem) OR remove the response_model."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Vulnerabilidades.jsx (filter row)",
+        "issue": "The epic required a 'Corrección Parcial' FILTER on the vulnerabilidades list. No such UI exists — grep of `Corrección Parcial` returns only the DETAIL modal badge and the confirm-change modal. Backend already supports `?correccion_parcial=true` query param.",
+        "selector": "no data-testid found; expected e.g. [data-testid='filter-correccion-parcial']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Vulnerability Detail modal → Bitácora timeline",
+        "issues": ["Timeline entries do NOT display the `aplicacion_especifica` field to the user. When the note was registered against IBP, the timeline card shows only 'Nota de Seguimiento' + notas, no 'Aplicación: IBP' badge. Consider adding a small pill next to the resultado badge (e.g., 'App: IBP') to visualize partial-app remediations that user just registered via the new selector."]
+      },
+      {
+        "screen": "Vulnerability Detail Dialog",
+        "issues": ["Missing `Description`/`aria-describedby` on DialogContent (Radix a11y warning) — pre-existing, non-blocking."]
+      }
+    ]
+  },
+  "passed_tests": [
+    "POST /api/seguimiento/{id}/registrar with aplicacion_especifica=null (general) — persisted correctly (test_registrar_seguimiento_general_sin_aplicacion)",
+    "POST /api/seguimiento/{id}/registrar with aplicacion_especifica='IBP' — persisted correctly (test_registrar_seguimiento_con_aplicacion_especifica)",
+    "POST /api/seguimiento/{id}/registrar with 'En Retest' still normalized to 'Para Re Test' (test_registrar_seguimiento_en_retest_still_works)",
+    "GET /api/vulnerabilidades?correccion_parcial=true — subset of all vulns, and each returned vuln confirms partial via /aplicaciones-resultados endpoint",
+    "GET /api/vulnerabilidades?correccion_parcial=false + ?correccion_parcial=true partition the full list (arithmetic OK, disjoint)",
+    "PUT /api/vulnerabilidades/{id}/aplicacion-resultado — updates only the targeted app, returns info_normalizacion and vulnerabilidad",
+    "es_correccion_parcial flag flips to True after correcting one of two apps (via /aplicaciones-resultados)",
+    "GET /api/export/excel — Excel file contains both 'resultados_por_aplicacion' and 'es_correccion_parcial' columns",
+    "Frontend LOGIN with admin/admin123 succeeds and redirects to /",
+    "Frontend Vulnerabilidades → open VULN_PE_CE_1 detail modal → Bitácora tab → 'Registrar Seguimiento' button visible ([data-testid='btn-nuevo-seguimiento'])",
+    "Frontend SeguimientoForm shows the APP SELECTOR ([data-testid='seguimiento-form-aplicacion']) because the vuln has 2 apps (IBP, MBP). Dropdown lists exactly 3 options: 'General (todas las aplicaciones)', 'IBP', 'MBP'",
+    "Frontend Guardar with aplicacion_especifica='IBP' + 'Nota de Seguimiento' → success toast 'Seguimiento registrado exitosamente'; historial[0].aplicacion_especifica == 'IBP' confirmed via API"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_iteration33_remediacion_parcial.py",
+    "/app/test_reports/pytest/pytest_iteration33.xml"
+  ],
+  "action_items": [
+    "HIGH — Implement the 'Corrección Parcial' FILTER on the Vulnerabilidades list (Vulnerabilidades.jsx). Backend already accepts ?correccion_parcial=true|false. Add a checkbox/toggle in the filter row (near severidad/estatus filters) with data-testid='filter-correccion-parcial' and wire it into the fetch params.",
+    "MEDIUM — Add `es_correccion_parcial`, `aplicaciones_corregidas`, `aplicaciones_total`, `tiene_resultados_personalizados` to the Vulnerabilidad Pydantic response model (server.py ~L314-321) OR remove `response_model=List[Vulnerabilidad]` from the GET /api/vulnerabilidades endpoint (server.py L2716) so the computed fields survive. This will let the frontend render a badge on the list row and drive the new filter UI reactively.",
+    "LOW — In TimelineSeguimiento.jsx, render `entry.aplicacion_especifica` as a small badge (e.g. 'App: IBP') next to the resultado badge so users can distinguish per-app entries. Currently the info is stored but invisible."
+  ],
+  "critical_code_review_comments": [
+    "server.py L227-253 (VulnerabilidadBase) & L314 (Vulnerabilidad): missing declaration of the 4 computed fields the endpoint writes at L2820-2824. Since ConfigDict(extra='ignore') is set, they are silently dropped. Either declare them (with defaults) or ditch the response_model on the list endpoint.",
+    "server.py L2716: `response_model=List[Vulnerabilidad]` interacts with the computed fields above. The bug is invisible in a functional sense (filter still works) but blocks any UI that wants to display the flag from the list response.",
+    "Frontend Vulnerabilidades.jsx: no filter for correccion_parcial despite the epic explicitly listing it as a deliverable. This is a missing feature, not a bug — E1 should add a toggle/checkbox that appends `correccion_parcial=true` to the axios GET.",
+    "TimelineSeguimiento.jsx L298-361: the timeline card ignores `entry.aplicacion_especifica`. The backend stores it (verified), the form writes it (verified), but the user has no way of seeing which app a note applies to after saving. This defeats part of the epic's UX goal.",
+    "server.py file size still ~5881 lines — refactor into route modules (routes/seguimiento.py, routes/vulnerabilidades.py) recommended in prior iterations still not addressed."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration33_remediacion_parcial.py (new)"
+  ],
+  "success_rate": {
+    "backend": "90% (9/10). The failing test documents the response_model stripping issue on GET /api/vulnerabilidades.",
+    "frontend": "80% (form + selector + persistence + toast + timeline refresh all work; filter UI missing; timeline doesn't show aplicacion_especifica)."
+  },
+  "test_credentials": {"user": "admin", "password": "admin123"},
+  "seed_data_creation": "Used the provided VULN_PE_CE_1 (id c392fd50-3337-4ef9-b210-fba50df57607) with apps IBP+MBP. Test entries prefixed 'TEST_iter33'. Cleanup fixture reverts app resultados to Pendiente but does not remove the historial entries (append-only by design).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The 3 remaining epic gaps are frontend-only or non-blocking backend polish: (1) missing Corrección Parcial filter UI in Vulnerabilidades.jsx (backend param works), (2) missing computed fields in GET /api/vulnerabilidades response due to response_model stripping — filter still works because it's applied in-memory before serialization, (3) TimelineSeguimiento doesn't display aplicacion_especifica. Core epic functionality (per-app tracking, POST persistence, PUT app-resultado, Excel export) is working. Test file at /app/backend/tests/test_iteration33_remediacion_parcial.py — 9/10 passing; the 1 failing test is a documented BUG marker for the response_model stripping issue.",
+  "rca of the issue": "Root cause of remaining gaps: (A) The list endpoint GET /api/vulnerabilidades sets `response_model=List[Vulnerabilidad]` (server.py L2716) and Vulnerabilidad has `ConfigDict(extra='ignore')`. The handler then computes `es_correccion_parcial` etc. into the raw dict at L2820-2824, but Pydantic drops them during serialization because they are not declared on the model. Fix: declare the 4 fields on Vulnerabilidad or drop the response_model. (B) Frontend never sends `?correccion_parcial=true` because no filter component exists in the Vulnerabilidades page filter bar. Fix: E1 should add a toggle bound to a state variable and included in the axios GET params."
+}

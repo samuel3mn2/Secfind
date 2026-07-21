@@ -409,7 +409,8 @@ export default function SeguimientoRiesgos() {
     resultado_retest: "",
     fecha_compromiso_asignada: "",
     fecha_cierre: "",
-    notas_impedimento: ""
+    notas_impedimento: "",
+    aplicacion_especifica: ""  // "" = General (todas las apps)
   });
   const [savingSeguimiento, setSavingSeguimiento] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState("info");
@@ -478,7 +479,12 @@ export default function SeguimientoRiesgos() {
     
     setSavingSeguimiento(true);
     try {
-      const response = await axios.post(`${API}/seguimiento/${viewingItem.id}/registrar`, seguimientoForm);
+      // Preparar payload - enviar null en lugar de "" para aplicacion_especifica si es general
+      const payload = {
+        ...seguimientoForm,
+        aplicacion_especifica: seguimientoForm.aplicacion_especifica || null
+      };
+      const response = await axios.post(`${API}/seguimiento/${viewingItem.id}/registrar`, payload);
       toast.success("Seguimiento registrado exitosamente");
       
       // Actualizar viewingItem con los nuevos datos
@@ -494,7 +500,9 @@ export default function SeguimientoRiesgos() {
       setSeguimientoForm({
         resultado_retest: "",
         fecha_compromiso_asignada: "",
-        notas_impedimento: ""
+        fecha_cierre: "",
+        notas_impedimento: "",
+        aplicacion_especifica: ""
       });
       setShowSeguimientoForm(false);
       
@@ -1347,7 +1355,7 @@ export default function SeguimientoRiesgos() {
         setShowViewModal(open);
         if (!open) {
           setShowSeguimientoForm(false);
-          setSeguimientoForm({ resultado_retest: "", fecha_compromiso_asignada: "", fecha_cierre: "", notas_impedimento: "" });
+          setSeguimientoForm({ resultado_retest: "", fecha_compromiso_asignada: "", fecha_cierre: "", notas_impedimento: "", aplicacion_especifica: "" });
         }
       }}>
         <DialogContent className="bg-[#18181b] border-[#27272a] text-white max-w-4xl max-h-[90vh]">
@@ -1478,6 +1486,30 @@ export default function SeguimientoRiesgos() {
                             Nuevo Registro de Seguimiento
                           </h4>
                           
+                          {/* Selector de Aplicación Específica - Solo si hay múltiples apps */}
+                          {viewingItem?.aplicaciones?.length > 1 && (
+                            <div className="space-y-2">
+                              <Label className="text-cyan-400">
+                                Aplicación (opcional)
+                                <span className="text-zinc-500 ml-2 font-normal">- Deja vacío para aplicar a todas</span>
+                              </Label>
+                              <Select
+                                value={seguimientoForm.aplicacion_especifica}
+                                onValueChange={(value) => setSeguimientoForm(prev => ({ ...prev, aplicacion_especifica: value === "_general_" ? "" : value }))}
+                              >
+                                <SelectTrigger className="bg-zinc-900 border-zinc-700 border-cyan-500/30" data-testid="select-aplicacion-especifica">
+                                  <SelectValue placeholder="General (todas las aplicaciones)" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-zinc-900 border-zinc-700">
+                                  <SelectItem value="_general_">General (todas las aplicaciones)</SelectItem>
+                                  {viewingItem.aplicaciones.map((app) => (
+                                    <SelectItem key={app} value={app}>{app}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                          
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <Label className="text-zinc-400">Resultado Retest *</Label>
@@ -1598,7 +1630,7 @@ export default function SeguimientoRiesgos() {
                               variant="outline"
                               onClick={() => {
                                 setShowSeguimientoForm(false);
-                                setSeguimientoForm({ resultado_retest: "", fecha_compromiso_asignada: "", fecha_cierre: "", notas_impedimento: "" });
+                                setSeguimientoForm({ resultado_retest: "", fecha_compromiso_asignada: "", fecha_cierre: "", notas_impedimento: "", aplicacion_especifica: "" });
                               }}
                               className="border-zinc-600"
                             >

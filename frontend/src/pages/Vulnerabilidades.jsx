@@ -1987,6 +1987,7 @@ export default function Vulnerabilidades() {
                       vulnId={viewingVuln.id} 
                       allowCreate={canModify}
                       currentFechaCompromiso={viewingVuln.fecha_compromiso}
+                      aplicaciones={viewingVuln.aplicaciones || []}
                       onSeguimientoCreated={(updatedVuln) => {
                         setViewingVuln(updatedVuln);
                         fetchVulnerabilidades(false);
