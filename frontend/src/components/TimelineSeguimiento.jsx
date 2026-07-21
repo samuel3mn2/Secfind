@@ -319,6 +319,13 @@ export const TimelineSeguimiento = ({
                         {tipoInfo.tipo}
                       </span>
                       
+                      {/* Badge de aplicación específica si existe */}
+                      {entry.aplicacion_especifica && (
+                        <span className="px-2 py-0.5 rounded text-xs font-medium border bg-cyan-500/20 border-cyan-500/50 text-cyan-300">
+                          App: {entry.aplicacion_especifica}
+                        </span>
+                      )}
+                      
                       <span className="text-xs text-zinc-500 flex items-center gap-1">
                         <Clock className="w-3 h-3" />
                         {entry.fecha_registro_nota ? 

@@ -4,6 +4,28 @@
 
 ### Cambios Recientes (Julio 2026)
 
+- **FEATURE: Epic de Remediación Parcial Completada (2026-07-21)**:
+  - **Integración del selector de aplicación en Formulario de Seguimiento**:
+    * `SeguimientoForm.jsx` ahora muestra un selector de aplicación cuando la vulnerabilidad tiene >1 aplicación
+    * Opciones: "General (todas las aplicaciones)" + lista de aplicaciones individuales
+    * El backend almacena `aplicacion_especifica` en cada entrada de la bitácora
+    * TimelineSeguimiento muestra badge "App: {nombre}" en entradas con aplicación específica
+  - **Filtro "Corrección Parcial" en Lista de Vulnerabilidades**:
+    * Nuevo toggle en la barra de filtros de `/vulnerabilidades`
+    * Filtra vulnerabilidades con al menos una app corregida Y al menos una no resuelta
+    * Backend: query param `correccion_parcial=true|false`
+  - **Exportación Excel con detalles por aplicación**:
+    * Columnas `resultados_por_aplicacion` y `es_correccion_parcial` incluidas
+    * Formato: "App1: Corregido | App2: Pendiente | ..."
+  - **Modelo Pydantic actualizado**:
+    * `Vulnerabilidad` ahora incluye campos computados: `es_correccion_parcial`, `aplicaciones_corregidas`, `aplicaciones_total`, `tiene_resultados_personalizados`
+  - **Archivos modificados**:
+    * `/app/backend/server.py` - Modelo, endpoint seguimiento, filtro
+    * `/app/frontend/src/components/SeguimientoForm.jsx` - Selector de aplicación
+    * `/app/frontend/src/components/TimelineSeguimiento.jsx` - Badge de app específica
+    * `/app/frontend/src/pages/Vulnerabilidades.jsx` - Filtro UI + props para TimelineSeguimiento
+    * `/app/frontend/src/pages/SeguimientoRiesgos.jsx` - Selector de aplicación en formulario inline
+
 - **FEATURE: Remediación Parcial por Aplicación (2026-07-21)**:
   - **Solicitud**: Permitir resultados de Re-Test independientes por aplicación cuando una vulnerabilidad afecta múltiples aplicaciones
   - **Problema resuelto**: Anteriormente no había forma estructurada de representar que IBE está Vulnerable mientras IBP está Corregido

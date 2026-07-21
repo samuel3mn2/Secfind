@@ -282,6 +282,7 @@ export default function Vulnerabilidades() {
   const [filterNivelRiesgo, setFilterNivelRiesgo] = useState([]);
   const [filterProveedor, setFilterProveedor] = useState([]);
   const [filterResultadoRetest, setFilterResultadoRetest] = useState([]);
+  const [filterCorreccionParcial, setFilterCorreccionParcial] = useState(false); // Filtro para mostrar solo correcciones parciales
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showBulkEntryModal, setShowBulkEntryModal] = useState(false);
@@ -477,6 +478,7 @@ export default function Vulnerabilidades() {
       if (filterNivelRiesgo.length > 0) filterNivelRiesgo.forEach(v => params.append("nivel_riesgo", v));
       if (filterProveedor.length > 0) filterProveedor.forEach(v => params.append("proveedor", v));
       if (filterResultadoRetest.length > 0) filterResultadoRetest.forEach(v => params.append("resultado_retest", v));
+      if (filterCorreccionParcial) params.append("correccion_parcial", "true");
 
       const response = await axios.get(`${API}/vulnerabilidades?${params.toString()}`);
       setVulnerabilidades(response.data);
@@ -489,7 +491,7 @@ export default function Vulnerabilidades() {
     } finally {
       setLoading(false);
     }
-  }, [search, filterSeveridad, filterEstatus, filterInstitucion, filterAño, filterAplicacion, filterInforme, filterResponsable, filterDominio, filterControl, filterNivelRiesgo, filterProveedor, filterResultadoRetest]);
+  }, [search, filterSeveridad, filterEstatus, filterInstitucion, filterAño, filterAplicacion, filterInforme, filterResponsable, filterDominio, filterControl, filterNivelRiesgo, filterProveedor, filterResultadoRetest, filterCorreccionParcial]);
 
   useEffect(() => {
     fetchOptions();
@@ -1212,6 +1214,30 @@ export default function Vulnerabilidades() {
                 allLabel="Todos los resultados"
                 data-testid="filter-resultado-retest"
               />
+
+              {/* Filtro de Corrección Parcial */}
+              <div className="flex items-center gap-2">
+                <label 
+                  htmlFor="filter-correccion-parcial"
+                  className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors ${
+                    filterCorreccionParcial 
+                      ? 'bg-amber-500/20 border-amber-500/50 text-amber-300' 
+                      : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:bg-zinc-700'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    id="filter-correccion-parcial"
+                    checked={filterCorreccionParcial}
+                    onChange={(e) => setFilterCorreccionParcial(e.target.checked)}
+                    className="sr-only"
+                    data-testid="filter-correccion-parcial"
+                  />
+                  <span className="text-sm whitespace-nowrap">
+                    {filterCorreccionParcial ? "✓ " : ""}Corrección Parcial
+                  </span>
+                </label>
+              </div>
 
               {/* Import/Export */}
               <div className="flex gap-2 ml-auto">

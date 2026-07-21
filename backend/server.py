@@ -319,6 +319,11 @@ class Vulnerabilidad(VulnerabilidadBase):
     nombre_dominio: Optional[str] = None
     codigo_control: Optional[str] = None
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # Campos computados para remediación parcial (calculados en runtime, no almacenados)
+    es_correccion_parcial: Optional[bool] = None
+    aplicaciones_corregidas: Optional[int] = None
+    aplicaciones_total: Optional[int] = None
+    tiene_resultados_personalizados: Optional[bool] = None
 
 # Report Groups Model
 class GrupoInformesBase(BaseModel):
