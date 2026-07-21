@@ -1531,6 +1531,27 @@ export default function VistaComite() {
                         >
                           {vuln.estatus || "-"}
                         </Badge>
+                        {/* Badge de Corrección Parcial */}
+                        {vuln.es_correccion_parcial && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge
+                                  variant="outline"
+                                  className="ml-1 bg-amber-500/20 text-amber-400 border-amber-500/30 text-[10px] px-1.5"
+                                >
+                                  Parcial
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent className="bg-zinc-800 border-zinc-700 max-w-xs">
+                                <p className="text-xs">
+                                  <span className="text-amber-400 font-medium">Corrección Parcial:</span>{" "}
+                                  {vuln.aplicaciones_corregidas || 0} de {vuln.aplicaciones_total || vuln.aplicaciones?.length || 0} aplicaciones corregidas
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                       </TableCell>
                       <TableCell className="text-zinc-300 text-sm">
                         {vuln.responsable || "-"}
@@ -1670,7 +1691,7 @@ export default function VistaComite() {
               ¿Eliminar vista guardada?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-zinc-400">
-              Esto eliminará permanentemente la vista "{deleteViewConfirm?.nombre}".
+              Esto eliminará permanentemente la vista &quot;{deleteViewConfirm?.nombre}&quot;.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
