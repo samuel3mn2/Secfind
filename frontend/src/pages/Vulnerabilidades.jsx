@@ -1872,11 +1872,14 @@ export default function Vulnerabilidades() {
                                                 onValueChange={(val) => setEditingAppResult(prev => ({ ...prev, resultado_re_test: val }))}
                                               >
                                                 <SelectTrigger className="h-8 text-xs bg-zinc-800 border-zinc-600">
-                                                  <SelectValue />
+                                                  <SelectValue placeholder="Seleccionar..." />
                                                 </SelectTrigger>
-                                                <SelectContent>
-                                                  {options?.resultado_re_test?.map((r) => (
-                                                    <SelectItem key={r} value={r}>{r}</SelectItem>
+                                                <SelectContent className="bg-zinc-900 border-zinc-700">
+                                                  {(options?.resultado_re_test || [
+                                                    "Corregido", "Pendiente", "Impedimento", "Vulnerable", 
+                                                    "Desestimado", "En Retest", "Nota de Seguimiento"
+                                                  ]).map((r) => (
+                                                    <SelectItem key={r} value={r} className="text-zinc-100 hover:bg-zinc-800">{r}</SelectItem>
                                                   ))}
                                                 </SelectContent>
                                               </Select>
@@ -1948,6 +1951,7 @@ export default function Vulnerabilidades() {
                                                 variant="ghost"
                                                 onClick={() => handleEditAppResult(app)}
                                                 className="h-7 w-7 p-0 text-zinc-400 hover:text-white hover:bg-zinc-700"
+                                                data-testid={`edit-app-result-${app.aplicacion}`}
                                               >
                                                 <Pencil className="w-3 h-3" />
                                               </Button>
