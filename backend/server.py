@@ -4710,6 +4710,9 @@ async def export_excel(
     
     # Convert array fields and enrich data
     for vuln in vulnerabilidades:
+        # Guardar lista original de aplicaciones antes de convertir a string
+        vuln["aplicaciones_original"] = vuln.get("aplicaciones", []) if isinstance(vuln.get("aplicaciones"), list) else []
+        
         if isinstance(vuln.get("aplicaciones"), list):
             vuln["aplicaciones"] = " | ".join(vuln["aplicaciones"])
         if isinstance(vuln.get("responsables"), list):
@@ -4722,9 +4725,12 @@ async def export_excel(
         if vuln.get("riesgo_id"):
             vuln["riesgo_catalogo"] = riesgos_map.get(vuln["riesgo_id"], "")
         
-        # Agregar columna de resultados por aplicación
-        info_apps = normalizar_resultados_por_aplicacion(vuln)
-        if info_apps["tiene_resultados_personalizados"] or len(info_apps["aplicaciones"]) > 1:
+        # Agregar columna de resultados por aplicación y corrección parcial
+        apps_list = vuln.get("aplicaciones_original") if "aplicaciones_original" in vuln else (vuln.get("aplicaciones", "").split(" | ") if isinstance(vuln.get("aplicaciones"), str) else vuln.get("aplicaciones", []))
+        
+        info_apps = normalizar_resultados_por_aplicacion({**vuln, "aplicaciones": apps_list if isinstance(apps_list, list) else [apps_list] if apps_list else []})
+        
+        if len(info_apps["aplicaciones"]) > 1:
             # Formato: "APP1: Corregido | APP2: Vulnerable"
             detalles = []
             for app_info in info_apps["aplicaciones"]:
@@ -4732,9 +4738,17 @@ async def export_excel(
                 detalles.append(f"{app_info['aplicacion']}: {resultado}")
             vuln["resultados_por_aplicacion"] = " | ".join(detalles)
             vuln["es_correccion_parcial"] = "Sí" if info_apps["es_correccion_parcial"] else "No"
+        elif info_apps["tiene_resultados_personalizados"]:
+            # Una sola app pero con resultado personalizado
+            vuln["resultados_por_aplicacion"] = f"{info_apps['aplicaciones'][0]['aplicacion']}: {info_apps['aplicaciones'][0].get('resultado_re_test', 'Sin resultado')}" if info_apps["aplicaciones"] else ""
+            vuln["es_correccion_parcial"] = ""
         else:
             vuln["resultados_por_aplicacion"] = ""
             vuln["es_correccion_parcial"] = ""
+        
+        # Eliminar campo temporal
+        if "aplicaciones_original" in vuln:
+            del vuln["aplicaciones_original"]
     df = pd.DataFrame(vulnerabilidades)
     
     # Remove internal columns

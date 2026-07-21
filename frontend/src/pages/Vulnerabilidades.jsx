@@ -52,6 +52,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -1510,7 +1516,29 @@ export default function Vulnerabilidades() {
                       )}
                       {isColumnVisible("estatus") && (
                         <TableCell>
-                          <StatusBadge status={vuln.estatus} />
+                          <div className="flex items-center gap-1">
+                            <StatusBadge status={vuln.estatus} />
+                            {vuln.es_correccion_parcial && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge
+                                      variant="outline"
+                                      className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-[10px] px-1.5 cursor-help"
+                                    >
+                                      Parcial
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="bg-zinc-800 border-zinc-700 max-w-xs">
+                                    <p className="text-xs">
+                                      <span className="text-amber-400 font-medium">Corrección Parcial:</span>{" "}
+                                      {vuln.aplicaciones_corregidas || 0} de {vuln.aplicaciones_total || vuln.aplicaciones?.length || 0} apps corregidas
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
                         </TableCell>
                       )}
                       {isColumnVisible("responsable") && (
@@ -1678,10 +1706,30 @@ export default function Vulnerabilidades() {
             {viewingVuln && (
               <div className="space-y-4">
                 {/* Header Info */}
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-3 items-center">
                   <SeverityBadge severity={viewingVuln.severidad} />
                   <NivelRiesgoBadge nivel={viewingVuln.nivel_riesgo} />
                   <StatusBadge status={viewingVuln.estatus} />
+                  {viewingVuln.es_correccion_parcial && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Badge
+                            variant="outline"
+                            className="bg-amber-500/20 text-amber-400 border-amber-500/30 cursor-help"
+                          >
+                            Corrección Parcial
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-zinc-800 border-zinc-700 max-w-xs">
+                          <p className="text-xs">
+                            <span className="text-amber-400 font-medium">Corrección Parcial:</span>{" "}
+                            {viewingVuln.aplicaciones_corregidas || 0} de {viewingVuln.aplicaciones_total || viewingVuln.aplicaciones?.length || 0} aplicaciones corregidas
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                 </div>
 
                 {/* Tabs para Info/Bitácora */}
