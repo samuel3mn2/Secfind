@@ -83,6 +83,10 @@ import {
   Shield,
   History,
   Loader2,
+  ChevronDown,
+  ChevronUp,
+  Smartphone,
+  AlertCircle,
 } from "lucide-react";
 import ImportarPDF from "@/pages/ImportarPDF";
 import BulkEntryModal from "@/components/BulkEntryModal";
@@ -332,6 +336,14 @@ export default function Vulnerabilidades() {
   const [pendingImportFile, setPendingImportFile] = useState(null);
   const [pendingImportFormat, setPendingImportFormat] = useState(null);
 
+  // ============ ESTADO PARA RESULTADOS POR APLICACIÓN ============
+  const [showAppResultsSection, setShowAppResultsSection] = useState(false);
+  const [appResultsData, setAppResultsData] = useState(null);
+  const [loadingAppResults, setLoadingAppResults] = useState(false);
+  const [editingAppResult, setEditingAppResult] = useState(null);
+  const [showGlobalChangeWarning, setShowGlobalChangeWarning] = useState(false);
+  const [pendingGlobalChange, setPendingGlobalChange] = useState(null);
+
   // Toggle column visibility
   const toggleColumn = (columnId) => {
     setVisibleColumns(prev => {
@@ -498,6 +510,157 @@ export default function Vulnerabilidades() {
     // Siempre incrementar el key al abrir el modal para garantizar datos frescos en la bitácora
     setBitacoraRefreshKey(prev => prev + 1);
     setShowViewModal(true);
+    // Resetear estado de resultados por aplicación
+    setShowAppResultsSection(false);
+    setAppResultsData(null);
+    setEditingAppResult(null);
+  };
+
+  // ============ FUNCIONES PARA RESULTADOS POR APLICACIÓN ============
+  
+  const fetchAppResults = async (vulnId) => {
+    if (!vulnId) return;
+    setLoadingAppResults(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${API}/vulnerabilidades/${vulnId}/aplicaciones-resultados`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setAppResultsData(response.data);
+    } catch (error) {
+      console.error("Error al cargar resultados por aplicación:", error);
+      toast.error("Error al cargar resultados por aplicación");
+    } finally {
+      setLoadingAppResults(false);
+    }
+  };
+
+  const handleToggleAppResults = () => {
+    if (!showAppResultsSection && viewingVuln) {
+      fetchAppResults(viewingVuln.id);
+    }
+    setShowAppResultsSection(!showAppResultsSection);
+  };
+
+  const handleEditAppResult = (app) => {
+    setEditingAppResult({
+      aplicacion: app.aplicacion,
+      resultado_re_test: app.resultado_re_test || "",
+      fecha_correccion: app.fecha_correccion || "",
+      notas: app.notas || ""
+    });
+  };
+
+  const handleSaveAppResult = async () => {
+    if (!editingAppResult || !viewingVuln) return;
+    
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.put(
+        `${API}/vulnerabilidades/${viewingVuln.id}/aplicacion-resultado`,
+        editingAppResult,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      toast.success(`Resultado actualizado para ${editingAppResult.aplicacion}`);
+      
+      // Actualizar datos locales
+      setAppResultsData(prev => ({
+        ...prev,
+        ...response.data.info_normalizacion,
+        aplicaciones: response.data.info_normalizacion.aplicaciones,
+        estatus_global: response.data.vulnerabilidad.estatus,
+        fecha_cierre_global: response.data.vulnerabilidad.fecha_cierre
+      }));
+      
+      // Actualizar la vulnerabilidad en la lista
+      const vulnActualizada = response.data.vulnerabilidad;
+      setVulnerabilidades(prev => prev.map(v => 
+        v.id === vulnActualizada.id ? vulnActualizada : v
+      ));
+      setViewingVuln(vulnActualizada);
+      
+      // Cerrar editor y refrescar bitácora
+      setEditingAppResult(null);
+      setBitacoraRefreshKey(prev => prev + 1);
+      
+    } catch (error) {
+      console.error("Error al guardar resultado:", error);
+      toast.error(error.response?.data?.detail || "Error al guardar resultado");
+    }
+  };
+
+  const handleCancelEditAppResult = () => {
+    setEditingAppResult(null);
+  };
+
+  // Verificar si hay resultados personalizados antes de cambiar el resultado global
+  const checkForPersonalizedResults = async (vulnId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(
+        `${API}/vulnerabilidades/${vulnId}/verificar-resultados-personalizados`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error al verificar resultados personalizados:", error);
+      return null;
+    }
+  };
+
+  const handleGlobalResultChange = async (newResult) => {
+    if (!editingVuln) return;
+    
+    // Verificar si hay resultados personalizados
+    const checkResult = await checkForPersonalizedResults(editingVuln.id);
+    
+    if (checkResult?.tiene_resultados_personalizados || checkResult?.hay_diferencias_entre_aplicaciones) {
+      // Mostrar advertencia y guardar cambio pendiente
+      setPendingGlobalChange({
+        resultado: newResult,
+        infoPersonalizados: checkResult
+      });
+      setShowGlobalChangeWarning(true);
+    } else {
+      // Sin resultados personalizados, aplicar cambio normalmente
+      setFormData(prev => ({ ...prev, resultado_re_test: newResult }));
+    }
+  };
+
+  const handleConfirmGlobalChange = async (sobrescribirTodos) => {
+    if (!pendingGlobalChange || !editingVuln) return;
+    
+    try {
+      if (sobrescribirTodos) {
+        const token = localStorage.getItem("token");
+        // Sincronizar a todas las aplicaciones
+        await axios.put(
+          `${API}/vulnerabilidades/${editingVuln.id}/sincronizar-resultado-global`,
+          { 
+            resultado_re_test: pendingGlobalChange.resultado,
+            sobrescribir_personalizados: true
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        toast.success("Resultado aplicado a todas las aplicaciones");
+      }
+      
+      // Actualizar formData
+      setFormData(prev => ({ ...prev, resultado_re_test: pendingGlobalChange.resultado }));
+      
+    } catch (error) {
+      console.error("Error al sincronizar resultado:", error);
+      toast.error("Error al actualizar resultado global");
+    } finally {
+      setShowGlobalChangeWarning(false);
+      setPendingGlobalChange(null);
+    }
+  };
+
+  const handleCancelGlobalChange = () => {
+    setShowGlobalChangeWarning(false);
+    setPendingGlobalChange(null);
   };
 
   const handleOpenModal = (vuln = null) => {
@@ -1618,6 +1781,198 @@ export default function Vulnerabilidades() {
                         </div>
                       </div>
                     )}
+
+                    {/* ============ SECCIÓN RESULTADO POR APLICACIÓN ============ */}
+                    {(viewingVuln.aplicaciones?.length > 1 || viewingVuln.aplicaciones_resultados?.length > 0) && (
+                      <div className="border border-zinc-700 rounded-lg overflow-hidden">
+                        {/* Header colapsable */}
+                        <button
+                          onClick={handleToggleAppResults}
+                          className="w-full p-3 bg-zinc-800/50 flex items-center justify-between hover:bg-zinc-800 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Smartphone className="w-4 h-4 text-blue-400" />
+                            <span className="text-sm font-medium text-white">Resultado por Aplicación</span>
+                            <Badge variant="outline" className="text-xs bg-zinc-700/50 text-zinc-300 border-zinc-600">
+                              {viewingVuln.aplicaciones?.length || 0} apps
+                            </Badge>
+                            {/* Indicador de corrección parcial */}
+                            {appResultsData?.es_correccion_parcial && (
+                              <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 text-xs animate-pulse">
+                                <AlertCircle className="w-3 h-3 mr-1" />
+                                Corrección Parcial - {appResultsData.aplicaciones_corregidas} de {appResultsData.aplicaciones_total}
+                              </Badge>
+                            )}
+                          </div>
+                          {showAppResultsSection ? (
+                            <ChevronUp className="w-4 h-4 text-zinc-400" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-zinc-400" />
+                          )}
+                        </button>
+
+                        {/* Contenido expandible */}
+                        {showAppResultsSection && (
+                          <div className="p-3 space-y-3 bg-zinc-900/30">
+                            {loadingAppResults ? (
+                              <div className="flex items-center justify-center py-6">
+                                <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
+                                <span className="ml-2 text-zinc-400">Cargando resultados...</span>
+                              </div>
+                            ) : appResultsData ? (
+                              <>
+                                {/* Resumen */}
+                                <div className="flex items-center gap-4 text-sm text-zinc-400 mb-2">
+                                  <span>
+                                    <span className="text-green-400 font-medium">{appResultsData.aplicaciones_corregidas}</span> corregidas
+                                  </span>
+                                  <span>•</span>
+                                  <span>
+                                    <span className="text-zinc-300 font-medium">{appResultsData.aplicaciones_total - appResultsData.aplicaciones_corregidas}</span> pendientes
+                                  </span>
+                                  {appResultsData.tiene_resultados_personalizados && (
+                                    <>
+                                      <span>•</span>
+                                      <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-300 border-purple-500/30">
+                                        Resultados Personalizados
+                                      </Badge>
+                                    </>
+                                  )}
+                                </div>
+
+                                {/* Tabla de aplicaciones */}
+                                <div className="rounded-lg border border-zinc-700 overflow-hidden">
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow className="bg-zinc-800/50 border-zinc-700">
+                                        <TableHead className="text-zinc-400 text-xs">Aplicación</TableHead>
+                                        <TableHead className="text-zinc-400 text-xs">Resultado Re-Test</TableHead>
+                                        <TableHead className="text-zinc-400 text-xs">Fecha Corrección</TableHead>
+                                        <TableHead className="text-zinc-400 text-xs">Notas</TableHead>
+                                        <TableHead className="text-zinc-400 text-xs w-20">Acciones</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {appResultsData.aplicaciones?.map((app) => (
+                                        <TableRow key={app.aplicacion} className="border-zinc-700 hover:bg-zinc-800/30">
+                                          <TableCell className="font-medium text-white">
+                                            <div className="flex items-center gap-2">
+                                              {app.aplicacion}
+                                              {!app.es_personalizado && (
+                                                <Badge variant="outline" className="text-xs bg-zinc-700/50 text-zinc-400 border-zinc-600">
+                                                  heredado
+                                                </Badge>
+                                              )}
+                                            </div>
+                                          </TableCell>
+                                          <TableCell>
+                                            {editingAppResult?.aplicacion === app.aplicacion ? (
+                                              <Select
+                                                value={editingAppResult.resultado_re_test}
+                                                onValueChange={(val) => setEditingAppResult(prev => ({ ...prev, resultado_re_test: val }))}
+                                              >
+                                                <SelectTrigger className="h-8 text-xs bg-zinc-800 border-zinc-600">
+                                                  <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                  {options?.resultado_re_test?.map((r) => (
+                                                    <SelectItem key={r} value={r}>{r}</SelectItem>
+                                                  ))}
+                                                </SelectContent>
+                                              </Select>
+                                            ) : (
+                                              <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                                app.resultado_re_test === "Corregido" ? "bg-green-500/20 text-green-300" :
+                                                app.resultado_re_test === "Vulnerable" ? "bg-red-500/20 text-red-300" :
+                                                app.resultado_re_test === "Desestimado" ? "bg-gray-500/20 text-gray-300" :
+                                                app.resultado_re_test === "Impedimento" ? "bg-orange-500/20 text-orange-300" :
+                                                app.resultado_re_test === "En Retest" ? "bg-blue-500/20 text-blue-300" :
+                                                "bg-zinc-500/20 text-zinc-300"
+                                              }`}>
+                                                {app.resultado_re_test || "Sin resultado"}
+                                              </span>
+                                            )}
+                                          </TableCell>
+                                          <TableCell>
+                                            {editingAppResult?.aplicacion === app.aplicacion ? (
+                                              <Input
+                                                type="date"
+                                                value={editingAppResult.fecha_correccion || ""}
+                                                onChange={(e) => setEditingAppResult(prev => ({ ...prev, fecha_correccion: e.target.value }))}
+                                                className="h-8 text-xs bg-zinc-800 border-zinc-600"
+                                                disabled={editingAppResult.resultado_re_test !== "Corregido"}
+                                              />
+                                            ) : (
+                                              <span className="text-zinc-300 text-xs font-mono">
+                                                {app.fecha_correccion || "-"}
+                                              </span>
+                                            )}
+                                          </TableCell>
+                                          <TableCell>
+                                            {editingAppResult?.aplicacion === app.aplicacion ? (
+                                              <Input
+                                                value={editingAppResult.notas || ""}
+                                                onChange={(e) => setEditingAppResult(prev => ({ ...prev, notas: e.target.value }))}
+                                                className="h-8 text-xs bg-zinc-800 border-zinc-600"
+                                                placeholder="Nota..."
+                                              />
+                                            ) : (
+                                              <span className="text-zinc-400 text-xs truncate max-w-[150px] block" title={app.notas}>
+                                                {app.notas || "-"}
+                                              </span>
+                                            )}
+                                          </TableCell>
+                                          <TableCell>
+                                            {editingAppResult?.aplicacion === app.aplicacion ? (
+                                              <div className="flex gap-1">
+                                                <Button
+                                                  size="sm"
+                                                  variant="ghost"
+                                                  onClick={handleSaveAppResult}
+                                                  className="h-7 w-7 p-0 text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                                                >
+                                                  <Check className="w-4 h-4" />
+                                                </Button>
+                                                <Button
+                                                  size="sm"
+                                                  variant="ghost"
+                                                  onClick={handleCancelEditAppResult}
+                                                  className="h-7 w-7 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                                >
+                                                  <X className="w-4 h-4" />
+                                                </Button>
+                                              </div>
+                                            ) : (
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => handleEditAppResult(app)}
+                                                className="h-7 w-7 p-0 text-zinc-400 hover:text-white hover:bg-zinc-700"
+                                              >
+                                                <Pencil className="w-3 h-3" />
+                                              </Button>
+                                            )}
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+
+                                {/* Nota informativa */}
+                                <p className="text-xs text-zinc-500 mt-2 flex items-start gap-1">
+                                  <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                  Los resultados marcados como &quot;heredado&quot; utilizan el resultado global. 
+                                  Al editarlos, se crearán resultados personalizados independientes.
+                                </p>
+                              </>
+                            ) : (
+                              <p className="text-center text-zinc-500 py-4">No hay datos disponibles</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </TabsContent>
 
                   <TabsContent value="bitacora" className="mt-4">
@@ -2465,6 +2820,63 @@ export default function Vulnerabilidades() {
                 </>
               )}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ============ MODAL DE ADVERTENCIA PARA CAMBIO GLOBAL CON RESULTADOS PERSONALIZADOS ============ */}
+      <AlertDialog open={showGlobalChangeWarning} onOpenChange={setShowGlobalChangeWarning}>
+        <AlertDialogContent className="bg-zinc-900 border-zinc-800 max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-amber-400 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5" />
+              Resultados Personalizados Detectados
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-zinc-400 space-y-3">
+              <p>
+                Esta vulnerabilidad contiene <strong className="text-white">Resultados de Re-Test personalizados</strong> por aplicación.
+              </p>
+              {pendingGlobalChange?.infoPersonalizados && (
+                <div className="bg-zinc-800/50 p-3 rounded-lg space-y-2">
+                  <p className="text-sm">
+                    <span className="text-zinc-300">Aplicaciones con resultados diferentes:</span>{" "}
+                    <span className="text-white font-medium">
+                      {pendingGlobalChange.infoPersonalizados.resultados_diferentes?.join(", ") || "Varios"}
+                    </span>
+                  </p>
+                  {pendingGlobalChange.infoPersonalizados.es_correccion_parcial && (
+                    <p className="text-amber-400 text-sm flex items-center gap-1">
+                      <AlertCircle className="w-4 h-4" />
+                      Corrección parcial: {pendingGlobalChange.infoPersonalizados.aplicaciones_corregidas} de {pendingGlobalChange.infoPersonalizados.aplicaciones_total} aplicaciones corregidas
+                    </p>
+                  )}
+                </div>
+              )}
+              <p className="text-sm">
+                ¿Cómo desea aplicar el cambio a <strong className="text-blue-400">{pendingGlobalChange?.resultado}</strong>?
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel 
+              onClick={handleCancelGlobalChange}
+              className="bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700"
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={() => handleConfirmGlobalChange(false)}
+              className="border-zinc-600 text-zinc-300 hover:bg-zinc-800"
+            >
+              Solo resultado general
+            </Button>
+            <Button
+              onClick={() => handleConfirmGlobalChange(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Aplicar a todas las apps
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

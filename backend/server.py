@@ -249,6 +249,36 @@ class VulnerabilidadBase(BaseModel):
     riesgo_id: Optional[str] = None  # Reference to catalogo_riesgos
     # Bitácora de impedimentos y seguimientos
     historial_impedimentos_seguimiento: List[dict] = Field(default_factory=list)
+    # Resultados de Re-Test por aplicación (para remediación parcial)
+    aplicaciones_resultados: Optional[List[dict]] = None  # [{aplicacion, resultado_re_test, fecha_correccion, notas}]
+
+# ============ MODELO PARA RESULTADO POR APLICACIÓN ============
+
+class AplicacionResultado(BaseModel):
+    """Metadatos de resultado de re-test para una aplicación específica"""
+    aplicacion: str  # Nombre de la aplicación
+    resultado_re_test: Optional[str] = None  # Mismo catálogo: Corregido, Pendiente, Impedimento, Vulnerable, Desestimado, En Retest, Nota de Seguimiento
+    fecha_correccion: Optional[str] = None  # Fecha cuando se corrigió en esta aplicación (YYYY-MM-DD)
+    notas: Optional[str] = None  # Notas específicas para esta aplicación
+
+class ActualizarResultadoAplicacionRequest(BaseModel):
+    """Request para actualizar el resultado de una aplicación específica"""
+    aplicacion: str  # Nombre de la aplicación a actualizar
+    resultado_re_test: str  # Nuevo resultado
+    fecha_correccion: Optional[str] = None
+    notas: Optional[str] = None
+
+class ResultadosPorAplicacionResponse(BaseModel):
+    """Response con los resultados normalizados por aplicación"""
+    vuln_id: str
+    resultado_re_test_global: Optional[str] = None
+    estatus_global: Optional[str] = None
+    fecha_cierre_global: Optional[str] = None
+    tiene_resultados_personalizados: bool = False
+    es_correccion_parcial: bool = False
+    aplicaciones_corregidas: int = 0
+    aplicaciones_total: int = 0
+    aplicaciones: List[dict] = []  # Lista normalizada de todas las aplicaciones con sus resultados
 
 # Modelo para entrada de bitácora de seguimiento
 class EntradaBitacoraSeguimiento(BaseModel):
@@ -500,6 +530,346 @@ def calcular_cambios(original: dict, actualizado: dict, campos_excluir: list = N
                 "valor_nuevo": valor_nuevo
             })
     return cambios
+
+# ============ FUNCIÓN CENTRALIZADA PARA RESULTADOS POR APLICACIÓN ============
+
+# Resultados que cierran una aplicación/vulnerabilidad
+RESULTADOS_QUE_CIERRAN = ["Corregido", "Desestimado"]
+# Resultados que mantienen pendiente
+RESULTADOS_PENDIENTES = ["Vulnerable", "Pendiente", "Impedimento", "En Retest", "Para Re Test"]
+
+def normalizar_resultados_por_aplicacion(vulnerabilidad: dict) -> dict:
+    """
+    Función centralizada que normaliza los resultados por aplicación.
+    
+    Retorna un diccionario con:
+    - aplicaciones: Lista normalizada de todas las aplicaciones con sus resultados
+    - tiene_resultados_personalizados: bool
+    - es_correccion_parcial: bool (al menos una Corregido Y al menos una no resuelta)
+    - aplicaciones_corregidas: int
+    - aplicaciones_total: int
+    - todas_resueltas: bool
+    - resultado_global_sugerido: str o None
+    - estatus_sugerido: str
+    - debe_tener_fecha_cierre: bool
+    """
+    aplicaciones_lista = vulnerabilidad.get("aplicaciones") or []
+    aplicaciones_resultados = vulnerabilidad.get("aplicaciones_resultados") or []
+    resultado_global = vulnerabilidad.get("resultado_re_test")
+    
+    # Si no hay aplicaciones, retornar estado básico
+    if not aplicaciones_lista:
+        return {
+            "aplicaciones": [],
+            "tiene_resultados_personalizados": False,
+            "es_correccion_parcial": False,
+            "aplicaciones_corregidas": 0,
+            "aplicaciones_total": 0,
+            "todas_resueltas": resultado_global in RESULTADOS_QUE_CIERRAN if resultado_global else False,
+            "resultado_global_sugerido": resultado_global,
+            "estatus_sugerido": "Cerrado" if resultado_global in RESULTADOS_QUE_CIERRAN else "Pendiente",
+            "debe_tener_fecha_cierre": resultado_global in RESULTADOS_QUE_CIERRAN if resultado_global else False
+        }
+    
+    # Crear mapa de resultados personalizados por nombre de aplicación
+    resultados_personalizados = {}
+    for ar in aplicaciones_resultados:
+        if ar.get("aplicacion"):
+            resultados_personalizados[ar["aplicacion"]] = ar
+    
+    # Normalizar: para cada aplicación, usar resultado personalizado o heredar del global
+    aplicaciones_normalizadas = []
+    tiene_personalizados = len(resultados_personalizados) > 0
+    
+    for app_nombre in aplicaciones_lista:
+        if app_nombre in resultados_personalizados:
+            ar = resultados_personalizados[app_nombre]
+            aplicaciones_normalizadas.append({
+                "aplicacion": app_nombre,
+                "resultado_re_test": ar.get("resultado_re_test") or resultado_global,
+                "fecha_correccion": ar.get("fecha_correccion"),
+                "notas": ar.get("notas"),
+                "es_personalizado": True
+            })
+        else:
+            # Heredar del resultado global
+            aplicaciones_normalizadas.append({
+                "aplicacion": app_nombre,
+                "resultado_re_test": resultado_global,
+                "fecha_correccion": None,
+                "notas": None,
+                "es_personalizado": False
+            })
+    
+    # Calcular estadísticas
+    total = len(aplicaciones_normalizadas)
+    corregidas = sum(1 for a in aplicaciones_normalizadas if a["resultado_re_test"] == "Corregido")
+    desestimadas = sum(1 for a in aplicaciones_normalizadas if a["resultado_re_test"] == "Desestimado")
+    resueltas = corregidas + desestimadas
+    no_resueltas = total - resueltas
+    
+    # Corrección parcial: al menos una Corregido Y al menos una no resuelta
+    es_correccion_parcial = corregidas > 0 and no_resueltas > 0
+    
+    # Determinar si todas están resueltas
+    todas_resueltas = resueltas == total and total > 0
+    
+    # Determinar resultado global sugerido y estatus
+    resultado_global_sugerido = None
+    estatus_sugerido = "Pendiente"
+    debe_tener_fecha_cierre = False
+    
+    if todas_resueltas:
+        estatus_sugerido = "Cerrado"
+        debe_tener_fecha_cierre = True
+        
+        if corregidas == total:
+            # Todas Corregido
+            resultado_global_sugerido = "Corregido"
+        elif desestimadas == total:
+            # Todas Desestimado
+            resultado_global_sugerido = "Desestimado"
+        else:
+            # Combinación de Corregido y Desestimado - no asignar automáticamente
+            # Mantener el resultado global existente
+            resultado_global_sugerido = None  # Indica que debe mantenerse o pedir al usuario
+    else:
+        # Al menos una no resuelta
+        estatus_sugerido = "Pendiente"
+        debe_tener_fecha_cierre = False
+        
+        # Si todos los resultados son iguales y no resuelven, sincronizar
+        resultados_unicos = set(a["resultado_re_test"] for a in aplicaciones_normalizadas if a["resultado_re_test"])
+        if len(resultados_unicos) == 1:
+            resultado_unico = list(resultados_unicos)[0]
+            if resultado_unico not in RESULTADOS_QUE_CIERRAN:
+                resultado_global_sugerido = resultado_unico
+    
+    return {
+        "aplicaciones": aplicaciones_normalizadas,
+        "tiene_resultados_personalizados": tiene_personalizados,
+        "es_correccion_parcial": es_correccion_parcial,
+        "aplicaciones_corregidas": corregidas,
+        "aplicaciones_desestimadas": desestimadas,
+        "aplicaciones_resueltas": resueltas,
+        "aplicaciones_total": total,
+        "todas_resueltas": todas_resueltas,
+        "resultado_global_sugerido": resultado_global_sugerido,
+        "estatus_sugerido": estatus_sugerido,
+        "debe_tener_fecha_cierre": debe_tener_fecha_cierre
+    }
+
+
+async def procesar_cambio_resultado_aplicacion(
+    vuln_id: str,
+    aplicacion: str,
+    nuevo_resultado: str,
+    fecha_correccion: Optional[str],
+    notas: Optional[str],
+    usuario: str,
+    forzar_actualizacion_global: bool = False
+) -> dict:
+    """
+    Procesa el cambio de resultado para una aplicación específica.
+    
+    Retorna:
+    - vulnerabilidad actualizada
+    - info de normalización
+    - cambios realizados
+    """
+    # Obtener vulnerabilidad actual
+    vuln = await db.vulnerabilidades.find_one({"id": vuln_id}, {"_id": 0})
+    if not vuln:
+        raise HTTPException(status_code=404, detail="Vulnerabilidad no encontrada")
+    
+    # Validar que la aplicación pertenece a la vulnerabilidad
+    aplicaciones_lista = vuln.get("aplicaciones") or []
+    if aplicacion not in aplicaciones_lista:
+        raise HTTPException(status_code=400, detail=f"La aplicación '{aplicacion}' no está asociada a esta vulnerabilidad")
+    
+    # Validar resultado
+    if nuevo_resultado not in DEFAULT_RESULTADO_RETEST:
+        raise HTTPException(status_code=400, detail=f"Resultado de Re-Test inválido: {nuevo_resultado}")
+    
+    # Obtener o inicializar aplicaciones_resultados
+    aplicaciones_resultados = vuln.get("aplicaciones_resultados") or []
+    
+    # Buscar si ya existe un registro para esta aplicación
+    resultado_anterior = None
+    fecha_correccion_anterior = None
+    indice_existente = None
+    
+    for i, ar in enumerate(aplicaciones_resultados):
+        if ar.get("aplicacion") == aplicacion:
+            resultado_anterior = ar.get("resultado_re_test")
+            fecha_correccion_anterior = ar.get("fecha_correccion")
+            indice_existente = i
+            break
+    
+    # Si no había registro personalizado, el resultado anterior es el global
+    if resultado_anterior is None:
+        resultado_anterior = vuln.get("resultado_re_test")
+    
+    # Crear o actualizar el registro
+    nuevo_registro = {
+        "aplicacion": aplicacion,
+        "resultado_re_test": nuevo_resultado,
+        "fecha_correccion": fecha_correccion if nuevo_resultado == "Corregido" else None,
+        "notas": notas
+    }
+    
+    if indice_existente is not None:
+        aplicaciones_resultados[indice_existente] = nuevo_registro
+    else:
+        aplicaciones_resultados.append(nuevo_registro)
+    
+    # Actualizar la vulnerabilidad con los nuevos resultados
+    update_data = {
+        "aplicaciones_resultados": aplicaciones_resultados,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    # Crear vulnerabilidad temporal para normalizar
+    vuln_temp = {**vuln, "aplicaciones_resultados": aplicaciones_resultados}
+    info_normalizacion = normalizar_resultados_por_aplicacion(vuln_temp)
+    
+    # Actualizar estatus y fecha_cierre según la normalización
+    estatus_anterior = vuln.get("estatus")
+    fecha_cierre_anterior = vuln.get("fecha_cierre")
+    resultado_global_anterior = vuln.get("resultado_re_test")
+    
+    update_data["estatus"] = info_normalizacion["estatus_sugerido"]
+    
+    if info_normalizacion["debe_tener_fecha_cierre"]:
+        if not vuln.get("fecha_cierre"):
+            update_data["fecha_cierre"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    else:
+        update_data["fecha_cierre"] = None
+    
+    # Actualizar resultado global si hay sugerencia y está forzado o todas resueltas homogéneamente
+    if info_normalizacion["resultado_global_sugerido"] and (forzar_actualizacion_global or info_normalizacion["todas_resueltas"]):
+        update_data["resultado_re_test"] = info_normalizacion["resultado_global_sugerido"]
+    
+    # Registrar en la bitácora
+    entrada_bitacora = {
+        "fecha_registro_nota": datetime.now(timezone.utc).isoformat(),
+        "resultado_retest": nuevo_resultado,
+        "notas_impedimento": f"📱 Resultado por aplicación [{aplicacion}]: {resultado_anterior or '(sin resultado)'} → {nuevo_resultado}" + (f"\n{notas}" if notas else ""),
+        "usuario": usuario,
+        "tipo": "cambio_resultado_aplicacion",
+        "aplicacion_afectada": aplicacion,
+        "resultado_anterior": resultado_anterior,
+        "resultado_nuevo": nuevo_resultado,
+        "fecha_correccion_anterior": fecha_correccion_anterior,
+        "fecha_correccion_nueva": fecha_correccion if nuevo_resultado == "Corregido" else None
+    }
+    
+    # Agregar entrada a la bitácora existente
+    await db.vulnerabilidades.update_one(
+        {"id": vuln_id},
+        {
+            "$set": update_data,
+            "$push": {"historial_impedimentos_seguimiento": entrada_bitacora}
+        }
+    )
+    
+    # Obtener vulnerabilidad actualizada
+    vuln_actualizada = await db.vulnerabilidades.find_one({"id": vuln_id}, {"_id": 0})
+    
+    return {
+        "vulnerabilidad": vuln_actualizada,
+        "info_normalizacion": info_normalizacion,
+        "cambios": {
+            "aplicacion": aplicacion,
+            "resultado_anterior": resultado_anterior,
+            "resultado_nuevo": nuevo_resultado,
+            "estatus_anterior": estatus_anterior,
+            "estatus_nuevo": update_data.get("estatus"),
+            "fecha_cierre_anterior": fecha_cierre_anterior,
+            "fecha_cierre_nueva": update_data.get("fecha_cierre")
+        }
+    }
+
+
+async def sincronizar_resultado_global_a_aplicaciones(
+    vuln_id: str,
+    nuevo_resultado_global: str,
+    usuario: str,
+    sobrescribir_personalizados: bool = False
+) -> dict:
+    """
+    Sincroniza el resultado global a todas las aplicaciones.
+    
+    Si sobrescribir_personalizados es True, sobrescribe todos los resultados individuales.
+    Si es False, solo actualiza el resultado global (las aplicaciones sin personalización lo heredarán).
+    """
+    vuln = await db.vulnerabilidades.find_one({"id": vuln_id}, {"_id": 0})
+    if not vuln:
+        raise HTTPException(status_code=404, detail="Vulnerabilidad no encontrada")
+    
+    aplicaciones_lista = vuln.get("aplicaciones") or []
+    aplicaciones_resultados = vuln.get("aplicaciones_resultados") or []
+    resultado_anterior = vuln.get("resultado_re_test")
+    
+    update_data = {
+        "resultado_re_test": nuevo_resultado_global,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    if sobrescribir_personalizados:
+        # Crear nuevos registros para todas las aplicaciones con el resultado global
+        nuevos_resultados = []
+        for app_nombre in aplicaciones_lista:
+            # Conservar notas existentes si las hay
+            notas_existentes = None
+            for ar in aplicaciones_resultados:
+                if ar.get("aplicacion") == app_nombre:
+                    notas_existentes = ar.get("notas")
+                    break
+            
+            nuevos_resultados.append({
+                "aplicacion": app_nombre,
+                "resultado_re_test": nuevo_resultado_global,
+                "fecha_correccion": datetime.now(timezone.utc).strftime("%Y-%m-%d") if nuevo_resultado_global == "Corregido" else None,
+                "notas": notas_existentes
+            })
+        
+        update_data["aplicaciones_resultados"] = nuevos_resultados
+    
+    # Aplicar lógica de estatus y fecha_cierre
+    if nuevo_resultado_global in RESULTADOS_QUE_CIERRAN:
+        update_data["estatus"] = "Cerrado"
+        if not vuln.get("fecha_cierre"):
+            update_data["fecha_cierre"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    else:
+        update_data["estatus"] = "Pendiente"
+        update_data["fecha_cierre"] = None
+    
+    # Registrar en bitácora
+    entrada_bitacora = {
+        "fecha_registro_nota": datetime.now(timezone.utc).isoformat(),
+        "resultado_retest": nuevo_resultado_global,
+        "notas_impedimento": f"🔄 Cambio global de resultado: {resultado_anterior or '(sin resultado)'} → {nuevo_resultado_global}" + (" (aplicado a todas las aplicaciones)" if sobrescribir_personalizados else ""),
+        "usuario": usuario,
+        "tipo": "cambio_resultado_global",
+        "sobrescribio_personalizados": sobrescribir_personalizados
+    }
+    
+    await db.vulnerabilidades.update_one(
+        {"id": vuln_id},
+        {
+            "$set": update_data,
+            "$push": {"historial_impedimentos_seguimiento": entrada_bitacora}
+        }
+    )
+    
+    vuln_actualizada = await db.vulnerabilidades.find_one({"id": vuln_id}, {"_id": 0})
+    info_normalizacion = normalizar_resultados_por_aplicacion(vuln_actualizada)
+    
+    return {
+        "vulnerabilidad": vuln_actualizada,
+        "info_normalizacion": info_normalizacion
+    }
 
 # ============ NOTIFICATION CONFIG MODEL ============
 
@@ -2606,6 +2976,42 @@ async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate, c
                 )
     # Si resultado_re_test está vacío, el usuario puede poner el estatus que quiera
     
+    # ==========================================================================
+    # VERIFICAR RESULTADOS PERSONALIZADOS POR APLICACIÓN
+    # Si hay resultados diferentes por aplicación, ajustar la lógica de cierre
+    # ==========================================================================
+    info_aplicaciones = normalizar_resultados_por_aplicacion(existing)
+    
+    # Si hay resultados personalizados y el usuario está cambiando el resultado global
+    if info_aplicaciones["tiene_resultados_personalizados"] and "resultado_re_test" in update_dict:
+        # Si no todas las aplicaciones están resueltas, forzar estado Pendiente
+        if not info_aplicaciones["todas_resueltas"]:
+            update_dict["estatus"] = "Pendiente"
+            update_dict["fecha_cierre"] = None
+    
+    # Si se están agregando nuevas aplicaciones a una vulnerabilidad cerrada
+    aplicaciones_nuevas = update_dict.get("aplicaciones", [])
+    aplicaciones_anteriores = existing.get("aplicaciones", [])
+    if aplicaciones_nuevas and estaba_cerrada:
+        apps_agregadas = set(aplicaciones_nuevas) - set(aplicaciones_anteriores)
+        if apps_agregadas and info_aplicaciones["tiene_resultados_personalizados"]:
+            # Las nuevas aplicaciones no tienen resultado definido, no se puede mantener cerrada
+            update_dict["estatus"] = "Pendiente"
+            update_dict["fecha_cierre"] = None
+            # Agregar nota sobre nueva aplicación
+            nota_nueva_app = {
+                "id_accion": str(uuid.uuid4()),
+                "fecha_registro_nota": datetime.now(timezone.utc).isoformat(),
+                "resultado_retest": "Nota de Seguimiento",
+                "fecha_compromiso_asignada": None,
+                "notas_impedimento": f"🆕 Aplicaciones agregadas: {', '.join(apps_agregadas)}. Vulnerabilidad reabierta para validar nuevas aplicaciones.",
+                "usuario_registro": current_user.nombre or current_user.username
+            }
+            await db.vulnerabilidades.update_one(
+                {"id": vuln_id},
+                {"$push": {"historial_impedimentos_seguimiento": nota_nueva_app}}
+            )
+    
     # Calcular cambios antes de actualizar
     cambios = calcular_cambios(existing, update_dict)
     
@@ -2727,6 +3133,142 @@ async def delete_vulnerabilidad(
     )
     
     return {"message": "Vulnerabilidad eliminada exitosamente"}
+
+# ============ RESULTADOS POR APLICACIÓN ENDPOINTS ============
+
+@api_router.get("/vulnerabilidades/{vuln_id}/aplicaciones-resultados")
+async def get_resultados_por_aplicacion(
+    vuln_id: str,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Obtiene los resultados de re-test normalizados por aplicación.
+    Para cada aplicación, devuelve su resultado personalizado o el heredado del global.
+    """
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos para ver vulnerabilidades")
+    
+    vuln = await db.vulnerabilidades.find_one({"id": vuln_id}, {"_id": 0})
+    if not vuln:
+        raise HTTPException(status_code=404, detail="Vulnerabilidad no encontrada")
+    
+    info = normalizar_resultados_por_aplicacion(vuln)
+    
+    return {
+        "vuln_id": vuln_id,
+        "resultado_re_test_global": vuln.get("resultado_re_test"),
+        "estatus_global": vuln.get("estatus"),
+        "fecha_cierre_global": vuln.get("fecha_cierre"),
+        "tiene_resultados_personalizados": info["tiene_resultados_personalizados"],
+        "es_correccion_parcial": info["es_correccion_parcial"],
+        "aplicaciones_corregidas": info["aplicaciones_corregidas"],
+        "aplicaciones_total": info["aplicaciones_total"],
+        "todas_resueltas": info["todas_resueltas"],
+        "aplicaciones": info["aplicaciones"]
+    }
+
+
+@api_router.put("/vulnerabilidades/{vuln_id}/aplicacion-resultado")
+async def actualizar_resultado_aplicacion(
+    vuln_id: str,
+    data: ActualizarResultadoAplicacionRequest,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Actualiza el resultado de re-test para una aplicación específica.
+    El nombre de la aplicación se envía en el body para evitar problemas con caracteres especiales.
+    """
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.editar:
+        raise HTTPException(status_code=403, detail="No tiene permisos para editar vulnerabilidades")
+    
+    resultado = await procesar_cambio_resultado_aplicacion(
+        vuln_id=vuln_id,
+        aplicacion=data.aplicacion,
+        nuevo_resultado=data.resultado_re_test,
+        fecha_correccion=data.fecha_correccion,
+        notas=data.notas,
+        usuario=current_user.username
+    )
+    
+    return {
+        "message": f"Resultado actualizado para {data.aplicacion}",
+        "vulnerabilidad": resultado["vulnerabilidad"],
+        "info_normalizacion": resultado["info_normalizacion"],
+        "cambios": resultado["cambios"]
+    }
+
+
+class SincronizarResultadoGlobalRequest(BaseModel):
+    resultado_re_test: str
+    sobrescribir_personalizados: bool = False
+
+
+@api_router.put("/vulnerabilidades/{vuln_id}/sincronizar-resultado-global")
+async def sincronizar_resultado_global(
+    vuln_id: str,
+    data: SincronizarResultadoGlobalRequest,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Actualiza el resultado de re-test global.
+    
+    Si sobrescribir_personalizados es True, también actualiza todas las aplicaciones.
+    Si es False, solo cambia el resultado global (las aplicaciones sin personalización lo heredarán).
+    """
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.editar:
+        raise HTTPException(status_code=403, detail="No tiene permisos para editar vulnerabilidades")
+    
+    if data.resultado_re_test not in DEFAULT_RESULTADO_RETEST:
+        raise HTTPException(status_code=400, detail=f"Resultado de Re-Test inválido: {data.resultado_re_test}")
+    
+    resultado = await sincronizar_resultado_global_a_aplicaciones(
+        vuln_id=vuln_id,
+        nuevo_resultado_global=data.resultado_re_test,
+        usuario=current_user.username,
+        sobrescribir_personalizados=data.sobrescribir_personalizados
+    )
+    
+    return {
+        "message": "Resultado global actualizado",
+        "vulnerabilidad": resultado["vulnerabilidad"],
+        "info_normalizacion": resultado["info_normalizacion"]
+    }
+
+
+@api_router.get("/vulnerabilidades/{vuln_id}/verificar-resultados-personalizados")
+async def verificar_resultados_personalizados(
+    vuln_id: str,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Verifica si una vulnerabilidad tiene resultados personalizados por aplicación.
+    Útil para mostrar advertencia antes de cambiar el resultado global.
+    """
+    if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
+        raise HTTPException(status_code=403, detail="No tiene permisos para ver vulnerabilidades")
+    
+    vuln = await db.vulnerabilidades.find_one({"id": vuln_id}, {"_id": 0})
+    if not vuln:
+        raise HTTPException(status_code=404, detail="Vulnerabilidad no encontrada")
+    
+    info = normalizar_resultados_por_aplicacion(vuln)
+    
+    # Detectar si hay diferencias entre aplicaciones
+    resultados_unicos = set()
+    for app in info["aplicaciones"]:
+        if app.get("resultado_re_test"):
+            resultados_unicos.add(app["resultado_re_test"])
+    
+    hay_diferencias = len(resultados_unicos) > 1
+    
+    return {
+        "tiene_resultados_personalizados": info["tiene_resultados_personalizados"],
+        "hay_diferencias_entre_aplicaciones": hay_diferencias,
+        "es_correccion_parcial": info["es_correccion_parcial"],
+        "aplicaciones_total": info["aplicaciones_total"],
+        "aplicaciones_corregidas": info["aplicaciones_corregidas"],
+        "resultados_diferentes": list(resultados_unicos)
+    }
 
 # ============ BULK ACTIONS ENDPOINT ============
 

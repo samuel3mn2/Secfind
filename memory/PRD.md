@@ -1,8 +1,47 @@
 # SecFind - Sistema de Gestión de Vulnerabilidades
 
-## Última Actualización: 2026-07-20
+## Última Actualización: 2026-07-21
 
 ### Cambios Recientes (Julio 2026)
+
+- **FEATURE: Remediación Parcial por Aplicación (2026-07-21)**:
+  - **Solicitud**: Permitir resultados de Re-Test independientes por aplicación cuando una vulnerabilidad afecta múltiples aplicaciones
+  - **Problema resuelto**: Anteriormente no había forma estructurada de representar que IBE está Vulnerable mientras IBP está Corregido
+  - **Modelo de datos ampliado**:
+    * Nuevo campo `aplicaciones_resultados: List[dict]` en VulnerabilidadBase
+    * Cada registro contiene: `{aplicacion, resultado_re_test, fecha_correccion, notas}`
+    * Utiliza el mismo catálogo de resultados existente (Corregido, Pendiente, Vulnerable, etc.)
+  - **Función centralizada `normalizar_resultados_por_aplicacion()`**:
+    * Normalización: para cada aplicación devuelve resultado personalizado o hereda del global
+    * Detección de corrección parcial: al menos una Corregido Y al menos una no resuelta
+    * Cálculo de resolución completa: todas Corregido o todas Desestimado
+    * Determinación de estatus sugerido y fecha de cierre
+  - **Nuevos endpoints**:
+    * `GET /api/vulnerabilidades/{id}/aplicaciones-resultados` - Obtener resultados normalizados
+    * `PUT /api/vulnerabilidades/{id}/aplicacion-resultado` - Actualizar resultado de una aplicación
+    * `PUT /api/vulnerabilidades/{id}/sincronizar-resultado-global` - Sincronizar resultado global a todas
+    * `GET /api/vulnerabilidades/{id}/verificar-resultados-personalizados` - Verificar antes de cambio global
+  - **Lógica de cierre**:
+    * Todas Corregido → Resultado global = Corregido, Estatus = Cerrado, Fecha cierre = hoy
+    * Todas Desestimado → Resultado global = Desestimado, Estatus = Cerrado, Fecha cierre = hoy
+    * Combinación Corregido + Desestimado → Estatus = Cerrado, mantener resultado global existente
+    * Al menos una no resuelta → Estatus = Pendiente, Fecha cierre = null
+  - **UI - Sección "Resultado por Aplicación"**:
+    * Panel colapsable en modal de detalle de vulnerabilidad
+    * Indicador visual "⚠️ Corrección Parcial - X de Y aplicaciones corregidas"
+    * Tabla con: Aplicación | Resultado Re-Test | Fecha Corrección | Notas | Acciones
+    * Badge "heredado" para aplicaciones que usan resultado global
+    * Edición inline con Select para resultado y campos para fecha/notas
+  - **Auditoría**:
+    * Registra en bitácora existente con tipo "cambio_resultado_aplicacion"
+    * Incluye: aplicación afectada, resultado anterior, resultado nuevo, fecha corrección, usuario
+  - **Compatibilidad hacia atrás**:
+    * Vulnerabilidades existentes sin `aplicaciones_resultados` funcionan igual que antes
+    * La normalización hereda automáticamente del resultado global
+  - **Archivos modificados**:
+    * `/app/backend/server.py` - Modelos, función centralizada, endpoints
+    * `/app/frontend/src/pages/Vulnerabilidades.jsx` - UI de sección y funciones de manejo
+  - **Verificado**: Screenshot confirma MBP=Vulnerable, IBP=Corregido(heredado), indicador "Corrección Parcial - 1 de 2"
 
 - **FEATURE: Exportación de Gráficos Pivot a PNG/PDF (2026-07-20)**:
   - Agregados botones "PNG" y "PDF" junto al botón "Exportar CSV" en el módulo de Análisis Avanzado (Pivot)
