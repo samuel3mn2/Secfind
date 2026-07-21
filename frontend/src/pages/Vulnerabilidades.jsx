@@ -1914,7 +1914,7 @@ export default function Vulnerabilidades() {
                                   )}
                                 </div>
 
-                                {/* Tabla de aplicaciones */}
+                                {/* Tabla de aplicaciones - Solo lectura en modo visualización */}
                                 <div className="rounded-lg border border-zinc-700 overflow-hidden">
                                   <Table>
                                     <TableHeader>
@@ -1923,7 +1923,6 @@ export default function Vulnerabilidades() {
                                         <TableHead className="text-zinc-400 text-xs">Resultado Re-Test</TableHead>
                                         <TableHead className="text-zinc-400 text-xs">Fecha Corrección</TableHead>
                                         <TableHead className="text-zinc-400 text-xs">Notas</TableHead>
-                                        <TableHead className="text-zinc-400 text-xs w-20">Acciones</TableHead>
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -1940,96 +1939,26 @@ export default function Vulnerabilidades() {
                                             </div>
                                           </TableCell>
                                           <TableCell>
-                                            {editingAppResult?.aplicacion === app.aplicacion ? (
-                                              <Select
-                                                value={editingAppResult.resultado_re_test}
-                                                onValueChange={(val) => setEditingAppResult(prev => ({ ...prev, resultado_re_test: val }))}
-                                              >
-                                                <SelectTrigger className="h-8 text-xs bg-zinc-800 border-zinc-600">
-                                                  <SelectValue placeholder="Seleccionar..." />
-                                                </SelectTrigger>
-                                                <SelectContent className="bg-zinc-900 border-zinc-700">
-                                                  {(options?.resultado_re_test || [
-                                                    "Corregido", "Pendiente", "Impedimento", "Vulnerable", 
-                                                    "Desestimado", "En Retest", "Nota de Seguimiento"
-                                                  ]).map((r) => (
-                                                    <SelectItem key={r} value={r} className="text-zinc-100 hover:bg-zinc-800">{r}</SelectItem>
-                                                  ))}
-                                                </SelectContent>
-                                              </Select>
-                                            ) : (
-                                              <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                                app.resultado_re_test === "Corregido" ? "bg-green-500/20 text-green-300" :
-                                                app.resultado_re_test === "Vulnerable" ? "bg-red-500/20 text-red-300" :
-                                                app.resultado_re_test === "Desestimado" ? "bg-gray-500/20 text-gray-300" :
-                                                app.resultado_re_test === "Impedimento" ? "bg-orange-500/20 text-orange-300" :
-                                                app.resultado_re_test === "En Retest" ? "bg-blue-500/20 text-blue-300" :
-                                                "bg-zinc-500/20 text-zinc-300"
-                                              }`}>
-                                                {app.resultado_re_test || "Sin resultado"}
-                                              </span>
-                                            )}
+                                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                              app.resultado_re_test === "Corregido" ? "bg-green-500/20 text-green-300" :
+                                              app.resultado_re_test === "Vulnerable" ? "bg-red-500/20 text-red-300" :
+                                              app.resultado_re_test === "Desestimado" ? "bg-gray-500/20 text-gray-300" :
+                                              app.resultado_re_test === "Impedimento" ? "bg-orange-500/20 text-orange-300" :
+                                              app.resultado_re_test === "En Retest" ? "bg-blue-500/20 text-blue-300" :
+                                              "bg-zinc-500/20 text-zinc-300"
+                                            }`}>
+                                              {app.resultado_re_test || "Sin resultado"}
+                                            </span>
                                           </TableCell>
                                           <TableCell>
-                                            {editingAppResult?.aplicacion === app.aplicacion ? (
-                                              <Input
-                                                type="date"
-                                                value={editingAppResult.fecha_correccion || ""}
-                                                onChange={(e) => setEditingAppResult(prev => ({ ...prev, fecha_correccion: e.target.value }))}
-                                                className="h-8 text-xs bg-zinc-800 border-zinc-600"
-                                                disabled={editingAppResult.resultado_re_test !== "Corregido"}
-                                              />
-                                            ) : (
-                                              <span className="text-zinc-300 text-xs font-mono">
-                                                {app.fecha_correccion || "-"}
-                                              </span>
-                                            )}
+                                            <span className="text-zinc-300 text-xs font-mono">
+                                              {app.fecha_correccion || "-"}
+                                            </span>
                                           </TableCell>
                                           <TableCell>
-                                            {editingAppResult?.aplicacion === app.aplicacion ? (
-                                              <Input
-                                                value={editingAppResult.notas || ""}
-                                                onChange={(e) => setEditingAppResult(prev => ({ ...prev, notas: e.target.value }))}
-                                                className="h-8 text-xs bg-zinc-800 border-zinc-600"
-                                                placeholder="Nota..."
-                                              />
-                                            ) : (
-                                              <span className="text-zinc-400 text-xs truncate max-w-[150px] block" title={app.notas}>
-                                                {app.notas || "-"}
-                                              </span>
-                                            )}
-                                          </TableCell>
-                                          <TableCell>
-                                            {editingAppResult?.aplicacion === app.aplicacion ? (
-                                              <div className="flex gap-1">
-                                                <Button
-                                                  size="sm"
-                                                  variant="ghost"
-                                                  onClick={handleSaveAppResult}
-                                                  className="h-7 w-7 p-0 text-green-400 hover:text-green-300 hover:bg-green-500/10"
-                                                >
-                                                  <Check className="w-4 h-4" />
-                                                </Button>
-                                                <Button
-                                                  size="sm"
-                                                  variant="ghost"
-                                                  onClick={handleCancelEditAppResult}
-                                                  className="h-7 w-7 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                                                >
-                                                  <X className="w-4 h-4" />
-                                                </Button>
-                                              </div>
-                                            ) : (
-                                              <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => handleEditAppResult(app)}
-                                                className="h-7 w-7 p-0 text-zinc-400 hover:text-white hover:bg-zinc-700"
-                                                data-testid={`edit-app-result-${app.aplicacion}`}
-                                              >
-                                                <Pencil className="w-3 h-3" />
-                                              </Button>
-                                            )}
+                                            <span className="text-zinc-400 text-xs truncate max-w-[200px] block" title={app.notas}>
+                                              {app.notas || "-"}
+                                            </span>
                                           </TableCell>
                                         </TableRow>
                                       ))}
@@ -2041,7 +1970,7 @@ export default function Vulnerabilidades() {
                                 <p className="text-xs text-zinc-500 mt-2 flex items-start gap-1">
                                   <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
                                   Los resultados marcados como &quot;heredado&quot; utilizan el resultado global. 
-                                  Al editarlos, se crearán resultados personalizados independientes.
+                                  Para modificar resultados por aplicación, use el botón &quot;Editar&quot; o el formulario de Seguimiento en la pestaña Bitácora.
                                 </p>
                               </>
                             ) : (
