@@ -48,7 +48,7 @@ api_router = APIRouter(prefix="/api")
 # Default predefined values (fallback)
 DEFAULT_SEVERIDADES = ["Critica", "Alta", "Media", "Baja"]
 DEFAULT_ESTATUS = ["En Proceso", "Cerrado", "Pendiente", "En Retest"]
-DEFAULT_RESULTADO_RETEST = ["Corregido", "Pendiente", "Impedimento", "Vulnerable", "Desestimado", "En Retest", "Nota de Seguimiento"]
+DEFAULT_RESULTADO_RETEST = ["Corregido", "Pendiente", "Impedimento", "Vulnerable", "Desestimado", "En Retest", "Para Re Test", "Nota de Seguimiento"]
 
 # ============ PERMISSION MODELS ============
 
