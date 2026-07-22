@@ -23,6 +23,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
  * @param {string} vulnId - ID de la vulnerabilidad
  * @param {string} currentFechaCompromiso - Fecha compromiso actual de la vulnerabilidad
  * @param {Array<string>} aplicaciones - Lista de aplicaciones de la vulnerabilidad (opcional)
+ * @param {Array<object>} aplicacionesResultados - Resultados por aplicación con estado actual [{aplicacion, resultado_re_test}]
  * @param {function} onSuccess - Callback cuando se guarda exitosamente (recibe la vuln actualizada)
  * @param {function} onCancel - Callback para cancelar (opcional, si no se pasa no muestra botón cancelar)
  * @param {boolean} compact - Modo compacto para espacios reducidos
@@ -31,6 +32,7 @@ export const SeguimientoForm = ({
   vulnId, 
   currentFechaCompromiso,
   aplicaciones = [],
+  aplicacionesResultados = [],
   onSuccess, 
   onCancel,
   compact = false 
@@ -46,6 +48,28 @@ export const SeguimientoForm = ({
 
   // Mostrar selector de aplicación solo si hay más de una
   const mostrarSelectorApp = aplicaciones && aplicaciones.length > 1;
+  
+  // Función para obtener el estado de una aplicación
+  const getAppEstado = (appName) => {
+    const appData = aplicacionesResultados.find(a => a.aplicacion === appName);
+    if (!appData) return null;
+    // Normalizar "Para Re Test" a "En Retest" para mostrar
+    const estado = appData.resultado_re_test === "Para Re Test" ? "En Retest" : appData.resultado_re_test;
+    return estado;
+  };
+  
+  // Función para obtener el color del badge según el estado
+  const getEstadoColor = (estado) => {
+    switch(estado) {
+      case "Corregido": return "text-green-400";
+      case "Desestimado": return "text-gray-400";
+      case "Vulnerable": return "text-red-400";
+      case "Impedimento": return "text-orange-400";
+      case "En Retest": return "text-blue-400";
+      case "Pendiente": return "text-yellow-400";
+      default: return "text-zinc-400";
+    }
+  };
 
   // Estados que NO requieren fecha compromiso (la limpian o congelan)
   const ESTADOS_SIN_FECHA_COMPROMISO = ["Corregido", "Desestimado", "En Retest", "Nota de Seguimiento"];
@@ -154,9 +178,22 @@ export const SeguimientoForm = ({
             </SelectTrigger>
             <SelectContent className="bg-zinc-900 border-zinc-700">
               <SelectItem value="_general_">General (todas las aplicaciones)</SelectItem>
-              {aplicaciones.map((app) => (
-                <SelectItem key={app} value={app}>{app}</SelectItem>
-              ))}
+              {aplicaciones.map((app) => {
+                const estado = getAppEstado(app);
+                const colorEstado = getEstadoColor(estado);
+                return (
+                  <SelectItem key={app} value={app}>
+                    <div className="flex items-center justify-between gap-3 w-full">
+                      <span>{app}</span>
+                      {estado && (
+                        <span className={`text-xs font-medium ${colorEstado}`}>
+                          ({estado})
+                        </span>
+                      )}
+                    </div>
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>

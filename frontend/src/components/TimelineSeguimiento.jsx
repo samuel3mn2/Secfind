@@ -33,6 +33,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
  * @param {boolean} allowCreate - Si es true, permite crear registros desde este componente
  * @param {string} currentFechaCompromiso - Fecha compromiso actual (para el formulario)
  * @param {Array<string>} aplicaciones - Lista de aplicaciones de la vulnerabilidad (opcional)
+ * @param {Array<object>} aplicacionesResultados - Resultados por aplicación [{aplicacion, resultado_re_test}]
  * @param {function} onSeguimientoCreated - Callback cuando se crea un seguimiento (recibe vuln actualizada)
  */
 export const TimelineSeguimiento = ({ 
@@ -41,6 +42,7 @@ export const TimelineSeguimiento = ({
   allowCreate = true,
   currentFechaCompromiso = "",
   aplicaciones = [],
+  aplicacionesResultados = [],
   onSeguimientoCreated
 }) => {
   const [historial, setHistorial] = useState([]);
@@ -235,6 +237,7 @@ export const TimelineSeguimiento = ({
                 vulnId={vulnId}
                 currentFechaCompromiso={currentFechaCompromiso}
                 aplicaciones={aplicaciones}
+                aplicacionesResultados={aplicacionesResultados}
                 onSuccess={handleSeguimientoSuccess}
                 onCancel={() => setShowForm(false)}
                 compact={true}

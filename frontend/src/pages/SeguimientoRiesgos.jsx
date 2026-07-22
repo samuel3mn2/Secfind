@@ -400,6 +400,7 @@ export default function SeguimientoRiesgos() {
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingItem, setViewingItem] = useState(null);
   const [viewingType, setViewingType] = useState("vulnerabilidad");
+  const [viewingAppResults, setViewingAppResults] = useState([]); // Resultados por aplicación
   
   // Seguimiento/Bitácora state
   const [historialSeguimiento, setHistorialSeguimiento] = useState([]);
@@ -496,6 +497,16 @@ export default function SeguimientoRiesgos() {
       // Recargar lista de vulnerabilidades
       fetchVulnerabilidades();
       
+      // Refrescar resultados por aplicación si hay múltiples apps
+      if (viewingItem.aplicaciones && viewingItem.aplicaciones.length > 1) {
+        try {
+          const appResponse = await axios.get(`${API}/vulnerabilidades/${viewingItem.id}/aplicaciones-resultados`);
+          setViewingAppResults(appResponse.data.aplicaciones || []);
+        } catch (err) {
+          console.error("Error actualizando resultados por aplicación:", err);
+        }
+      }
+      
       // Limpiar formulario
       setSeguimientoForm({
         resultado_retest: "",
@@ -516,14 +527,25 @@ export default function SeguimientoRiesgos() {
     }
   };
 
-  // Al abrir el modal de vista, cargar historial
-  const handleViewVulnerabilidad = (vuln) => {
+  // Al abrir el modal de vista, cargar historial y resultados por aplicación
+  const handleViewVulnerabilidad = async (vuln) => {
     setViewingItem(vuln);
     setViewingType("vulnerabilidad");
     setShowViewModal(true);
     setActiveDetailTab("info");
     setHistorialSeguimiento([]);
+    setViewingAppResults([]);
     fetchHistorialSeguimiento(vuln.id);
+    
+    // Cargar resultados por aplicación si tiene múltiples apps
+    if (vuln.aplicaciones && vuln.aplicaciones.length > 1) {
+      try {
+        const response = await axios.get(`${API}/vulnerabilidades/${vuln.id}/aplicaciones-resultados`);
+        setViewingAppResults(response.data.aplicaciones || []);
+      } catch (error) {
+        console.error("Error cargando resultados por aplicación:", error);
+      }
+    }
   };
 
   // Fetch Vulnerabilidades
@@ -1502,9 +1524,29 @@ export default function SeguimientoRiesgos() {
                                 </SelectTrigger>
                                 <SelectContent className="bg-zinc-900 border-zinc-700">
                                   <SelectItem value="_general_">General (todas las aplicaciones)</SelectItem>
-                                  {viewingItem.aplicaciones.map((app) => (
-                                    <SelectItem key={app} value={app}>{app}</SelectItem>
-                                  ))}
+                                  {viewingItem.aplicaciones.map((app) => {
+                                    const appData = viewingAppResults.find(a => a.aplicacion === app);
+                                    const estado = appData?.resultado_re_test === "Para Re Test" ? "En Retest" : appData?.resultado_re_test;
+                                    const colorEstado = estado === "Corregido" ? "text-green-400" :
+                                                       estado === "Desestimado" ? "text-gray-400" :
+                                                       estado === "Vulnerable" ? "text-red-400" :
+                                                       estado === "Impedimento" ? "text-orange-400" :
+                                                       estado === "En Retest" ? "text-blue-400" :
+                                                       estado === "Pendiente" ? "text-yellow-400" :
+                                                       "text-zinc-400";
+                                    return (
+                                      <SelectItem key={app} value={app}>
+                                        <div className="flex items-center justify-between gap-3 w-full">
+                                          <span>{app}</span>
+                                          {estado && (
+                                            <span className={`text-xs font-medium ${colorEstado}`}>
+                                              ({estado})
+                                            </span>
+                                          )}
+                                        </div>
+                                      </SelectItem>
+                                    );
+                                  })}
                                 </SelectContent>
                               </Select>
                             </div>

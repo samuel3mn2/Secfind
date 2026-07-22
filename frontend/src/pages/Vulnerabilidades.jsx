@@ -522,6 +522,11 @@ export default function Vulnerabilidades() {
     setShowAppResultsSection(false);
     setAppResultsData(null);
     setEditingAppResult(null);
+    
+    // Pre-cargar resultados por aplicación si tiene múltiples apps (para el formulario de seguimiento)
+    if (vulnActualizada.aplicaciones && vulnActualizada.aplicaciones.length > 1) {
+      fetchAppResults(vulnActualizada.id);
+    }
   };
 
   // ============ FUNCIONES PARA RESULTADOS POR APLICACIÓN ============
@@ -1997,14 +2002,13 @@ export default function Vulnerabilidades() {
                       allowCreate={canModify}
                       currentFechaCompromiso={viewingVuln.fecha_compromiso}
                       aplicaciones={viewingVuln.aplicaciones || []}
+                      aplicacionesResultados={appResultsData?.aplicaciones || []}
                       onSeguimientoCreated={(updatedVuln) => {
                         setViewingVuln(updatedVuln);
                         fetchVulnerabilidades(false);
                         setBitacoraRefreshKey(prev => prev + 1);
-                        // Refrescar datos de aplicaciones si la sección está abierta
-                        if (showAppResultsSection) {
-                          fetchAppResults(updatedVuln.id);
-                        }
+                        // Refrescar datos de aplicaciones para actualizar el selector del formulario
+                        fetchAppResults(updatedVuln.id);
                       }}
                     />
                   </TabsContent>
