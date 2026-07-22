@@ -1926,7 +1926,12 @@ export default function Vulnerabilidades() {
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                      {appResultsData.aplicaciones?.map((app) => (
+                                      {appResultsData.aplicaciones?.map((app) => {
+                                        // Normalizar "Para Re Test" a "En Retest" para mostrar
+                                        const resultadoDisplay = app.resultado_re_test === "Para Re Test" ? "En Retest" : app.resultado_re_test;
+                                        const resultadoParaEstilo = resultadoDisplay;
+                                        
+                                        return (
                                         <TableRow key={app.aplicacion} className="border-zinc-700 hover:bg-zinc-800/30">
                                           <TableCell className="font-medium text-white">
                                             <div className="flex items-center gap-2">
@@ -1940,14 +1945,14 @@ export default function Vulnerabilidades() {
                                           </TableCell>
                                           <TableCell>
                                             <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                              app.resultado_re_test === "Corregido" ? "bg-green-500/20 text-green-300" :
-                                              app.resultado_re_test === "Vulnerable" ? "bg-red-500/20 text-red-300" :
-                                              app.resultado_re_test === "Desestimado" ? "bg-gray-500/20 text-gray-300" :
-                                              app.resultado_re_test === "Impedimento" ? "bg-orange-500/20 text-orange-300" :
-                                              app.resultado_re_test === "En Retest" ? "bg-blue-500/20 text-blue-300" :
+                                              resultadoParaEstilo === "Corregido" ? "bg-green-500/20 text-green-300" :
+                                              resultadoParaEstilo === "Vulnerable" ? "bg-red-500/20 text-red-300" :
+                                              resultadoParaEstilo === "Desestimado" ? "bg-gray-500/20 text-gray-300" :
+                                              resultadoParaEstilo === "Impedimento" ? "bg-orange-500/20 text-orange-300" :
+                                              resultadoParaEstilo === "En Retest" ? "bg-blue-500/20 text-blue-300" :
                                               "bg-zinc-500/20 text-zinc-300"
                                             }`}>
-                                              {app.resultado_re_test || "Sin resultado"}
+                                              {resultadoDisplay || "Sin resultado"}
                                             </span>
                                           </TableCell>
                                           <TableCell>
@@ -1961,7 +1966,8 @@ export default function Vulnerabilidades() {
                                             </span>
                                           </TableCell>
                                         </TableRow>
-                                      ))}
+                                        );
+                                      })}
                                     </TableBody>
                                   </Table>
                                 </div>
@@ -1995,6 +2001,10 @@ export default function Vulnerabilidades() {
                         setViewingVuln(updatedVuln);
                         fetchVulnerabilidades(false);
                         setBitacoraRefreshKey(prev => prev + 1);
+                        // Refrescar datos de aplicaciones si la sección está abierta
+                        if (showAppResultsSection) {
+                          fetchAppResults(updatedVuln.id);
+                        }
                       }}
                     />
                   </TabsContent>
