@@ -1,8 +1,19 @@
 # SecFind - Sistema de Gestión de Vulnerabilidades
 
-## Última Actualización: 2026-07-21
+## Última Actualización: 2026-07-23
 
 ### Cambios Recientes (Julio 2026)
+
+- **FEATURE: Mejoras en Módulo de Importación PDF (2026-07-23)**:
+  - **Buscador en "Informe de Pentest"**: Campo SearchableSelect con filtrado por nombre
+  - **Buscador en "Aplicaciones Afectadas"**: Multi-select con búsqueda y badges
+  - **Campo "Nivel de Riesgo Corporativo GRC"**: Nuevo select con opciones Alto, Medio Alto, Medio, Bajo
+  - **Parser Pentraze mejorado**: Extrae correctamente metadata (nombre_informe, fecha, institución, proveedor) y 5 vulnerabilidades del formato BHD
+  - **Auto-merge de opciones**: Valores extraídos del PDF se añaden automáticamente a los dropdowns para facilitar la selección
+  - **Archivos modificados**:
+    * `/app/frontend/src/pages/ImportarPDF.jsx` - Nuevos componentes SearchableSelect y SearchableMultiSelect, campo nivel_riesgo
+    * `/app/backend/pdf_parsers/pentraze_parser.py` - Patrones mejorados para extracción de texto
+  - **Verificado**: Testing agent iteration_34 - 100% backend (9/9 pytest), 100% frontend
 
 - **BUGFIX: Sincronización de resultado_re_test global al cambiar app individual (2026-07-21)**:
   - **Problema reportado**: Si una vulnerabilidad estaba con resultado_re_test "Corregido" y se cambiaba una app individual a "Pendiente" o "Vulnerable", el estatus cambiaba a "Pendiente" pero el resultado_re_test global permanecía en "Corregido". Esto causaba que la vulnerabilidad no apareciera en el módulo de Seguimiento.

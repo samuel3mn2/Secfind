@@ -322,11 +322,15 @@ export default function ImportarPDF({ onClose, onSuccess }) {
         
         // Transform response to match AI format
         const rulesData = response.data;
+        const newInforme = rulesData.metadata?.nombre_informe || "";
+        const newInstitucion = rulesData.metadata?.institucion || "";
+        const newProveedor = rulesData.metadata?.proveedor || "";
+        
         setExtractedData({
-          nombre_informe: rulesData.metadata?.nombre_informe || "",
+          nombre_informe: newInforme,
           fecha_informe: rulesData.metadata?.fecha_informe || "",
-          institucion: rulesData.metadata?.institucion || "",
-          proveedor: rulesData.metadata?.proveedor || "",
+          institucion: newInstitucion,
+          proveedor: newProveedor,
           aplicacion_evaluada: "",
           vulnerabilidades: rulesData.vulnerabilities?.map(v => ({
             titulo: v.vulnerabilidad,
@@ -337,14 +341,33 @@ export default function ImportarPDF({ onClose, onSuccess }) {
             recomendaciones: v.recomendaciones || "",
             codigo: v.codigo || "",
           })) || [],
-          // For rules parser, items come pre-formatted
+          // For rules parser, track new items for merging with options
           aplicaciones_nuevas: [],
-          informes_nuevos: rulesData.metadata?.nombre_informe ? [rulesData.metadata.nombre_informe] : [],
-          proveedores_nuevos: rulesData.metadata?.proveedor ? [rulesData.metadata.proveedor] : [],
-          instituciones_nuevas: [],
+          informes_nuevos: newInforme ? [newInforme] : [],
+          proveedores_nuevos: newProveedor ? [newProveedor] : [],
+          instituciones_nuevas: newInstitucion ? [newInstitucion] : [],
         });
         
-        await fetchOptions();
+        // Fetch options first, then merge with new items from extraction
+        const optionsResponse = await axios.get(`${API}/dropdown-options`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        // Merge extracted values into options (so they appear in dropdowns)
+        const mergedOptions = {
+          ...optionsResponse.data,
+          informes_pentest: newInforme && !optionsResponse.data.informes_pentest?.includes(newInforme)
+            ? [newInforme, ...(optionsResponse.data.informes_pentest || [])]
+            : optionsResponse.data.informes_pentest,
+          instituciones: newInstitucion && !optionsResponse.data.instituciones?.includes(newInstitucion)
+            ? [newInstitucion, ...(optionsResponse.data.instituciones || [])]
+            : optionsResponse.data.instituciones,
+          proveedores: newProveedor && !optionsResponse.data.proveedores?.includes(newProveedor)
+            ? [newProveedor, ...(optionsResponse.data.proveedores || [])]
+            : optionsResponse.data.proveedores,
+        };
+        setOptions(mergedOptions);
+        
         setStep(3);
         
         // Prepare first vulnerability
