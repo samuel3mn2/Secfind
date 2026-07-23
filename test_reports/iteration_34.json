@@ -1,0 +1,79 @@
+{
+  "summary": "Iteration 34 (both) — Verified 4 improvements to ImportarPDF module: (1) searchable Informe Pentest combobox, (2) new 'Nivel de Riesgo Corporativo GRC' field with 4 options, (3) searchable multi-select for Aplicaciones Afectadas, (4) improved pentraze_parser extracting the BHD PDF correctly. Backend: 9/9 pytest cases pass against POST /api/import/pdf/extract-rules using the real BHD Pentraze PDF (total=5, 1 Critica + 4 Media, metadata OK: nombre_informe='Prueba de Penetración al Portal Web BHD Fondos', institucion='BHD Fondos', proveedor='Pentraze Cybersecurity', fecha_informe present; severidad→nivel_riesgo mapping Critica→Alto and Media→Medio verified; every vuln has non-empty descripcion_riesgo + recomendaciones; 0-day title detected). Frontend E2E via Playwright: login admin/admin123 → Vulnerabilidades → Importar PDF button opens the modal → upload real BHD PDF → 6s later step 3 renders with progress '1 / 5', 'Critica' severity badge, Proveedor pre-filled 'Pentraze Cybersecurity', Informe Pentest SearchableSelect present ([data-testid='searchable-select-trigger']), Aplicaciones SearchableMultiSelect present with wpbhdf.staging.applab.do already added as a Badge, and the new 'Nivel de Riesgo Corporativo GRC' Select confirmed to expose exactly ['Alto','Medio Alto','Medio','Bajo']. Search filter of Informe (query='Fondos') and Aplicaciones (opened, 59 options, add works) both functional. No blocking issues.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "ImportarPDF step 3 — Informe Pentest searchable select",
+        "issue": "The extracted informe ('Prueba de Penetración al Portal Web BHD Fondos') is set as the trigger value AND queued in extractedData.informes_nuevos, but the SearchableSelect only lists items already in options.informes_pentest catalog. Typing 'Fondos' therefore returns 'No hay informes disponibles' even though the selected value is that informe. Minor UX gap: after extraction, either (a) merge informes_nuevos into the options passed to SearchableSelect (with a small 'nuevo' badge), or (b) auto-run the Add-to-Catalog step for rules parser (currently only AI method surfaces step 2).",
+        "affected_selectors": ["[data-testid='searchable-select-input']"]
+      },
+      {
+        "flow": "ImportarPDF step 3 — Institución field",
+        "issue": "Parser returns institucion='BHD Fondos' but the Institución Shadcn Select in step 3 does NOT auto-select it (empty trigger in screenshot) because rules parser branch never puts 'BHD Fondos' into the options catalog. For the AI branch, catalog step 2 handles this; for rules branch it is skipped. Consider showing step 2 (catalog review) for the rules branch too, OR letting the Institución dropdown accept new values in-place."
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "Importar desde PDF Dialog",
+        "issues": [
+          "Radix Dialog: 'Missing Description or aria-describedby' console warning (a11y). Pre-existing.",
+          "Recharts console warnings 'width(-1) and height(-1) of chart should be greater than 0' triggered from the Dashboard behind the modal — pre-existing, non-blocking."
+        ]
+      }
+    ]
+  },
+  "passed_tests": [
+    "POST /api/import/pdf/extract-rules → 200 success=true, total=5, parser_used present",
+    "Metadata: nombre_informe non-empty, fecha_informe non-empty, institucion contains 'BHD', proveedor contains 'pentraze'",
+    "Each of the 5 vulns has vulnerabilidad, severidad, nivel_riesgo, aplicaciones (list), descripcion_riesgo, recomendaciones, nombre_informe_pentest, proveedor",
+    "Severity distribution: 1 Critica + 4 Media (matches PDF)",
+    "Severity → Nivel Riesgo: Critica→Alto, Media→Medio verified for all 5 vulns",
+    "'0-DAY' title present in the Critica vulnerability",
+    "≥4/5 vulns have descripcion_riesgo >30 chars AND recomendaciones >20 chars",
+    "POST /api/import/pdf/extract-rules requires Bearer token (401/403 without)",
+    "POST /api/import/pdf/extract-rules rejects non-PDF with 400",
+    "Frontend login admin/admin123 → /vulnerabilidades OK",
+    "'Importar PDF' button opens Dialog with 'Parser de Reglas' preselected and 'Pentraze Cybersecurity' as Tipo de Informe",
+    "Uploading the BHD PDF via [data-testid='pdf-file-input'] triggers extract-rules and jumps to step 3 with '1 / 5' progress badge and 'Critica' severity badge",
+    "Step 3 shows [data-testid='searchable-select-trigger'] (Informe Pentest) and [data-testid='searchable-multi-select-trigger'] (Aplicaciones Afectadas)",
+    "Aplicaciones multi-select popover lists 59 options, first option ('API GW') can be clicked and appended",
+    "'Nivel de Riesgo Corporativo GRC' label present and its Select exposes exactly ['Alto','Medio Alto','Medio','Bajo']",
+    "Proveedor Select pre-filled with 'Pentraze Cybersecurity'",
+    "Aplicaciones badge 'wpbhdf.staging.applab.do' pre-loaded from parser output"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_import_pdf_pentraze.py",
+    "/app/test_reports/pytest/pytest_iteration34_importpdf.xml"
+  ],
+  "action_items": [
+    "LOW — For the rules parser branch, either surface step 2 (catalog review) like the AI branch or auto-add extracted metadata (nombre_informe, institucion, proveedor) to the dropdown options so the Informe/Institución fields don't appear disconnected from their trigger value.",
+    "LOW — SearchableSelect: consider merging `extractedData.informes_nuevos` into the options list passed to Informe Pentest so the user can still filter/see the freshly-extracted informe.",
+    "LOW (pre-existing) — Add `aria-describedby` (DialogDescription id) to Importar PDF DialogContent to remove Radix a11y warning."
+  ],
+  "critical_code_review_comments": [
+    "pentraze_parser.py L179 header_pattern combined with the 'Severidad within 500 chars' guard (L195) is a solid fix for the TOC false-positives. Confirmed 5/5 valid vulns on the real PDF.",
+    "server.py L5387-5394 wraps the parser result in a stable envelope (success/parser_used/metadata/vulnerabilities/total/message). Good.",
+    "ImportarPDF.jsx L349-379 (rules branch) skips step 2 by design, but the step-3 dropdowns (Institución, Proveedor, Informe) still expect the catalog to already contain the extracted values. Result: Institución is often blank on load. Non-blocking but confusing.",
+    "ImportarPDF.jsx SearchableSelect passes only `options?.informes_pentest` — it does NOT include `informes_nuevos` from the current extraction. Filtering hides the pre-selected value.",
+    "ImportarPDF.jsx file is ~1090 lines including two inline helper components; consider extracting SearchableSelect and SearchableMultiSelect to /components/ui/searchable-select.jsx for reuse (they are useful across the app).",
+    "server.py still ~5976 lines — modular route split still pending from prior iterations."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_import_pdf_pentraze.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (9/9 tests pass)",
+    "frontend": "100% for the requested features; 2 minor UX gaps flagged as LOW"
+  },
+  "test_credentials": {"user": "admin", "password": "admin123"},
+  "seed_data_creation": "None. Test consumes the public BHD Pentraze PDF at customer-assets-jai6qajn.emergentagent.net. No DB writes in tests (extraction endpoint is read-only; POST /import/pdf/add-vulnerability was not exercised to avoid seeding).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The 4 improvements in the review request are all verified. Backend parser is stable on the BHD PDF. Only remaining polish concerns the rules branch skipping the catalog step 2, which leaves Institución empty and makes the Informe search look empty even though a value is pre-selected. Test file /app/backend/tests/test_import_pdf_pentraze.py is a reusable regression suite for the pentraze parser + endpoint.",
+  "rca of the issue": "N/A — no bugs blocking the requested features. The two LOW findings stem from the same design decision in ImportarPDF.jsx (L349): rules parser branch calls setStep(3) directly, bypassing step 2's Add-to-Catalog flow. Consequently, options.informes_pentest / options.instituciones remain stale relative to what the parser just extracted, and the step-3 Select/SearchableSelect components — which are gated on those options — do not surface the freshly-extracted values. Fix path: run the same add-catalog-items logic (or a simplified variant) for the rules branch before setStep(3), OR pass a merged options list into the SearchableSelect that includes extractedData.informes_nuevos / aplicaciones_nuevas / etc."
+}

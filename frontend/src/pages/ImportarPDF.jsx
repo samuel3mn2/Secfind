@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
@@ -35,6 +35,19 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
   FileText,
   Upload,
   AlertTriangle,
@@ -46,9 +59,197 @@ import {
   X,
   Edit,
   Save,
+  Check,
+  ChevronsUpDown,
+  Search,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+// Opciones de Nivel de Riesgo Corporativo GRC
+const NIVEL_RIESGO_OPTIONS = ["Alto", "Medio Alto", "Medio", "Bajo"];
+
+// Colores para el badge de Nivel de Riesgo
+const getNivelRiesgoClass = (nivel) => {
+  switch (nivel) {
+    case "Alto":
+      return "bg-red-500/20 text-red-400 border-red-500/30";
+    case "Medio Alto":
+      return "bg-orange-500/20 text-orange-400 border-orange-500/30";
+    case "Medio":
+      return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
+    case "Bajo":
+      return "bg-green-500/20 text-green-400 border-green-500/30";
+    default:
+      return "bg-zinc-500/20 text-zinc-400 border-zinc-500/30";
+  }
+};
+
+// Searchable Combobox Component para selección simple
+const SearchableSelect = ({ value, onValueChange, options, placeholder, emptyMessage = "No hay opciones" }) => {
+  const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  const filteredOptions = options?.filter((option) =>
+    option.toLowerCase().includes(searchQuery.toLowerCase())
+  ) || [];
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between bg-black/20 border-zinc-700 text-white hover:bg-zinc-800 hover:text-white"
+          data-testid="searchable-select-trigger"
+        >
+          <span className="truncate text-left flex-1">
+            {value || placeholder}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-full p-0 bg-zinc-900 border-zinc-700" align="start">
+        <Command className="bg-zinc-900">
+          <div className="flex items-center border-b border-zinc-700 px-3">
+            <Search className="mr-2 h-4 w-4 shrink-0 text-zinc-400" />
+            <input
+              placeholder={`Buscar...`}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex h-10 w-full bg-transparent py-3 text-sm text-white outline-none placeholder:text-zinc-500"
+              data-testid="searchable-select-input"
+            />
+          </div>
+          <CommandList className="max-h-[200px]">
+            {filteredOptions.length === 0 ? (
+              <div className="py-6 text-center text-sm text-zinc-500">{emptyMessage}</div>
+            ) : (
+              <CommandGroup>
+                {filteredOptions.map((option) => (
+                  <CommandItem
+                    key={option}
+                    value={option}
+                    onSelect={() => {
+                      onValueChange(option);
+                      setOpen(false);
+                      setSearchQuery("");
+                    }}
+                    className="text-zinc-200 cursor-pointer hover:bg-zinc-800 data-[selected=true]:bg-zinc-800"
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        value === option ? "opacity-100 text-green-500" : "opacity-0"
+                      )}
+                    />
+                    <span className="truncate">{option}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+// Searchable Multi-Select Combobox para aplicaciones
+const SearchableMultiSelect = ({ values = [], onValuesChange, options, placeholder, emptyMessage = "No hay opciones" }) => {
+  const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  const filteredOptions = options?.filter((option) =>
+    option.toLowerCase().includes(searchQuery.toLowerCase()) && !values.includes(option)
+  ) || [];
+
+  const handleSelect = (option) => {
+    onValuesChange([...values, option]);
+    setSearchQuery("");
+  };
+
+  const handleRemove = (optionToRemove) => {
+    onValuesChange(values.filter((v) => v !== optionToRemove));
+  };
+
+  return (
+    <div className="space-y-2">
+      {/* Selected items */}
+      {values.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {values.map((item, i) => (
+            <Badge key={i} variant="outline" className="border-zinc-600 text-zinc-300">
+              {item}
+              <button
+                type="button"
+                onClick={() => handleRemove(item)}
+                className="ml-1 hover:text-red-400"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </Badge>
+          ))}
+        </div>
+      )}
+      
+      {/* Combobox */}
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between bg-black/20 border-zinc-700 text-white hover:bg-zinc-800 hover:text-white"
+            data-testid="searchable-multi-select-trigger"
+          >
+            <span className="text-zinc-400">
+              {placeholder}
+            </span>
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-full p-0 bg-zinc-900 border-zinc-700" align="start">
+          <Command className="bg-zinc-900">
+            <div className="flex items-center border-b border-zinc-700 px-3">
+              <Search className="mr-2 h-4 w-4 shrink-0 text-zinc-400" />
+              <input
+                placeholder={`Buscar aplicación...`}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex h-10 w-full bg-transparent py-3 text-sm text-white outline-none placeholder:text-zinc-500"
+                data-testid="searchable-multi-select-input"
+              />
+            </div>
+            <CommandList className="max-h-[200px]">
+              {filteredOptions.length === 0 ? (
+                <div className="py-6 text-center text-sm text-zinc-500">
+                  {searchQuery ? "No se encontraron aplicaciones" : emptyMessage}
+                </div>
+              ) : (
+                <CommandGroup>
+                  {filteredOptions.map((option) => (
+                    <CommandItem
+                      key={option}
+                      value={option}
+                      onSelect={() => handleSelect(option)}
+                      className="text-zinc-200 cursor-pointer hover:bg-zinc-800 data-[selected=true]:bg-zinc-800"
+                    >
+                      <Plus className="mr-2 h-4 w-4 text-zinc-400" />
+                      <span className="truncate">{option}</span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+};
 
 const SeverityBadge = ({ severity }) => {
   const classes = {
@@ -149,6 +350,15 @@ export default function ImportarPDF({ onClose, onSuccess }) {
         // Prepare first vulnerability
         if (rulesData.vulnerabilities?.length > 0) {
           const vuln = rulesData.vulnerabilities[0];
+          // Calcular nivel_riesgo desde severidad si no viene
+          const severidadToNivelRiesgo = {
+            "Critica": "Alto",
+            "Alta": "Medio Alto", 
+            "Media": "Medio",
+            "Baja": "Bajo"
+          };
+          const nivelRiesgo = vuln.nivel_riesgo || severidadToNivelRiesgo[vuln.severidad] || "Medio";
+          
           setEditingVuln({
             codigo: vuln.codigo || "",
             fecha_hallazgo: rulesData.metadata?.fecha_informe || new Date().toISOString().split('T')[0],
@@ -157,6 +367,7 @@ export default function ImportarPDF({ onClose, onSuccess }) {
             vulnerabilidad: vuln.vulnerabilidad || "",
             recomendaciones: vuln.recomendaciones || "",
             severidad: vuln.severidad || "Media",
+            nivel_riesgo: nivelRiesgo,
             estatus: "Pendiente",
             nombre_informe_pentest: rulesData.metadata?.nombre_informe || "",
             proveedor: rulesData.metadata?.proveedor || "",
@@ -218,6 +429,16 @@ export default function ImportarPDF({ onClose, onSuccess }) {
         descripcion += `\n\nImpacto: ${vuln.impacto}`;
       }
       
+      // Calcular nivel_riesgo desde severidad
+      const severidadToNivelRiesgo = {
+        "Critica": "Alto",
+        "Alta": "Medio Alto", 
+        "Media": "Medio",
+        "Baja": "Bajo"
+      };
+      const severidad = vuln.severidad || "Media";
+      const nivelRiesgo = severidadToNivelRiesgo[severidad] || "Medio";
+      
       setEditingVuln({
         fecha_hallazgo: data.fecha_informe || new Date().toISOString().split('T')[0],
         institucion: data.institucion || "",
@@ -225,7 +446,8 @@ export default function ImportarPDF({ onClose, onSuccess }) {
         vulnerabilidad: vuln.titulo || "",
         descripcion_riesgo: descripcion.trim(),
         recomendaciones: vuln.recomendaciones || "",
-        severidad: vuln.severidad || "Media",
+        severidad: severidad,
+        nivel_riesgo: nivelRiesgo,
         estatus: "Pendiente",
         nombre_informe_pentest: data.nombre_informe || "",
         proveedor: data.proveedor || "",
@@ -324,6 +546,16 @@ export default function ImportarPDF({ onClose, onSuccess }) {
         descripcion += `\n\nImpacto: ${vuln.impacto}`;
       }
       
+      // Calcular nivel_riesgo desde severidad
+      const severidadToNivelRiesgo = {
+        "Critica": "Alto",
+        "Alta": "Medio Alto", 
+        "Media": "Medio",
+        "Baja": "Bajo"
+      };
+      const severidad = vuln.severidad || "Media";
+      const nivelRiesgo = severidadToNivelRiesgo[severidad] || "Medio";
+      
       setEditingVuln({
         fecha_hallazgo: extractedData.fecha_informe || new Date().toISOString().split('T')[0],
         institucion: extractedData.institucion || "",
@@ -331,7 +563,8 @@ export default function ImportarPDF({ onClose, onSuccess }) {
         vulnerabilidad: vuln.titulo || "",
         descripcion_riesgo: descripcion.trim(),
         recomendaciones: vuln.recomendaciones || "",
-        severidad: vuln.severidad || "Media",
+        severidad: severidad,
+        nivel_riesgo: nivelRiesgo,
         estatus: "Pendiente",
         nombre_informe_pentest: extractedData.nombre_informe || "",
         proveedor: extractedData.proveedor || "",
@@ -359,6 +592,16 @@ export default function ImportarPDF({ onClose, onSuccess }) {
         descripcion += `\n\nImpacto: ${vuln.impacto}`;
       }
       
+      // Calcular nivel_riesgo desde severidad
+      const severidadToNivelRiesgo = {
+        "Critica": "Alto",
+        "Alta": "Medio Alto", 
+        "Media": "Medio",
+        "Baja": "Bajo"
+      };
+      const severidad = vuln.severidad || "Media";
+      const nivelRiesgo = severidadToNivelRiesgo[severidad] || "Medio";
+      
       setEditingVuln({
         fecha_hallazgo: extractedData.fecha_informe || new Date().toISOString().split('T')[0],
         institucion: extractedData.institucion || "",
@@ -366,7 +609,8 @@ export default function ImportarPDF({ onClose, onSuccess }) {
         vulnerabilidad: vuln.titulo || "",
         descripcion_riesgo: descripcion.trim(),
         recomendaciones: vuln.recomendaciones || "",
-        severidad: vuln.severidad || "Media",
+        severidad: severidad,
+        nivel_riesgo: nivelRiesgo,
         estatus: "Pendiente",
         nombre_informe_pentest: extractedData.nombre_informe || "",
         proveedor: extractedData.proveedor || "",
@@ -701,19 +945,13 @@ export default function ImportarPDF({ onClose, onSuccess }) {
 
             <div className="space-y-2">
               <Label className="text-zinc-400">Informe Pentest</Label>
-              <Select
+              <SearchableSelect
                 value={editingVuln.nombre_informe_pentest}
                 onValueChange={(v) => setEditingVuln({...editingVuln, nombre_informe_pentest: v})}
-              >
-                <SelectTrigger className="bg-black/20 border-zinc-700 text-white">
-                  <SelectValue placeholder="Seleccionar..." />
-                </SelectTrigger>
-                <SelectContent className="bg-zinc-900 border-zinc-700 max-h-[200px]">
-                  {options?.informes_pentest?.map((i) => (
-                    <SelectItem key={i} value={i}>{i}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={options?.informes_pentest || []}
+                placeholder="Buscar informe..."
+                emptyMessage="No hay informes disponibles"
+              />
             </div>
 
             <div className="space-y-2">
@@ -727,38 +965,31 @@ export default function ImportarPDF({ onClose, onSuccess }) {
 
             <div className="space-y-2">
               <Label className="text-zinc-400">Aplicaciones Afectadas</Label>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {editingVuln.aplicaciones.map((app, i) => (
-                  <Badge key={i} variant="outline" className="border-zinc-600 text-zinc-300">
-                    {app}
-                    <button
-                      onClick={() => setEditingVuln({
-                        ...editingVuln,
-                        aplicaciones: editingVuln.aplicaciones.filter((_, idx) => idx !== i)
-                      })}
-                      className="ml-1 hover:text-red-400"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
+              <SearchableMultiSelect
+                values={editingVuln.aplicaciones}
+                onValuesChange={(apps) => setEditingVuln({...editingVuln, aplicaciones: apps})}
+                options={options?.aplicaciones || []}
+                placeholder="Buscar y agregar aplicación..."
+                emptyMessage="No hay aplicaciones disponibles"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-zinc-400">Nivel de Riesgo Corporativo GRC</Label>
               <Select
-                onValueChange={(v) => {
-                  if (!editingVuln.aplicaciones.includes(v)) {
-                    setEditingVuln({
-                      ...editingVuln,
-                      aplicaciones: [...editingVuln.aplicaciones, v]
-                    });
-                  }
-                }}
+                value={editingVuln.nivel_riesgo}
+                onValueChange={(v) => setEditingVuln({...editingVuln, nivel_riesgo: v})}
               >
                 <SelectTrigger className="bg-black/20 border-zinc-700 text-white">
-                  <SelectValue placeholder="Agregar aplicación..." />
+                  <SelectValue placeholder="Seleccionar nivel de riesgo..." />
                 </SelectTrigger>
-                <SelectContent className="bg-zinc-900 border-zinc-700 max-h-[200px]">
-                  {options?.aplicaciones?.filter(a => !editingVuln.aplicaciones.includes(a)).map((a) => (
-                    <SelectItem key={a} value={a}>{a}</SelectItem>
+                <SelectContent className="bg-zinc-900 border-zinc-700">
+                  {NIVEL_RIESGO_OPTIONS.map((nivel) => (
+                    <SelectItem key={nivel} value={nivel}>
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getNivelRiesgoClass(nivel)}`}>
+                        {nivel}
+                      </span>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>

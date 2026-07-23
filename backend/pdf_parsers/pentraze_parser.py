@@ -58,19 +58,32 @@ class PentrazePDFParser:
         # Get first 2 pages for metadata
         cover_text = "\n".join(self.pages_text[:2]) if len(self.pages_text) >= 2 else self.full_text[:3000]
         
-        # Extract report name - look for "Pruebas de Penetración" or similar
+        # Extract report name - improved patterns for BHD format
+        # Look for patterns like "Prueba de Penetración Web a Fondos BHD"
         name_patterns = [
-            r'Pruebas de Penetración[^\n]*',
-            r'Penetration Test[^\n]*',
+            r'Prueba\s+de\s+Penetración[^\n]*(?:Web|Aplicación|Portal|Sistema)[^\n]*',
+            r'Pruebas\s+de\s+Penetración[^\n]*',
+            r'Penetration\s+Test[^\n]*',
             r'Pentest[^\n]*',
-            r'Informe de[^\n]*Seguridad[^\n]*',
+            r'Informe\s+de[^\n]*Seguridad[^\n]*',
+            r'Portal\s+Web[^\n]*BHD[^\n]*',
         ]
         
         for pattern in name_patterns:
             match = re.search(pattern, cover_text, re.IGNORECASE)
             if match:
-                self.metadata['nombre_informe'] = match.group(0).strip()
+                nombre = match.group(0).strip()
+                # Clean up the name
+                nombre = re.sub(r'\s+', ' ', nombre)
+                self.metadata['nombre_informe'] = nombre
                 break
+        
+        # If still no name, try to extract from title-like text
+        if 'nombre_informe' not in self.metadata:
+            # Look for text after "Prueba" that spans multiple words
+            title_match = re.search(r'(Prueba[^\n]{10,50})', cover_text, re.IGNORECASE)
+            if title_match:
+                self.metadata['nombre_informe'] = title_match.group(1).strip()
         
         # Extract date - multiple formats
         date_patterns = [
@@ -104,7 +117,7 @@ class PentrazePDFParser:
                         self.metadata['fecha_informe'] = f"{groups[2]}-{groups[1]}-{groups[0]}"
                 break
         
-        # Extract institution/client
+        # Extract institution/client - improved for BHD
         client_patterns = [
             r'(?:Cliente|Client|Para|For)[:\s]+([^\n]+)',
             r'BANCO\s+\w+',
@@ -117,72 +130,92 @@ class PentrazePDFParser:
                 self.metadata['institucion'] = match.group(0).replace('Cliente:', '').replace('Para:', '').strip()
                 break
         
-        # Check for BHD specifically
+        # Check for BHD specifically - multiple patterns
         if 'BHD' in cover_text.upper():
-            self.metadata['institucion'] = 'Banco BHD'
+            if 'FONDOS' in cover_text.upper():
+                self.metadata['institucion'] = 'BHD Fondos'
+            else:
+                self.metadata['institucion'] = 'Banco BHD'
         
-        # Extract provider
-        if 'pentraze' in cover_text.lower():
+        # Extract provider - check in full document since it might be in headers/footers
+        proveedor_found = False
+        if 'pentraze' in self.full_text.lower():
             self.metadata['proveedor'] = 'Pentraze Cybersecurity'
+            proveedor_found = True
         elif 'gbm' in cover_text.lower():
             self.metadata['proveedor'] = 'GBM'
+            proveedor_found = True
+        
+        # If not found, look for "realizó" or "carried out by" patterns
+        if not proveedor_found:
+            provider_match = re.search(r'(\w+(?:\s+\w+)?)\s+realizó\s+(?:un|una|el|la)', self.full_text, re.IGNORECASE)
+            if provider_match:
+                self.metadata['proveedor'] = provider_match.group(1).strip()
         
         return self.metadata
     
     def extract_vulnerabilities(self) -> List[Dict]:
         """Extract all vulnerabilities from the report"""
         
-        # Pattern to identify vulnerability sections
-        # Pentraze format: "1. Title of Vulnerability" followed by severity
-        vuln_pattern = r'(\d+)\.\s+([^\n]+)\n.*?(?:Severidad|Severity)[:\s]*(\w+)\s*\(?([\d.]+)?\)?'
+        # Find the start of detailed findings section
+        details_start = 0
+        details_markers = [
+            r'Detalles\s+Técnicos\s+de\s+(?:Los\s+)?Hallazgos',
+            r'Technical\s+Details\s+of\s+Findings',
+            r'A\s+continuación,\s+presentamos\s+los\s+detalles\s+técnicos'
+        ]
         
-        # More detailed pattern for full vulnerability extraction
-        full_vuln_pattern = r'''
-            (\d+)\.\s+                          # Number and dot
-            ([^\n]+)\n                          # Title
-            .*?                                 # Any content
-            (?:Severidad|Severity)[:\s]*        # Severity label
-            (\w+)                               # Severity value (Alta, Crítica, etc.)
-            (?:\s*\(?([\d.]+)\)?)?              # Optional CVSS score
-            .*?                                 # Any content
-            (?:Activos\s+Afectados|Affected\s+Assets)[:\s]*
-            (.*?)                               # Affected assets
-            (?:Descripción|Description)[:\s]*
-            (.*?)                               # Description
-            (?:Impacto|Impact)[:\s]*
-            (.*?)                               # Impact
-            (?:Recomendaciones|Recommendations)[:\s]*
-            (.*?)                               # Recommendations
-            (?=\d+\.\s+[A-Z]|\Z|Referencias|References)  # Next vulnerability or end
-        '''
+        for marker in details_markers:
+            match = re.search(marker, self.full_text, re.IGNORECASE)
+            if match:
+                details_start = match.end()
+                break
         
-        # First, let's find all vulnerability headers
-        header_pattern = r'(\d+)\.\s+([A-Z][^\n]{10,})'
-        headers = list(re.finditer(header_pattern, self.full_text))
+        # Work only with text after the details section starts
+        details_text = self.full_text[details_start:]
         
-        for i, header_match in enumerate(headers):
+        # Improved header pattern to capture titles like "1. (0 DAY) Falta de Validación..."
+        # Must be followed by Severidad to be a real vulnerability (not TOC)
+        header_pattern = r'(\d+)\.\s+(\(?[A-Z0-9][^\n]{10,})'
+        headers = list(re.finditer(header_pattern, details_text))
+        
+        # Filter to only keep headers that have "Severidad" nearby (within 500 chars)
+        valid_headers = []
+        for h in headers:
+            title = h.group(2).strip()
+            
+            # Skip if it looks like a table of contents (has page numbers or dots)
+            if re.search(r'\.{3,}\s*\d+\s*$', title) or re.search(r'\.\.\.\s*\d+', title):
+                continue
+            if len(title) < 15:
+                continue
+                
+            # Check if there's a Severidad label nearby (this confirms it's a real vulnerability)
+            section_preview = details_text[h.end():h.end()+600]
+            if re.search(r'Severidad[:\s]*(?:Crítica|Critica|Alta|Media|Baja)', section_preview, re.IGNORECASE):
+                valid_headers.append(h)
+        
+        for i, header_match in enumerate(valid_headers):
             vuln_num = header_match.group(1)
             vuln_title = header_match.group(2).strip()
-            
-            # Skip if this looks like a table of contents entry
-            if len(vuln_title) < 15:
-                continue
+            # Clean up title - remove trailing page references if any
+            vuln_title = re.sub(r'\s*\.{2,}\s*\d+\s*$', '', vuln_title)
             
             # Get the text between this header and the next one (or end)
             start_pos = header_match.end()
-            if i + 1 < len(headers):
-                end_pos = headers[i + 1].start()
+            if i + 1 < len(valid_headers):
+                end_pos = valid_headers[i + 1].start()
             else:
-                end_pos = len(self.full_text)
+                end_pos = len(details_text)
             
-            section_text = self.full_text[start_pos:end_pos]
+            section_text = details_text[start_pos:end_pos]
             
-            # Extract severity
+            # Extract severity - improved pattern for "Severidad: Crítica (9.1)"
             severity = 'Media'  # Default
             cvss_score = None
             
             severity_match = re.search(
-                r'(?:Severidad|Severity)[:\s]*(\w+)(?:\s*\(?([\d.]+)\)?)?',
+                r'Severidad[:\s]*(\w+)(?:\s*\(?([\d.]+)\)?)?',
                 section_text,
                 re.IGNORECASE
             )
@@ -192,51 +225,60 @@ class PentrazePDFParser:
                 if severity_match.group(2):
                     cvss_score = severity_match.group(2)
             
-            # Extract affected assets
+            # Extract affected assets - improved pattern for URLs and bullet points
             activos = []
             activos_match = re.search(
-                r'(?:Activos\s+Afectados|Affected\s+Assets)[:\s]*(.*?)(?:Descripción|Description|CVSS)',
+                r'(?:Activos\s+Afectados|Affected\s+Assets)[:\s]*(.*?)(?:Descripción|Description|CVSS\s*Vector)',
                 section_text,
                 re.IGNORECASE | re.DOTALL
             )
             if activos_match:
                 activos_text = activos_match.group(1).strip()
-                # Clean up and split
-                activos = [a.strip() for a in re.split(r'[\n•\-\*]', activos_text) if a.strip() and len(a.strip()) > 3]
+                # Extract URLs first
+                urls = re.findall(r'https?://[^\s\n]+', activos_text)
+                if urls:
+                    activos = [url.strip().rstrip('.') for url in urls]
+                else:
+                    # Fall back to splitting by newlines/bullets
+                    activos = [a.strip() for a in re.split(r'[\n•\-\*]', activos_text) if a.strip() and len(a.strip()) > 3]
             
-            # Extract description
+            # Extract description - improved to handle "Prueba de Concepto"
             descripcion = ""
             desc_match = re.search(
-                r'(?:Descripción|Description)[:\s]*(.*?)(?:Prueba\s+de\s+Concepto|PoC|Impacto|Impact)',
+                r'(?:Descripción|Description)[:\s]*(.*?)(?:Prueba\s+de\s+Concepto|PoC|Impacto|Impact|Figura)',
                 section_text,
                 re.IGNORECASE | re.DOTALL
             )
             if desc_match:
                 descripcion = desc_match.group(1).strip()
-                # Clean up description
-                descripcion = re.sub(r'\s+', ' ', descripcion)[:1000]
+                # Clean up description - remove excessive whitespace but keep paragraph structure
+                descripcion = re.sub(r'\n\s*\n', '\n\n', descripcion)
+                descripcion = re.sub(r'[ \t]+', ' ', descripcion)
+                descripcion = descripcion[:1500]  # Allow longer descriptions
             
             # Extract impact
             impacto = ""
             impact_match = re.search(
-                r'(?:Impacto|Impact)[:\s]*(.*?)(?:Recomendaciones|Recommendations)',
+                r'(?:Impacto|Impact)[:\s]*(.*?)(?:Recomendaciones|Recommendations|Mitigación)',
                 section_text,
                 re.IGNORECASE | re.DOTALL
             )
             if impact_match:
                 impacto = impact_match.group(1).strip()
-                impacto = re.sub(r'\s+', ' ', impacto)[:500]
+                impacto = re.sub(r'\s+', ' ', impacto)[:800]
             
-            # Extract recommendations
+            # Extract recommendations - improved to capture lists
             recomendaciones = ""
             rec_match = re.search(
-                r'(?:Recomendaciones|Recommendations)[:\s]*(.*?)(?:Referencias|References|\d+\.\s+[A-Z]|\Z)',
+                r'(?:Recomendaciones|Recommendations|Mitigación)[:\s]*(.*?)(?:Referencias|References|\d+\.\s+\(?[A-Z]|\Z)',
                 section_text,
                 re.IGNORECASE | re.DOTALL
             )
             if rec_match:
                 recomendaciones = rec_match.group(1).strip()
-                recomendaciones = re.sub(r'\s+', ' ', recomendaciones)[:1000]
+                # Preserve bullet points for recommendations
+                recomendaciones = re.sub(r'\n\s*\n', '\n', recomendaciones)
+                recomendaciones = recomendaciones[:1500]
             
             # Only add if we have meaningful content
             if vuln_title and (descripcion or recomendaciones):
