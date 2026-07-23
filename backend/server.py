@@ -3188,27 +3188,33 @@ async def get_resultados_por_aplicacion(
     if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
         raise HTTPException(status_code=403, detail="No tiene permisos para ver vulnerabilidades")
     
-    vuln = await db.vulnerabilidades.find_one({"id": vuln_id}, {"_id": 0})
-    if not vuln:
-        raise HTTPException(status_code=404, detail="Vulnerabilidad no encontrada")
-    
-    info = normalizar_resultados_por_aplicacion(vuln)
-    
-    return {
-        "vuln_id": vuln_id,
-        "resultado_re_test_global": vuln.get("resultado_re_test"),
-        "estatus_global": vuln.get("estatus"),
-        "fecha_cierre_global": vuln.get("fecha_cierre"),
-        "tiene_resultados_personalizados": info["tiene_resultados_personalizados"],
-        "es_correccion_parcial": info["es_correccion_parcial"],
-        "aplicaciones_corregidas": info["aplicaciones_corregidas"],
-        "aplicaciones_total": info["aplicaciones_total"],
-        "todas_resueltas": info["todas_resueltas"],
-        "resultado_global_sugerido": info["resultado_global_sugerido"],
-        "estatus_sugerido": info["estatus_sugerido"],
-        "debe_tener_fecha_cierre": info["debe_tener_fecha_cierre"],
-        "aplicaciones": info["aplicaciones"]
-    }
+    try:
+        vuln = await db.vulnerabilidades.find_one({"id": vuln_id}, {"_id": 0})
+        if not vuln:
+            raise HTTPException(status_code=404, detail="Vulnerabilidad no encontrada")
+        
+        info = normalizar_resultados_por_aplicacion(vuln)
+        
+        return {
+            "vuln_id": vuln_id,
+            "resultado_re_test_global": vuln.get("resultado_re_test"),
+            "estatus_global": vuln.get("estatus"),
+            "fecha_cierre_global": vuln.get("fecha_cierre"),
+            "tiene_resultados_personalizados": info.get("tiene_resultados_personalizados", False),
+            "es_correccion_parcial": info.get("es_correccion_parcial", False),
+            "aplicaciones_corregidas": info.get("aplicaciones_corregidas", 0),
+            "aplicaciones_total": info.get("aplicaciones_total", 0),
+            "todas_resueltas": info.get("todas_resueltas", False),
+            "resultado_global_sugerido": info.get("resultado_global_sugerido"),
+            "estatus_sugerido": info.get("estatus_sugerido", "Pendiente"),
+            "debe_tener_fecha_cierre": info.get("debe_tener_fecha_cierre", False),
+            "aplicaciones": info.get("aplicaciones", [])
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error en get_resultados_por_aplicacion: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
 
 
 @api_router.put("/vulnerabilidades/{vuln_id}/aplicacion-resultado")
