@@ -4083,6 +4083,23 @@ async def get_seguimiento_riesgos(
     # Sort by dias_restantes (most urgent first)
     result.sort(key=lambda x: (x["dias_restantes"] is None, x["dias_restantes"] or 9999))
     
+    # POST-FILTRO: Aplicar filtro de vista DESPUÉS de normalización
+    # Esto es necesario porque el estatus real puede cambiar tras normalizar resultados por aplicación
+    if post_filter_vista == "activas_con_fecha":
+        # Excluir vulnerabilidades cerradas o corregidas (después de normalización)
+        result = [
+            v for v in result 
+            if v.get("estatus") not in ["Cerrado"] 
+            and v.get("resultado_re_test") not in ["Corregido", "Desestimado"]
+        ]
+    elif post_filter_vista == "en_analisis":
+        # Solo vulnerabilidades sin fecha y con estados específicos
+        result = [
+            v for v in result
+            if v.get("estatus") not in ["Cerrado"]
+            and v.get("resultado_re_test") not in ["Corregido", "Desestimado"]
+        ]
+    
     return result
 
 @api_router.get("/seguimiento-riesgos/resumen")
