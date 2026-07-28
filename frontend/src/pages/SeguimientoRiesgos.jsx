@@ -383,7 +383,7 @@ export default function SeguimientoRiesgos() {
   const [filterResponsable, setFilterResponsable] = useState([]);
   const [filterMes, setFilterMes] = useState("");
   const [filterAño, setFilterAño] = useState("");
-  const [filterTipoFecha, setFilterTipoFecha] = useState("todas");
+  const [filterNivelRiesgo, setFilterNivelRiesgo] = useState([]);
   
   // Vuln-specific filters
   const [filterSeveridad, setFilterSeveridad] = useState([]);
@@ -561,8 +561,10 @@ export default function SeguimientoRiesgos() {
         if (filterEstado && filterEstado !== "all") params.append("filtro", filterEstado);
         if (filterMes && filterMes !== "all") params.append("mes", filterMes);
         if (filterAño && filterAño !== "all") params.append("año_compromiso", filterAño);
-        if (filterTipoFecha) params.append("tipo_fecha", filterTipoFecha);
       }
+      
+      // Filtro de Nivel de Riesgo
+      if (filterNivelRiesgo.length > 0) filterNivelRiesgo.forEach(v => params.append("nivel_riesgo", v));
       
       // Filtros comunes
       if (filterSeveridad.length > 0) filterSeveridad.forEach(v => params.append("severidad", v));
@@ -582,7 +584,7 @@ export default function SeguimientoRiesgos() {
       console.error("Error fetching vulnerabilidades:", error);
       toast.error("Error al cargar vulnerabilidades");
     }
-  }, [filterEstado, filterSeveridad, filterInstitucion, filterInforme, filterAplicacion, filterResponsable, filterMes, filterAño, filterTipoFecha, vistaActiva, debouncedSearch]);
+  }, [filterEstado, filterSeveridad, filterInstitucion, filterInforme, filterAplicacion, filterResponsable, filterMes, filterAño, filterNivelRiesgo, vistaActiva, debouncedSearch]);
 
   const fetchResumenVulns = async () => {
     try {
@@ -601,7 +603,6 @@ export default function SeguimientoRiesgos() {
       if (filterResponsable.length > 0) filterResponsable.forEach(v => params.append("responsable", v));
       if (filterMes && filterMes !== "all") params.append("mes", filterMes);
       if (filterAño && filterAño !== "all") params.append("año_compromiso", filterAño);
-      if (filterTipoFecha) params.append("tipo_fecha", filterTipoFecha);
 
       const token = localStorage.getItem("token");
       const response = await axios.get(`${API}/hallazgos-auditoria/seguimiento?${params.toString()}`, {
@@ -612,7 +613,7 @@ export default function SeguimientoRiesgos() {
       console.error("Error fetching hallazgos:", error);
       toast.error("Error al cargar hallazgos");
     }
-  }, [filterEstado, filterResponsable, filterMes, filterAño, filterTipoFecha]);
+  }, [filterEstado, filterResponsable, filterMes, filterAño]);
 
   const fetchResumenHallazgos = async () => {
     try {
@@ -662,7 +663,7 @@ export default function SeguimientoRiesgos() {
       fetchVulnerabilidades();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, filterEstado, filterSeveridad, filterInstitucion, filterInforme, filterAplicacion, filterResponsable, filterMes, filterAño, filterTipoFecha, vistaActiva]);
+  }, [debouncedSearch, filterEstado, filterSeveridad, filterInstitucion, filterInforme, filterAplicacion, filterResponsable, filterMes, filterAño, filterNivelRiesgo, vistaActiva]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -700,7 +701,7 @@ export default function SeguimientoRiesgos() {
     setFilterResponsable([]);
     setFilterMes("");
     setFilterAño("");
-    setFilterTipoFecha("todas");
+    setFilterNivelRiesgo([]);
   };
 
   // Get current data based on active tab
@@ -1025,19 +1026,16 @@ export default function SeguimientoRiesgos() {
         <Card className="bg-[#18181b] border-[#27272a]">
           <CardContent className="p-4">
             <div className="flex flex-wrap gap-4">
-              {/* Tipo Fecha Filter - Solo mostrar en vista "Activas con Fecha" */}
-              {vistaActiva === "activas_con_fecha" && (
-                <Select value={filterTipoFecha} onValueChange={setFilterTipoFecha}>
-                  <SelectTrigger className="w-[150px] bg-zinc-900 border-zinc-700 text-white" data-testid="filter-tipo-fecha">
-                    <SelectValue placeholder="Tipo fecha" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-zinc-900 border-zinc-700">
-                    <SelectItem value="todas">Todas</SelectItem>
-                    <SelectItem value="con_fecha">Con fecha</SelectItem>
-                    <SelectItem value="sin_fecha">Sin fecha</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
+              {/* Nivel de Riesgo Filter */}
+              <MultiSelectFilter
+                options={["Alto", "Medio Alto", "Medio", "Bajo"]}
+                selected={filterNivelRiesgo}
+                onChange={setFilterNivelRiesgo}
+                placeholder="Nivel Riesgo"
+                searchPlaceholder="Buscar nivel..."
+                allLabel="Todos los niveles"
+                data-testid="filter-nivel-riesgo"
+              />
 
               {/* Vulnerabilidades-specific filters */}
               {activeTab === "vulnerabilidades" && (

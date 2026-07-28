@@ -3924,6 +3924,7 @@ async def get_seguimiento_riesgos(
     instituciones = request.query_params.getlist("institucion")
     aplicaciones = request.query_params.getlist("aplicacion")
     informes = request.query_params.getlist("informe_pentest")
+    niveles_riesgo = request.query_params.getlist("nivel_riesgo")
     
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     future_7 = (datetime.now(timezone.utc) + timedelta(days=7)).strftime("%Y-%m-%d")
@@ -4035,6 +4036,8 @@ async def get_seguimiento_riesgos(
         query["aplicaciones"] = {"$in": aplicaciones}
     if informes:
         query["nombre_informe_pentest"] = {"$in": informes}
+    if niveles_riesgo:
+        query["nivel_riesgo"] = {"$in": niveles_riesgo}
     
     # Get responsables filter
     responsables = request.query_params.getlist("responsable")
