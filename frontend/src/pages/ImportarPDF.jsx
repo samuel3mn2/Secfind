@@ -452,7 +452,7 @@ export default function ImportarPDF({ onClose, onSuccess }) {
         descripcion += `\n\nImpacto: ${vuln.impacto}`;
       }
       
-      // Calcular nivel_riesgo desde severidad
+      // Usar nivel_riesgo del LLM si existe, sino calcular desde severidad
       const severidadToNivelRiesgo = {
         "Critica": "Alto",
         "Alta": "Medio Alto", 
@@ -460,7 +460,7 @@ export default function ImportarPDF({ onClose, onSuccess }) {
         "Baja": "Bajo"
       };
       const severidad = vuln.severidad || "Media";
-      const nivelRiesgo = severidadToNivelRiesgo[severidad] || "Medio";
+      const nivelRiesgo = vuln.nivel_riesgo || severidadToNivelRiesgo[severidad] || "Medio";
       
       setEditingVuln({
         fecha_hallazgo: data.fecha_informe || new Date().toISOString().split('T')[0],
@@ -569,7 +569,7 @@ export default function ImportarPDF({ onClose, onSuccess }) {
         descripcion += `\n\nImpacto: ${vuln.impacto}`;
       }
       
-      // Calcular nivel_riesgo desde severidad
+      // Usar nivel_riesgo del LLM si existe, sino calcular desde severidad
       const severidadToNivelRiesgo = {
         "Critica": "Alto",
         "Alta": "Medio Alto", 
@@ -577,7 +577,7 @@ export default function ImportarPDF({ onClose, onSuccess }) {
         "Baja": "Bajo"
       };
       const severidad = vuln.severidad || "Media";
-      const nivelRiesgo = severidadToNivelRiesgo[severidad] || "Medio";
+      const nivelRiesgo = vuln.nivel_riesgo || severidadToNivelRiesgo[severidad] || "Medio";
       
       setEditingVuln({
         fecha_hallazgo: extractedData.fecha_informe || new Date().toISOString().split('T')[0],
@@ -615,7 +615,7 @@ export default function ImportarPDF({ onClose, onSuccess }) {
         descripcion += `\n\nImpacto: ${vuln.impacto}`;
       }
       
-      // Calcular nivel_riesgo desde severidad
+      // Usar nivel_riesgo del LLM si existe, sino calcular desde severidad
       const severidadToNivelRiesgo = {
         "Critica": "Alto",
         "Alta": "Medio Alto", 
@@ -623,7 +623,7 @@ export default function ImportarPDF({ onClose, onSuccess }) {
         "Baja": "Bajo"
       };
       const severidad = vuln.severidad || "Media";
-      const nivelRiesgo = severidadToNivelRiesgo[severidad] || "Medio";
+      const nivelRiesgo = vuln.nivel_riesgo || severidadToNivelRiesgo[severidad] || "Medio";
       
       setEditingVuln({
         fecha_hallazgo: extractedData.fecha_informe || new Date().toISOString().split('T')[0],
