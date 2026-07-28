@@ -3893,7 +3893,7 @@ async def get_kpi_detail(
 @api_router.get("/seguimiento-riesgos")
 async def get_seguimiento_riesgos(
     request: Request,
-    filtro: Optional[str] = None,  # "vencidas", "proximas", "todas"
+    filtro: Optional[str] = None,  # "vencidas", "critico" (7 días), "proximas" (30 días), "todas"
     mes: Optional[str] = None,  # "01" to "12"
     año_compromiso: Optional[str] = None,  # "2024", "2025", etc.
     tipo_fecha: Optional[str] = "con_fecha",  # "con_fecha", "sin_fecha", "todas"
@@ -3913,7 +3913,7 @@ async def get_seguimiento_riesgos(
     
     Otros parámetros:
     - tipo_fecha: "con_fecha", "sin_fecha", "todas"
-    - filtro: "vencidas", "proximas", "todas"
+    - filtro: "vencidas", "critico" (7 días), "proximas" (30 días), "todas"
     - busqueda: texto libre para filtrar por código o nombre
     """
     if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
@@ -3926,6 +3926,7 @@ async def get_seguimiento_riesgos(
     informes = request.query_params.getlist("informe_pentest")
     
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    future_7 = (datetime.now(timezone.utc) + timedelta(days=7)).strftime("%Y-%m-%d")
     future_30 = (datetime.now(timezone.utc) + timedelta(days=30)).strftime("%Y-%m-%d")
     
     # ==========================================================================
@@ -4000,23 +4001,31 @@ async def get_seguimiento_riesgos(
     
     # Filtros de fecha adicionales (solo para vistas con fecha)
     if vista in ["activas_con_fecha", None] and not incluir_cerradas and vista != "historico":
-        if tipo_fecha != "sin_fecha" and not vista:
-            if mes and mes != "all" and año_compromiso and año_compromiso != "all":
-                prefix = f"{año_compromiso}-{mes}"
-                query["fecha_compromiso"] = {"$regex": f"^{prefix}"}
-            elif año_compromiso and año_compromiso != "all":
-                query["fecha_compromiso"] = {"$regex": f"^{año_compromiso}"}
-            elif mes and mes != "all":
-                query["fecha_compromiso"] = {"$regex": f"^\\d{{4}}-{mes}"}
-            elif filtro == "vencidas":
-                query["fecha_compromiso"] = {"$lt": today, "$nin": [None, ""]}
-            elif filtro == "proximas":
-                if "$and" not in query:
-                    query["$and"] = []
-                query["$and"].extend([
-                    {"fecha_compromiso": {"$gte": today}},
-                    {"fecha_compromiso": {"$lte": future_30}}
-                ])
+        # Aplicar filtros de fecha siempre que estemos en vista con fechas
+        if mes and mes != "all" and año_compromiso and año_compromiso != "all":
+            prefix = f"{año_compromiso}-{mes}"
+            query["fecha_compromiso"] = {"$regex": f"^{prefix}"}
+        elif año_compromiso and año_compromiso != "all":
+            query["fecha_compromiso"] = {"$regex": f"^{año_compromiso}"}
+        elif mes and mes != "all":
+            query["fecha_compromiso"] = {"$regex": f"^\\d{{4}}-{mes}"}
+        elif filtro == "vencidas":
+            query["fecha_compromiso"] = {"$lt": today, "$nin": [None, ""]}
+        elif filtro == "critico":
+            # Próximos 7 días (crítico)
+            if "$and" not in query:
+                query["$and"] = []
+            query["$and"].extend([
+                {"fecha_compromiso": {"$gte": today}},
+                {"fecha_compromiso": {"$lte": future_7}}
+            ])
+        elif filtro == "proximas":
+            if "$and" not in query:
+                query["$and"] = []
+            query["$and"].extend([
+                {"fecha_compromiso": {"$gte": today}},
+                {"fecha_compromiso": {"$lte": future_30}}
+            ])
     
     if severidades:
         query["severidad"] = {"$in": severidades}
