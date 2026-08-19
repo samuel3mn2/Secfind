@@ -78,6 +78,21 @@ const SeverityBadge = ({ severity }) => {
   );
 };
 
+const NivelRiesgoBadge = ({ nivel }) => {
+  const classes = {
+    "Alto": "bg-red-500/20 text-red-400 border-red-500/30",
+    "Medio Alto": "bg-orange-500/20 text-orange-400 border-orange-500/30",
+    "Medio": "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+    "Bajo": "bg-green-500/20 text-green-400 border-green-500/30",
+  };
+  if (!nivel) return <span className="text-zinc-500">-</span>;
+  return (
+    <span className={`px-2 py-0.5 rounded text-xs font-medium border ${classes[nivel] || "bg-zinc-700 text-zinc-300"}`}>
+      {nivel}
+    </span>
+  );
+};
+
 const RiesgoBadge = ({ value }) => {
   const getColor = () => {
     if (value >= 15) return "bg-red-500/20 text-red-400 border-red-500/30";
@@ -1151,6 +1166,7 @@ export default function SeguimientoRiesgos() {
                       <TableHead className="text-zinc-400">Estado</TableHead>
                       <TableHead className="text-zinc-400">F. Compromiso</TableHead>
                       <TableHead className="text-zinc-400">Severidad</TableHead>
+                      <TableHead className="text-zinc-400">Nivel Riesgo</TableHead>
                       <TableHead className="text-zinc-400">Institución</TableHead>
                       <TableHead className="text-zinc-400 min-w-[250px]">Vulnerabilidad</TableHead>
                       <TableHead className="text-zinc-400">Responsable</TableHead>
@@ -1160,7 +1176,7 @@ export default function SeguimientoRiesgos() {
                   <TableBody>
                     {paginatedData.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-12 text-zinc-500">
+                        <TableCell colSpan={8} className="text-center py-12 text-zinc-500">
                           No hay vulnerabilidades pendientes
                         </TableCell>
                       </TableRow>
@@ -1223,6 +1239,9 @@ export default function SeguimientoRiesgos() {
                           </TableCell>
                           <TableCell>
                             <SeverityBadge severity={vuln.severidad} />
+                          </TableCell>
+                          <TableCell>
+                            <NivelRiesgoBadge nivel={vuln.nivel_riesgo} />
                           </TableCell>
                           <TableCell className="text-zinc-300">{vuln.institucion || "-"}</TableCell>
                           <TableCell className="text-zinc-100">
@@ -1407,6 +1426,7 @@ export default function SeguimientoRiesgos() {
                     diasRestantes={viewingItem.dias_restantes} 
                   />
                   <SeverityBadge severity={viewingItem.severidad} />
+                  <NivelRiesgoBadge nivel={viewingItem.nivel_riesgo} />
                   <Badge variant="outline" className="border-zinc-600 text-zinc-300">
                     {viewingItem.estatus}
                   </Badge>
