@@ -388,4 +388,11 @@ class BackupScheduler:
     async def actualizar_config(self, config: Dict):
         """Update config and reschedule"""
         await self.backup_service.save_config(config)
-        await self._actualizar_programacion()
+        
+        # Initialize scheduler if needed and config is enabled
+        if config.get("habilitado") and not self._running:
+            await self.start()
+        elif self._running:
+            await self._actualizar_programacion()
+        elif not config.get("habilitado") and self._running:
+            await self.stop()
