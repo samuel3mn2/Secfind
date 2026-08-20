@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, Users, AppWindow, Truck, FileText, Bell, UserCircle, FolderOpen, History, Layers, Shield } from "lucide-react";
+import { Building2, Users, AppWindow, Truck, FileText, Bell, UserCircle, FolderOpen, History, Layers, Shield, Database } from "lucide-react";
 import Instituciones from "@/pages/Instituciones";
 import Usuarios from "@/pages/Usuarios";
 import Aplicaciones from "@/pages/Aplicaciones";
@@ -13,6 +13,7 @@ import GruposInformes from "@/pages/GruposInformes";
 import Auditoria from "@/pages/Auditoria";
 import Dominios from "@/pages/Dominios";
 import Controles from "@/pages/Controles";
+import Backups from "@/pages/Backups";
 
 export default function Configuracion() {
   const { isAdmin, canView } = useAuth();
@@ -133,6 +134,16 @@ export default function Configuracion() {
               Controles
             </TabsTrigger>
           )}
+          {isAdmin && (
+            <TabsTrigger 
+              value="backups" 
+              className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white"
+              data-testid="tab-backups"
+            >
+              <Database className="w-4 h-4 mr-2" />
+              Backups
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="instituciones" className="mt-6">
@@ -186,6 +197,12 @@ export default function Configuracion() {
         {isAdmin && (
           <TabsContent value="controles" className="mt-6">
             <Controles />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="backups" className="mt-6">
+            <Backups />
           </TabsContent>
         )}
       </Tabs>

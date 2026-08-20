@@ -1,5 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Query, Depends, Header, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -17,6 +17,7 @@ import bcrypt
 import jwt
 from pdf_reports import generate_executive_report, generate_institution_report, generate_vista_comite_report
 from email_service import EmailService, generate_alert_email, generate_weekly_summary_email
+from backup_service import BackupService, BackupScheduler
 
 # GRC Module Routes (Modular Architecture)
 from routes.dominios import create_dominios_router
@@ -33,6 +34,10 @@ load_dotenv(ROOT_DIR / '.env')
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
+
+# Backup Service
+backup_service = BackupService(db, mongo_url, os.environ['DB_NAME'])
+backup_scheduler = BackupScheduler(backup_service)
 
 # JWT Configuration
 JWT_SECRET = os.environ.get('JWT_SECRET', 'secfind-secret-key-change-in-production')
@@ -2186,6 +2191,156 @@ async def enviar_resumen_semanal(current_user: CurrentUser = Depends(get_current
         raise HTTPException(status_code=400, detail=result["message"])
     
     return {"message": f"Resumen semanal enviado a {len(admin_emails)} administrador(es)"}
+
+# ============ BACKUP ENDPOINTS ============
+
+class BackupConfig(BaseModel):
+    habilitado: bool = False
+    ruta_local: str = "/app/backups"
+    google_drive_habilitado: bool = False
+    google_drive_folder_id: str = ""
+    google_drive_credentials: Optional[str] = None
+    frecuencia: str = "diario"  # diario, semanal, mensual
+    hora_ejecucion: str = "02:00"
+    dia_semana: int = 0  # 0=Lunes
+    dia_mes: int = 1
+    notificar_error: bool = True
+    email_notificacion: str = ""
+
+class BackupEjecutar(BaseModel):
+    destino: str = "local"  # local, google_drive, ambos
+    ruta_personalizada: Optional[str] = None
+
+@api_router.get("/config/backup")
+async def get_backup_config(current_user: CurrentUser = Depends(get_current_user)):
+    """Get backup configuration (admin only)"""
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden ver la configuración de backups")
+    
+    config = await backup_service.get_config()
+    
+    # Don't expose credentials in response
+    if config.get("google_drive_credentials"):
+        config["google_drive_credentials"] = "********"
+    
+    return config
+
+@api_router.put("/config/backup")
+async def update_backup_config(
+    data: BackupConfig,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Update backup configuration (admin only)"""
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden modificar la configuración")
+    
+    config_dict = data.model_dump()
+    
+    # If credentials are masked, keep existing
+    if config_dict.get("google_drive_credentials") == "********":
+        existing = await backup_service.get_config()
+        config_dict["google_drive_credentials"] = existing.get("google_drive_credentials")
+    
+    await backup_scheduler.actualizar_config(config_dict)
+    
+    return {"message": "Configuración de backup actualizada"}
+
+@api_router.post("/backup/ejecutar")
+async def ejecutar_backup(
+    data: BackupEjecutar,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Execute a manual backup (admin only)"""
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden ejecutar backups")
+    
+    resultado = await backup_service.ejecutar_backup(
+        destino=data.destino,
+        ruta_personalizada=data.ruta_personalizada
+    )
+    
+    return resultado
+
+@api_router.get("/backup/historial")
+async def get_backup_historial(
+    limite: int = Query(default=50, le=200),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Get backup history (admin only)"""
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden ver el historial")
+    
+    historial = await backup_service.obtener_historial(limite)
+    return historial
+
+@api_router.delete("/backup/{backup_id}")
+async def eliminar_backup(
+    backup_id: str,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Delete a backup (admin only)"""
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden eliminar backups")
+    
+    success = await backup_service.eliminar_backup(backup_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Backup no encontrado")
+    
+    return {"message": "Backup eliminado exitosamente"}
+
+@api_router.get("/backup/{backup_id}/descargar")
+async def descargar_backup(
+    backup_id: str,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Download a backup file (admin only)"""
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden descargar backups")
+    
+    filepath = await backup_service.descargar_backup(backup_id)
+    if not filepath:
+        raise HTTPException(status_code=404, detail="Archivo de backup no encontrado")
+    
+    return FileResponse(
+        path=filepath,
+        filename=os.path.basename(filepath),
+        media_type="application/gzip"
+    )
+
+@api_router.post("/backup/google-drive/test")
+async def test_google_drive_connection(current_user: CurrentUser = Depends(get_current_user)):
+    """Test Google Drive connection (admin only)"""
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden probar la conexión")
+    
+    config = await backup_service.get_config()
+    
+    if not config.get("google_drive_credentials"):
+        raise HTTPException(status_code=400, detail="Credenciales de Google Drive no configuradas")
+    
+    try:
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+        import json
+        
+        credentials_json = config.get("google_drive_credentials")
+        if isinstance(credentials_json, str):
+            credentials_json = json.loads(credentials_json)
+        
+        credentials = service_account.Credentials.from_service_account_info(
+            credentials_json,
+            scopes=['https://www.googleapis.com/auth/drive.file']
+        )
+        
+        service = build('drive', 'v3', credentials=credentials)
+        about = service.about().get(fields="user").execute()
+        
+        return {
+            "success": True,
+            "message": f"Conexión exitosa. Usuario: {about.get('user', {}).get('emailAddress', 'N/A')}"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error de conexión: {str(e)}")
 
 # Initialize default institutions if none exist
 async def init_instituciones():
