@@ -539,4 +539,74 @@ Esta funcionalidad permite **extraer automáticamente** las vulnerabilidades de 
 
 ---
 
+## PARTE 8: CONFIGURAR BACKUPS AUTOMÁTICOS (Opcional pero Recomendado)
+
+SecFind incluye un sistema de backup automático para proteger tu base de datos.
+
+### Configurar Backups:
+
+1. **Acceder a la configuración:**
+   - Inicia sesión como administrador
+   - Ve a **Configuración** → **Backups**
+
+2. **Configurar ruta de backup local:**
+   - Escribe la ruta donde quieres guardar los backups, por ejemplo:
+     ```
+     C:\Backups\SecFind
+     ```
+   - Haz clic en el botón ✓ para validar la ruta
+   - Si la carpeta no existe, haz clic en **"Crear carpeta"**
+
+3. **Activar backup automático:**
+   - Activa el switch **"Backup Automático"**
+   - Selecciona la **frecuencia**: Diario, Semanal o Mensual
+   - Configura la **hora de ejecución** (recomendado: 02:00 AM)
+   - Si elegiste Semanal, selecciona el día de la semana
+   - Si elegiste Mensual, selecciona el día del mes
+
+4. **Configurar notificaciones (opcional):**
+   - Activa **"Notificar Errores"**
+   - Escribe tu email para recibir alertas si un backup falla
+
+5. **Guardar:**
+   - Haz clic en **"Guardar Configuración"**
+
+### Backup Manual:
+- Puedes ejecutar un backup en cualquier momento con el botón **"Backup Manual"**
+- Selecciona el destino (Local, Google Drive, o Ambos)
+- El backup se guardará inmediatamente
+
+### Configurar Google Drive (Opcional):
+Si quieres subir backups a la nube:
+
+1. **Crear cuenta de servicio en Google Cloud:**
+   - Ve a [Google Cloud Console](https://console.cloud.google.com/)
+   - Crea un proyecto nuevo
+   - Ve a "APIs y servicios" → "Credenciales"
+   - Crea una "Cuenta de servicio"
+   - Descarga el archivo JSON de credenciales
+
+2. **Configurar en SecFind:**
+   - Activa **"Google Drive"**
+   - Pega el contenido del archivo JSON en el campo de credenciales
+   - Opcionalmente, especifica un Folder ID de Google Drive
+   - Haz clic en **"Probar Conexión"** para verificar
+
+### Historial de Backups:
+- En la sección **"Historial de Backups"** puedes ver todos los backups realizados
+- Cada entrada muestra: Fecha, Estado (Exitoso/Fallido), Destino, Tamaño, Duración
+- Puedes **descargar** o **eliminar** backups desde esta tabla
+
+### Restaurar un Backup:
+Si necesitas restaurar la base de datos desde un backup:
+
+1. Abre una terminal/cmd como Administrador
+2. Ejecuta:
+   ```cmd
+   mongorestore --gzip --archive=C:\Backups\SecFind\secfind_backup_FECHA.gz --db secfind
+   ```
+   (Reemplaza FECHA con la fecha del backup que quieres restaurar)
+
+---
+
 **¡Felicidades!** Has instalado SecFind correctamente en tu computadora con Windows 11.

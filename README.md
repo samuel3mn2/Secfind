@@ -1,12 +1,13 @@
 # SecFind - Sistema de Gestión de Vulnerabilidades y GRC
 
-Sistema web completo para la gestión de vulnerabilidades de ciberseguridad y Gobernanza, Riesgo y Cumplimiento (GRC). Diseñado para reemplazar flujos de trabajo basados en Excel. Incluye dashboard ejecutivo, **Dashboard GRC Unificado**, módulo CRUD completo, seguimiento de riesgos, catálogos GRC (Dominios, Controles, Riesgos), **Vista Comité**, **reportes PDF**, **auditoría del sistema**, **notificaciones por email** e importación inteligente desde PDF con IA.
+Sistema web completo para la gestión de vulnerabilidades de ciberseguridad y Gobernanza, Riesgo y Cumplimiento (GRC). Diseñado para reemplazar flujos de trabajo basados en Excel. Incluye dashboard ejecutivo, **Dashboard GRC Unificado**, módulo CRUD completo, seguimiento de riesgos, catálogos GRC (Dominios, Controles, Riesgos), **Vista Comité**, **reportes PDF**, **auditoría del sistema**, **notificaciones por email**, **backups automáticos** e importación inteligente desde PDF con IA.
 
 ![Dashboard](https://img.shields.io/badge/Dashboard-6%20KPIs%20%2B%20Gráficos-blue)
 ![GRC](https://img.shields.io/badge/GRC-Matriz%204x4%20Unificada-orange)
 ![Stack](https://img.shields.io/badge/Stack-FastAPI%20%2B%20React%20%2B%20MongoDB-green)
 ![Idioma](https://img.shields.io/badge/Idioma-Español-red)
 ![AI](https://img.shields.io/badge/AI-GPT--4o--mini-purple)
+![Backup](https://img.shields.io/badge/Backup-Local%20%2B%20Google%20Drive-yellow)
 
 ---
 
@@ -74,6 +75,16 @@ Sistema web completo para la gestión de vulnerabilidades de ciberseguridad y Go
 - Configuración SMTP flexible
 - Alertas configurables: 7, 3, 1 días antes del vencimiento
 - Resumen semanal automático
+
+### Backups de Base de Datos (NUEVO)
+- **Backup Manual**: Ejecutar backup inmediato con un clic
+- **Backup Automático Programado**: Diario, Semanal o Mensual
+- **Destinos múltiples**: Local y/o Google Drive
+- **Explorador de carpetas**: Navegar y seleccionar ruta de destino
+- **Validación de ruta**: Verificar permisos y espacio disponible
+- **Historial completo**: Registro de todos los backups con estado, tamaño y duración
+- **Notificaciones por email**: Alertas automáticas cuando un backup falla
+- **Descarga directa**: Descargar backups desde la interfaz web
 
 ---
 
@@ -192,6 +203,21 @@ Sistema web completo para la gestión de vulnerabilidades de ciberseguridad y Go
 | GET/PUT | `/api/config/notificaciones` | Config notificaciones email |
 | POST | `/api/config/notificaciones/test` | Probar conexión SMTP |
 | POST | `/api/config/notificaciones/send-test-email` | Enviar email de prueba |
+| GET/PUT | `/api/config/backup` | Config backup de base de datos |
+
+### Backups
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/config/backup` | Obtener configuración de backups |
+| PUT | `/api/config/backup` | Actualizar configuración de backups |
+| POST | `/api/backup/ejecutar` | Ejecutar backup manual |
+| GET | `/api/backup/historial` | Ver historial de backups |
+| DELETE | `/api/backup/{id}` | Eliminar backup |
+| GET | `/api/backup/{id}/descargar` | Descargar archivo de backup |
+| POST | `/api/backup/validar-ruta` | Validar ruta de destino |
+| POST | `/api/backup/crear-carpeta` | Crear carpeta de destino |
+| GET | `/api/backup/listar-carpetas` | Explorador de carpetas |
+| POST | `/api/backup/google-drive/test` | Probar conexión con Google Drive |
 
 ### Vistas Guardadas
 | Método | Endpoint | Descripción |

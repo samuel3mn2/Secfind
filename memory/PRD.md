@@ -1,8 +1,60 @@
 # SecFind - Sistema de Gestión de Vulnerabilidades
 
-## Última Actualización: 2026-07-23
+## Última Actualización: 2026-08-20
 
-### Cambios Recientes (Julio 2026)
+### Cambios Recientes (Agosto 2026)
+
+- **FEATURE: Módulo de Backups de Base de Datos (2026-08-20)**:
+  - **Backup Manual**: Ejecutar backup inmediato desde la interfaz
+  - **Backup Automático Programado**: Configurable diario, semanal o mensual con hora específica
+  - **Destinos múltiples**: 
+    * Local: Guardar en cualquier carpeta del servidor/PC
+    * Google Drive: Subir automáticamente a la nube (con cuenta de servicio)
+  - **Explorador de carpetas**: Navegar y seleccionar la carpeta de destino visualmente
+  - **Validación de ruta**: Verificar que la carpeta existe, tiene permisos de escritura y mostrar espacio disponible
+  - **Crear carpeta**: Botón para crear la carpeta de destino si no existe
+  - **Historial de Backups**: Registro completo con fecha, estado (Exitoso/Fallido), destino, tamaño y duración
+  - **Descargar backups**: Descargar archivos de backup directamente desde la interfaz
+  - **Notificaciones**: Email automático cuando un backup falla
+  - **Archivos creados/modificados**:
+    * `/app/backend/backup_service.py` - Servicio de backup y scheduler
+    * `/app/backend/server.py` - Endpoints de backup
+    * `/app/frontend/src/pages/Backups.jsx` - Interfaz completa
+    * `/app/frontend/src/pages/Configuracion.jsx` - Nueva pestaña Backups
+  - **Endpoints**:
+    * `GET/PUT /api/config/backup` - Configuración
+    * `POST /api/backup/ejecutar` - Ejecutar backup manual
+    * `GET /api/backup/historial` - Historial
+    * `DELETE /api/backup/{id}` - Eliminar
+    * `GET /api/backup/{id}/descargar` - Descargar
+    * `POST /api/backup/validar-ruta` - Validar ruta
+    * `POST /api/backup/crear-carpeta` - Crear carpeta
+    * `GET /api/backup/listar-carpetas` - Explorador de carpetas
+    * `POST /api/backup/google-drive/test` - Probar Google Drive
+  - **Dependencias nuevas**: `google-auth`, `google-auth-oauthlib`, `google-api-python-client`, `apscheduler`
+
+- **BUGFIX: Filtros KPI en Seguimiento no funcionaban (2026-08-20)**:
+  - Los botones Vencidas, Próximos 7 días, Próximos 30 días no filtraban la tabla
+  - Causa: Condición restrictiva impedía aplicar filtros cuando había vista seleccionada
+  - Solución: Corregida lógica de filtros y agregado filtro "critico" (7 días)
+  - Archivo modificado: `/app/backend/server.py`
+
+- **FEATURE: Filtro y Columna "Nivel de Riesgo" en Seguimiento (2026-08-20)**:
+  - Agregado filtro multi-select de Nivel de Riesgo (Alto, Medio Alto, Medio, Bajo)
+  - Agregada columna "Nivel Riesgo" en la tabla de seguimiento
+  - Agregado badge de Nivel de Riesgo en el modal de detalle
+  - Eliminado filtro "Tipo de fecha" obsoleto
+  - Archivos modificados: `/app/frontend/src/pages/SeguimientoRiesgos.jsx`, `/app/backend/server.py`
+
+- **BUGFIX: Icono de calendario invisible en campos de fecha (2026-08-20)**:
+  - Agregado CSS para invertir color del icono del date picker en tema oscuro
+  - Archivo modificado: `/app/frontend/src/index.css`
+
+- **BUGFIX: Vulnerabilidades corregidas aparecían en "Activas con Fecha" (2026-08-20)**:
+  - Agregado post-filtro para excluir vulnerabilidades con estado Cerrado o resultado Corregido/Desestimado
+  - Archivo modificado: `/app/backend/server.py`
+
+### Cambios Anteriores (Julio 2026)
 
 - **FEATURE: Mejoras en Módulo de Importación PDF (2026-07-23)**:
   - **Buscador en "Informe de Pentest"**: Campo SearchableSelect con filtrado por nombre
