@@ -136,6 +136,54 @@ MongoDB es la base de datos donde se guardarán las vulnerabilidades.
 
 ---
 
+### PASO 3.5: Instalar MongoDB Database Tools (REQUERIDO PARA BACKUPS)
+
+MongoDB Database Tools incluye `mongodump`, necesario para realizar backups de la base de datos.
+
+1. **Ir a la página de descargas:**
+   ```
+   https://www.mongodb.com/try/download/database-tools
+   ```
+
+2. **Descargar MongoDB Database Tools:**
+   - En "Version", selecciona la más reciente (ej: 100.18.0)
+   - En "Platform", selecciona **"Windows x86_64"**
+   - En "Package", selecciona **"zip"**
+   - Haz clic en el botón verde **"Download"**
+   - Se descargará un archivo como `mongodb-database-tools-windows-x86_64-100.18.0.zip`
+
+3. **Extraer el archivo:**
+   - Ve a tu carpeta de **Descargas**
+   - Haz clic derecho en el archivo `.zip`
+   - Selecciona **"Extraer todo..."**
+   - Extrae directamente en `C:\` (raíz del disco)
+   - Resultado: `C:\mongodb-database-tools-windows-x86_64-100.18.0`
+
+4. **Verificar la instalación:**
+   - Abre una nueva terminal (cmd)
+   - Navega a la carpeta bin:
+     ```
+     cd C:\mongodb-database-tools-windows-x86_64-100.18.0\bin
+     ```
+   - Ejecuta:
+     ```
+     mongodump.exe --version
+     ```
+   - Deberías ver: `mongodump version: 100.18.0`
+
+5. **Configurar en SecFind:**
+   - En la aplicación, ve a **Configuración > Backups**
+   - En la sección **"Configuración de mongodump"**, ingresa la ruta:
+     ```
+     C:\mongodb-database-tools-windows-x86_64-100.18.0\bin\mongodump.exe
+     ```
+   - Haz clic en el botón de validar (✓)
+   - Debería aparecer "mongodump encontrado" con la versión
+
+> **💡 Tip:** Si prefieres, puedes agregar la carpeta `bin` al PATH de Windows para no tener que especificar la ruta completa. Sin embargo, configurar la ruta explícitamente en SecFind es más sencillo y no requiere reiniciar Windows.
+
+---
+
 ## PARTE 2: DESCARGAR EL CÓDIGO DE SECFIND
 
 ### PASO 4: Descargar el código

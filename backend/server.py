@@ -2196,7 +2196,8 @@ async def enviar_resumen_semanal(current_user: CurrentUser = Depends(get_current
 
 class BackupConfig(BaseModel):
     habilitado: bool = False
-    ruta_local: str = "/app/backups"
+    ruta_local: str = ""  # Empty = platform default
+    ruta_mongodump: str = ""  # Empty = auto-detect
     google_drive_habilitado: bool = False
     google_drive_folder_id: str = ""
     google_drive_credentials: Optional[str] = None
@@ -2244,6 +2245,21 @@ async def update_backup_config(
     await backup_scheduler.actualizar_config(config_dict)
     
     return {"message": "Configuración de backup actualizada"}
+
+@api_router.post("/backup/validar-mongodump")
+async def validar_mongodump(
+    data: dict = None,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Validate mongodump executable and return info (admin only)"""
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden validar mongodump")
+    
+    ruta_personalizada = data.get("ruta_mongodump") if data else None
+    
+    resultado = await backup_service.validar_mongodump(ruta_personalizada)
+    
+    return resultado
 
 @api_router.post("/backup/ejecutar")
 async def ejecutar_backup(

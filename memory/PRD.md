@@ -4,6 +4,33 @@
 
 ### Cambios Recientes (Agosto 2026)
 
+- **FEATURE: Módulo de Backups con Compatibilidad Windows (2026-08-20)**:
+  - **Detección automática de mongodump**: Busca en PATH y rutas comunes de Windows
+  - **Campo configurable `ruta_mongodump`**: Permite especificar manualmente la ruta al ejecutable
+  - **Validación de mongodump**: Nuevo endpoint `/api/backup/validar-mongodump` con detección de versión
+  - **Rutas multiplataforma**: Usa `pathlib.Path` para compatibilidad Linux/Windows
+  - **Mensajes de error descriptivos**: Guía al usuario si mongodump no está disponible
+  - **Ruta de backup por defecto inteligente**: Linux `/app/backups`, Windows `%USERPROFILE%\Documents\SecFind\Backups`
+  - **UI mejorada**:
+    * Nueva sección "Configuración de mongodump" con validación visual
+    * Badge "Detectado" o "No encontrado" con detalles
+    * Placeholder con ejemplo de ruta Windows
+  - **Archivos modificados**:
+    * `/app/backend/backup_service.py` - Reescrito para compatibilidad multiplataforma
+    * `/app/backend/server.py` - Nuevo endpoint `/api/backup/validar-mongodump` y modelo `BackupConfig` actualizado
+    * `/app/frontend/src/pages/Backups.jsx` - Nueva sección de configuración mongodump
+  - **Endpoints de Backup**:
+    * `GET/PUT /api/config/backup` - Configuración (ahora incluye `ruta_mongodump`)
+    * `POST /api/backup/validar-mongodump` - **NUEVO** - Valida ejecutable y devuelve versión
+    * `POST /api/backup/ejecutar` - Ejecutar backup manual
+    * `GET /api/backup/historial` - Historial
+    * `DELETE /api/backup/{id}` - Eliminar
+    * `GET /api/backup/{id}/descargar` - Descargar
+    * `POST /api/backup/validar-ruta` - Validar ruta
+    * `POST /api/backup/crear-carpeta` - Crear carpeta
+    * `GET /api/backup/listar-carpetas` - Explorador de carpetas
+    * `POST /api/backup/google-drive/test` - Probar Google Drive
+
 - **FEATURE: Módulo de Backups de Base de Datos (2026-08-20)**:
   - **Backup Manual**: Ejecutar backup inmediato desde la interfaz
   - **Backup Automático Programado**: Configurable diario, semanal o mensual con hora específica

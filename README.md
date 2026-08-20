@@ -217,6 +217,7 @@ Sistema web completo para la gestión de vulnerabilidades de ciberseguridad y Go
 | POST | `/api/backup/validar-ruta` | Validar ruta de destino |
 | POST | `/api/backup/crear-carpeta` | Crear carpeta de destino |
 | GET | `/api/backup/listar-carpetas` | Explorador de carpetas |
+| POST | `/api/backup/validar-mongodump` | Validar ejecutable mongodump |
 | POST | `/api/backup/google-drive/test` | Probar conexión con Google Drive |
 
 ### Vistas Guardadas

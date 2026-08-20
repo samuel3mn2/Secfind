@@ -1,15 +1,17 @@
 """
 Backup Service for SecFind
 Handles database backups to local storage and Google Drive
+Cross-platform compatible (Windows/Linux/macOS)
 """
 import os
-import subprocess
+import sys
 import shutil
+import asyncio
+import json
+import platform
 from datetime import datetime, timezone
 from typing import Optional, Dict, List
-import asyncio
 from pathlib import Path
-import json
 
 # Google Drive imports
 try:
@@ -23,12 +25,97 @@ except ImportError:
 
 
 class BackupService:
+    """Service class for database backup operations"""
+    
+    # Common mongodump installation paths on Windows
+    WINDOWS_MONGODUMP_PATHS = [
+        r"C:\mongodb-database-tools-windows-x86_64-100.18.0\bin\mongodump.exe",
+        r"C:\Program Files\MongoDB\Tools\100\bin\mongodump.exe",
+        r"C:\Program Files\MongoDB\Server\7.0\bin\mongodump.exe",
+        r"C:\Program Files\MongoDB\Server\6.0\bin\mongodump.exe",
+        r"C:\Program Files\MongoDB\Server\5.0\bin\mongodump.exe",
+        r"C:\Program Files\MongoDB\Server\4.4\bin\mongodump.exe",
+        r"C:\MongoDB\bin\mongodump.exe",
+        r"C:\mongodb\bin\mongodump.exe",
+    ]
+    
     def __init__(self, db, mongo_url: str, db_name: str):
         self.db = db
         self.mongo_url = mongo_url
         self.db_name = db_name
-        self.default_backup_path = os.environ.get("BACKUP_PATH", "/app/backups")
+        self._is_windows = platform.system() == "Windows"
         
+        # Set platform-appropriate default backup path
+        if self._is_windows:
+            # Use user's Documents folder on Windows
+            default_path = os.environ.get("BACKUP_PATH", str(Path.home() / "Documents" / "SecFind" / "Backups"))
+        else:
+            default_path = os.environ.get("BACKUP_PATH", "/app/backups")
+        
+        self.default_backup_path = default_path
+        
+    def _buscar_mongodump(self, ruta_configurada: Optional[str] = None) -> Optional[str]:
+        """
+        Search for mongodump executable.
+        
+        Priority:
+        1. User-configured path (if valid)
+        2. System PATH (shutil.which)
+        3. Common Windows installation paths
+        
+        Returns the full path to mongodump or None if not found.
+        """
+        # 1. Check user-configured path first
+        if ruta_configurada:
+            configured_path = Path(ruta_configurada)
+            if configured_path.is_file():
+                return str(configured_path)
+        
+        # 2. Check system PATH
+        mongodump_in_path = shutil.which("mongodump")
+        if mongodump_in_path:
+            return mongodump_in_path
+        
+        # 3. On Windows, search common installation paths
+        if self._is_windows:
+            for path in self.WINDOWS_MONGODUMP_PATHS:
+                if Path(path).is_file():
+                    return path
+            
+            # Also check if user has a custom path in common locations
+            # Check all drives for mongodb-database-tools
+            import string
+            for drive in string.ascii_uppercase:
+                drive_path = f"{drive}:\\"
+                if Path(drive_path).exists():
+                    # Check for mongodb-database-tools folder pattern
+                    for folder in Path(drive_path).glob("mongodb-database-tools*"):
+                        if folder.is_dir():
+                            mongodump_path = folder / "bin" / "mongodump.exe"
+                            if mongodump_path.is_file():
+                                return str(mongodump_path)
+        
+        return None
+    
+    def _get_mongodump_error_message(self, ruta_configurada: Optional[str] = None) -> str:
+        """Generate a helpful error message when mongodump is not found"""
+        if self._is_windows:
+            return (
+                "No se encontró mongodump.exe. Por favor:\n"
+                "1. Descarga MongoDB Database Tools desde: https://www.mongodb.com/try/download/database-tools\n"
+                "2. Extrae el archivo en C:\\ (ej: C:\\mongodb-database-tools-windows-x86_64-100.18.0)\n"
+                "3. Configura la ruta completa a mongodump.exe en la configuración de backups\n"
+                f"   Ejemplo: C:\\mongodb-database-tools-windows-x86_64-100.18.0\\bin\\mongodump.exe\n"
+                f"Rutas buscadas: PATH del sistema + rutas comunes de Windows"
+            )
+        else:
+            return (
+                "No se encontró mongodump. Instálalo con:\n"
+                "  Ubuntu/Debian: sudo apt install mongodb-database-tools\n"
+                "  macOS: brew install mongodb-database-tools\n"
+                "  O descárgalo desde: https://www.mongodb.com/try/download/database-tools"
+            )
+    
     async def get_config(self) -> Dict:
         """Get backup configuration from database"""
         config = await self.db.configuracion.find_one({"id": "config_backup"}, {"_id": 0})
@@ -37,6 +124,7 @@ class BackupService:
                 "id": "config_backup",
                 "habilitado": False,
                 "ruta_local": self.default_backup_path,
+                "ruta_mongodump": "",  # Empty = auto-detect
                 "google_drive_habilitado": False,
                 "google_drive_folder_id": "",
                 "google_drive_credentials": None,
@@ -47,6 +135,11 @@ class BackupService:
                 "notificar_error": True,
                 "email_notificacion": "",
             }
+        
+        # Ensure new fields exist for backwards compatibility
+        if "ruta_mongodump" not in config:
+            config["ruta_mongodump"] = ""
+            
         return config
     
     async def save_config(self, config: Dict) -> bool:
@@ -61,6 +154,61 @@ class BackupService:
         )
         return True
     
+    async def validar_mongodump(self, ruta_personalizada: Optional[str] = None) -> Dict:
+        """
+        Validate that mongodump is accessible and return info about it.
+        """
+        mongodump_path = self._buscar_mongodump(ruta_personalizada)
+        
+        if not mongodump_path:
+            return {
+                "encontrado": False,
+                "ruta": None,
+                "version": None,
+                "error": self._get_mongodump_error_message(ruta_personalizada)
+            }
+        
+        # Try to get version
+        try:
+            if self._is_windows:
+                # On Windows, use shell=True to handle paths with spaces
+                process = await asyncio.create_subprocess_shell(
+                    f'"{mongodump_path}" --version',
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+            else:
+                process = await asyncio.create_subprocess_exec(
+                    mongodump_path, "--version",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+            
+            stdout, stderr = await process.communicate()
+            version_output = stdout.decode().strip() or stderr.decode().strip()
+            
+            # Extract version number
+            version = "desconocida"
+            for line in version_output.split('\n'):
+                if 'version' in line.lower():
+                    version = line.strip()
+                    break
+            
+            return {
+                "encontrado": True,
+                "ruta": mongodump_path,
+                "version": version,
+                "error": None
+            }
+            
+        except Exception as e:
+            return {
+                "encontrado": True,
+                "ruta": mongodump_path,
+                "version": f"Error obteniendo versión: {str(e)}",
+                "error": None
+            }
+    
     async def ejecutar_backup(self, destino: str = "local", ruta_personalizada: Optional[str] = None) -> Dict:
         """
         Execute a database backup
@@ -70,14 +218,9 @@ class BackupService:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_filename = f"secfind_backup_{timestamp}"
         
-        # Determine local path
-        ruta_local = ruta_personalizada or config.get("ruta_local", self.default_backup_path)
-        
-        # Ensure backup directory exists
-        Path(ruta_local).mkdir(parents=True, exist_ok=True)
-        
-        backup_path = os.path.join(ruta_local, backup_filename)
-        archivo_comprimido = f"{backup_path}.gz"
+        # Determine local path using pathlib for cross-platform compatibility
+        ruta_local_str = ruta_personalizada or config.get("ruta_local", self.default_backup_path)
+        ruta_local = Path(ruta_local_str)
         
         resultado = {
             "id": f"backup_{timestamp}",
@@ -87,6 +230,7 @@ class BackupService:
             "ruta_local": None,
             "google_drive_file_id": None,
             "tamaño": None,
+            "tamaño_humano": None,
             "error": None,
             "duracion_segundos": None
         }
@@ -94,38 +238,74 @@ class BackupService:
         inicio = datetime.now()
         
         try:
-            # Execute mongodump
-            cmd = [
-                "mongodump",
-                f"--uri={self.mongo_url}",
-                f"--db={self.db_name}",
-                f"--archive={archivo_comprimido}",
-                "--gzip"
-            ]
+            # Find mongodump executable
+            ruta_mongodump_config = config.get("ruta_mongodump", "")
+            mongodump_path = self._buscar_mongodump(ruta_mongodump_config)
             
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
+            if not mongodump_path:
+                raise FileNotFoundError(self._get_mongodump_error_message(ruta_mongodump_config))
+            
+            # Ensure backup directory exists
+            try:
+                ruta_local.mkdir(parents=True, exist_ok=True)
+            except PermissionError:
+                raise PermissionError(f"Sin permisos para crear/acceder a la carpeta: {ruta_local}")
+            except OSError as e:
+                raise OSError(f"Error al crear carpeta de backup: {e}")
+            
+            # Build output file path
+            archivo_comprimido = ruta_local / f"{backup_filename}.gz"
+            
+            # Execute mongodump
+            if self._is_windows:
+                # On Windows, use shell=True and quote paths properly
+                cmd = (
+                    f'"{mongodump_path}" '
+                    f'--uri="{self.mongo_url}" '
+                    f'--db="{self.db_name}" '
+                    f'--archive="{archivo_comprimido}" '
+                    f'--gzip'
+                )
+                
+                process = await asyncio.create_subprocess_shell(
+                    cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+            else:
+                # On Linux/macOS, use exec directly
+                cmd = [
+                    mongodump_path,
+                    f"--uri={self.mongo_url}",
+                    f"--db={self.db_name}",
+                    f"--archive={archivo_comprimido}",
+                    "--gzip"
+                ]
+                
+                process = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
             
             stdout, stderr = await process.communicate()
             
             if process.returncode != 0:
-                raise Exception(f"mongodump failed: {stderr.decode()}")
+                error_msg = stderr.decode().strip() or stdout.decode().strip()
+                raise Exception(f"mongodump falló (código {process.returncode}): {error_msg}")
             
             # Get file size
-            if os.path.exists(archivo_comprimido):
-                tamaño = os.path.getsize(archivo_comprimido)
+            if archivo_comprimido.exists():
+                tamaño = archivo_comprimido.stat().st_size
                 resultado["tamaño"] = tamaño
                 resultado["tamaño_humano"] = self._formato_tamaño(tamaño)
-                resultado["ruta_local"] = archivo_comprimido
+                resultado["ruta_local"] = str(archivo_comprimido)
             
             # Upload to Google Drive if requested
             if destino in ["google_drive", "ambos"] and config.get("google_drive_habilitado"):
                 try:
                     file_id = await self._upload_to_google_drive(
-                        archivo_comprimido, 
+                        str(archivo_comprimido), 
                         f"{backup_filename}.gz",
                         config
                     )
@@ -137,11 +317,26 @@ class BackupService:
             
             # If only google drive, remove local file
             if destino == "google_drive" and resultado.get("google_drive_file_id"):
-                os.remove(archivo_comprimido)
+                archivo_comprimido.unlink()
                 resultado["ruta_local"] = None
             
             resultado["estado"] = "exitoso"
             
+        except FileNotFoundError as e:
+            resultado["estado"] = "fallido"
+            resultado["error"] = str(e)
+            
+            # Send notification if configured
+            if config.get("notificar_error") and config.get("email_notificacion"):
+                await self._enviar_notificacion_error(config, resultado)
+                
+        except PermissionError as e:
+            resultado["estado"] = "fallido"
+            resultado["error"] = str(e)
+            
+            if config.get("notificar_error") and config.get("email_notificacion"):
+                await self._enviar_notificacion_error(config, resultado)
+                
         except Exception as e:
             resultado["estado"] = "fallido"
             resultado["error"] = str(e)
@@ -222,8 +417,10 @@ class BackupService:
             return False
         
         # Delete local file if exists
-        if log.get("ruta_local") and os.path.exists(log["ruta_local"]):
-            os.remove(log["ruta_local"])
+        if log.get("ruta_local"):
+            ruta = Path(log["ruta_local"])
+            if ruta.exists():
+                ruta.unlink()
         
         # Delete log entry
         await self.db.backup_logs.delete_one({"id": backup_id})
@@ -237,8 +434,9 @@ class BackupService:
         if not log or not log.get("ruta_local"):
             return None
         
-        if os.path.exists(log["ruta_local"]):
-            return log["ruta_local"]
+        ruta = Path(log["ruta_local"])
+        if ruta.exists():
+            return str(ruta)
         
         return None
     
@@ -306,6 +504,8 @@ class BackupService:
 
 # Scheduler for automated backups
 class BackupScheduler:
+    """Scheduler class for automated backups using APScheduler"""
+    
     def __init__(self, backup_service: BackupService):
         self.backup_service = backup_service
         self.scheduler = None
@@ -313,77 +513,102 @@ class BackupScheduler:
     
     async def start(self):
         """Start the backup scheduler"""
-        from apscheduler.schedulers.asyncio import AsyncIOScheduler
-        from apscheduler.triggers.cron import CronTrigger
+        try:
+            from apscheduler.schedulers.asyncio import AsyncIOScheduler
+            from apscheduler.triggers.cron import CronTrigger
+        except ImportError:
+            print("APScheduler not installed. Scheduled backups disabled.")
+            return
         
         if self._running:
             return
         
-        self.scheduler = AsyncIOScheduler()
-        
-        # Load config and schedule
-        await self._actualizar_programacion()
-        
-        self.scheduler.start()
-        self._running = True
+        try:
+            self.scheduler = AsyncIOScheduler(timezone="America/Santo_Domingo")
+            
+            # Load config and schedule
+            await self._actualizar_programacion()
+            
+            self.scheduler.start()
+            self._running = True
+            print("Backup scheduler started successfully")
+        except Exception as e:
+            print(f"Error starting backup scheduler: {e}")
+            self._running = False
     
     async def stop(self):
         """Stop the backup scheduler"""
         if self.scheduler and self._running:
-            self.scheduler.shutdown()
-            self._running = False
+            try:
+                self.scheduler.shutdown(wait=False)
+            except Exception as e:
+                print(f"Error stopping backup scheduler: {e}")
+            finally:
+                self._running = False
     
     async def _actualizar_programacion(self):
         """Update backup schedule based on config"""
+        if not self.scheduler:
+            return
+            
         config = await self.backup_service.get_config()
         
         if not config.get("habilitado"):
             # Remove existing job if any
-            if self.scheduler:
-                try:
-                    self.scheduler.remove_job("backup_programado")
-                except Exception:
-                    pass
+            try:
+                self.scheduler.remove_job("backup_programado")
+            except Exception:
+                pass
             return
         
-        hora, minuto = config.get("hora_ejecucion", "02:00").split(":")
-        frecuencia = config.get("frecuencia", "diario")
-        
-        trigger_kwargs = {
-            "hour": int(hora),
-            "minute": int(minuto)
-        }
-        
-        if frecuencia == "semanal":
-            trigger_kwargs["day_of_week"] = config.get("dia_semana", 0)
-        elif frecuencia == "mensual":
-            trigger_kwargs["day"] = config.get("dia_mes", 1)
-        
-        from apscheduler.triggers.cron import CronTrigger
-        trigger = CronTrigger(**trigger_kwargs)
-        
-        # Remove existing job and add new one
         try:
-            self.scheduler.remove_job("backup_programado")
-        except Exception:
-            pass
-        
-        self.scheduler.add_job(
-            self._ejecutar_backup_programado,
-            trigger=trigger,
-            id="backup_programado",
-            name="Backup Programado de Base de Datos"
-        )
+            hora, minuto = config.get("hora_ejecucion", "02:00").split(":")
+            frecuencia = config.get("frecuencia", "diario")
+            
+            trigger_kwargs = {
+                "hour": int(hora),
+                "minute": int(minuto)
+            }
+            
+            if frecuencia == "semanal":
+                trigger_kwargs["day_of_week"] = config.get("dia_semana", 0)
+            elif frecuencia == "mensual":
+                trigger_kwargs["day"] = config.get("dia_mes", 1)
+            
+            from apscheduler.triggers.cron import CronTrigger
+            trigger = CronTrigger(**trigger_kwargs)
+            
+            # Remove existing job and add new one
+            try:
+                self.scheduler.remove_job("backup_programado")
+            except Exception:
+                pass
+            
+            self.scheduler.add_job(
+                self._ejecutar_backup_programado,
+                trigger=trigger,
+                id="backup_programado",
+                name="Backup Programado de Base de Datos",
+                replace_existing=True
+            )
+            print(f"Backup scheduled: {frecuencia} at {hora}:{minuto}")
+            
+        except Exception as e:
+            print(f"Error updating backup schedule: {e}")
     
     async def _ejecutar_backup_programado(self):
         """Execute scheduled backup"""
-        config = await self.backup_service.get_config()
-        
-        destino = "local"
-        if config.get("google_drive_habilitado"):
-            destino = "ambos"
-        
-        await self.backup_service.ejecutar_backup(destino=destino)
+        try:
+            config = await self.backup_service.get_config()
+            
+            destino = "local"
+            if config.get("google_drive_habilitado"):
+                destino = "ambos"
+            
+            result = await self.backup_service.ejecutar_backup(destino=destino)
+            print(f"Scheduled backup completed: {result.get('estado')}")
+        except Exception as e:
+            print(f"Error in scheduled backup: {e}")
     
     async def actualizar_config(self, config: Dict):
         """Update config and reschedule"""

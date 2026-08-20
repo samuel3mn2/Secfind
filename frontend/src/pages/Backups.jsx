@@ -65,6 +65,7 @@ import {
   FolderPlus,
   Check,
   AlertTriangle,
+  Terminal,
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -87,7 +88,8 @@ const DIAS_MES = Array.from({ length: 28 }, (_, i) => ({
 export default function Backups() {
   const [config, setConfig] = useState({
     habilitado: false,
-    ruta_local: "/app/backups",
+    ruta_local: "",
+    ruta_mongodump: "",
     google_drive_habilitado: false,
     google_drive_folder_id: "",
     google_drive_credentials: "",
@@ -122,6 +124,10 @@ export default function Backups() {
   const [validatingPath, setValidatingPath] = useState(false);
   const [pathValidation, setPathValidation] = useState(null);
   const [creatingFolder, setCreatingFolder] = useState(false);
+  
+  // Mongodump validation state
+  const [validatingMongodump, setValidatingMongodump] = useState(false);
+  const [mongodumpValidation, setMongodumpValidation] = useState(null);
 
   const fetchConfig = useCallback(async () => {
     try {
@@ -251,6 +257,32 @@ export default function Backups() {
       setCreatingFolder(false);
     }
   };
+
+  const validateMongodump = async (ruta = "") => {
+    setValidatingMongodump(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.post(`${API}/backup/validar-mongodump`,
+        { ruta_mongodump: ruta },
+        { headers: { Authorization: `Bearer ${token}` }}
+      );
+      setMongodumpValidation(response.data);
+    } catch (error) {
+      setMongodumpValidation({
+        encontrado: false,
+        error: error.response?.data?.detail || "Error al validar mongodump"
+      });
+    } finally {
+      setValidatingMongodump(false);
+    }
+  };
+
+  // Validate mongodump on component load and when config changes
+  useEffect(() => {
+    if (!loading) {
+      validateMongodump(config.ruta_mongodump);
+    }
+  }, [loading]);
 
   const handleSaveConfig = async () => {
     setSaving(true);
@@ -584,6 +616,108 @@ export default function Backups() {
             </div>
           )}
 
+          {/* Mongodump Configuration Section */}
+          <div className="pt-4 border-t border-zinc-800 space-y-4">
+            <div className="flex items-center justify-between p-4 bg-zinc-900 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Terminal className="w-5 h-5 text-emerald-400" />
+                <div>
+                  <p className="text-white font-medium">Configuración de mongodump</p>
+                  <p className="text-sm text-zinc-500">Ejecutable para realizar backups de MongoDB</p>
+                </div>
+              </div>
+              {mongodumpValidation && (
+                mongodumpValidation.encontrado ? (
+                  <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
+                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                    Detectado
+                  </Badge>
+                ) : (
+                  <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
+                    <XCircle className="w-3 h-3 mr-1" />
+                    No encontrado
+                  </Badge>
+                )
+              )}
+            </div>
+
+            <div className="space-y-3 p-4 bg-zinc-900/50 rounded-lg">
+              <div className="space-y-2">
+                <Label className="text-zinc-400">Ruta al ejecutable mongodump (opcional)</Label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Terminal className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                    <Input
+                      value={config.ruta_mongodump}
+                      onChange={(e) => {
+                        setConfig({ ...config, ruta_mongodump: e.target.value });
+                        setMongodumpValidation(null);
+                      }}
+                      onBlur={() => validateMongodump(config.ruta_mongodump)}
+                      placeholder="Dejar vacío para auto-detectar"
+                      className="bg-zinc-900 border-zinc-700 text-white pl-10 font-mono text-sm"
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => validateMongodump(config.ruta_mongodump)}
+                    disabled={validatingMongodump}
+                    className="border-zinc-700"
+                    title="Validar mongodump"
+                  >
+                    {validatingMongodump ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Check className="w-4 h-4" />
+                    )}
+                  </Button>
+                </div>
+                <p className="text-xs text-zinc-500">
+                  Si mongodump no está en el PATH del sistema, especifica la ruta completa.<br/>
+                  Ejemplo Windows: <code className="bg-zinc-800 px-1 rounded">C:\mongodb-database-tools-windows-x86_64-100.18.0\bin\mongodump.exe</code>
+                </p>
+              </div>
+
+              {/* Mongodump validation result */}
+              {mongodumpValidation && (
+                <div className={`p-3 rounded-lg text-sm ${
+                  mongodumpValidation.encontrado
+                    ? "bg-emerald-500/10 border border-emerald-500/30"
+                    : "bg-red-500/10 border border-red-500/30"
+                }`}>
+                  {mongodumpValidation.encontrado ? (
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5" />
+                      <div>
+                        <p className="text-emerald-400 font-medium">mongodump encontrado</p>
+                        {mongodumpValidation.ruta && (
+                          <p className="text-zinc-400 text-xs mt-1 font-mono break-all">
+                            Ruta: {mongodumpValidation.ruta}
+                          </p>
+                        )}
+                        {mongodumpValidation.version && (
+                          <p className="text-zinc-400 text-xs mt-1">
+                            {mongodumpValidation.version}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-2">
+                      <XCircle className="w-4 h-4 text-red-400 mt-0.5" />
+                      <div>
+                        <p className="text-red-400 font-medium">mongodump no encontrado</p>
+                        <p className="text-zinc-400 text-xs mt-1 whitespace-pre-line">
+                          {mongodumpValidation.error}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Google Drive Section */}
           <div className="pt-4 border-t border-zinc-800 space-y-4">
             <div className="flex items-center justify-between p-4 bg-zinc-900 rounded-lg">
@@ -849,11 +983,11 @@ export default function Backups() {
                 <Input
                   value={backupRuta}
                   onChange={(e) => setBackupRuta(e.target.value)}
-                  placeholder={config.ruta_local || "/app/backups"}
-                  className="bg-zinc-900 border-zinc-700 text-white"
+                  placeholder={config.ruta_local || "Ruta configurada por defecto"}
+                  className="bg-zinc-900 border-zinc-700 text-white font-mono text-sm"
                 />
                 <p className="text-xs text-zinc-500">
-                  Deja vacío para usar la ruta predeterminada
+                  Deja vacío para usar la ruta configurada: <code className="bg-zinc-800 px-1 rounded">{config.ruta_local || "(por defecto)"}</code>
                 </p>
               </div>
             )}
