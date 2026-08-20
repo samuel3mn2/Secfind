@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -58,6 +59,12 @@ import {
   Calendar,
   Mail,
   TestTube,
+  Folder,
+  ChevronRight,
+  ChevronUp,
+  FolderPlus,
+  Check,
+  AlertTriangle,
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -103,6 +110,18 @@ export default function Backups() {
   const [backupRuta, setBackupRuta] = useState("");
   
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  
+  // Folder browser state
+  const [showFolderBrowser, setShowFolderBrowser] = useState(false);
+  const [folderBrowserPath, setFolderBrowserPath] = useState("");
+  const [folderList, setFolderList] = useState([]);
+  const [loadingFolders, setLoadingFolders] = useState(false);
+  const [folderBrowserTarget, setFolderBrowserTarget] = useState("config"); // "config" or "manual"
+  
+  // Path validation state
+  const [validatingPath, setValidatingPath] = useState(false);
+  const [pathValidation, setPathValidation] = useState(null);
+  const [creatingFolder, setCreatingFolder] = useState(false);
 
   const fetchConfig = useCallback(async () => {
     try {
@@ -136,6 +155,102 @@ export default function Backups() {
     };
     loadData();
   }, [fetchConfig, fetchHistorial]);
+
+  // Folder browser functions
+  const openFolderBrowser = async (target = "config") => {
+    setFolderBrowserTarget(target);
+    setShowFolderBrowser(true);
+    await loadFolders("");
+  };
+
+  const loadFolders = async (path) => {
+    setLoadingFolders(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${API}/backup/listar-carpetas`, {
+        params: { ruta: path },
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setFolderList(response.data.carpetas || []);
+      setFolderBrowserPath(response.data.ruta_actual || "");
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Error al listar carpetas");
+    } finally {
+      setLoadingFolders(false);
+    }
+  };
+
+  const navigateToFolder = (folderPath) => {
+    loadFolders(folderPath);
+  };
+
+  const navigateUp = async () => {
+    const token = localStorage.getItem("token");
+    try {
+      const response = await axios.get(`${API}/backup/listar-carpetas`, {
+        params: { ruta: folderBrowserPath },
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data.ruta_padre) {
+        loadFolders(response.data.ruta_padre);
+      } else {
+        loadFolders("");
+      }
+    } catch (error) {
+      loadFolders("");
+    }
+  };
+
+  const selectFolder = (folderPath) => {
+    if (folderBrowserTarget === "config") {
+      setConfig({ ...config, ruta_local: folderPath });
+    } else {
+      setBackupRuta(folderPath);
+    }
+    setShowFolderBrowser(false);
+    // Auto-validate the selected path
+    validatePath(folderPath);
+  };
+
+  const validatePath = async (path) => {
+    if (!path) {
+      setPathValidation(null);
+      return;
+    }
+    setValidatingPath(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.post(`${API}/backup/validar-ruta`, 
+        { ruta: path },
+        { headers: { Authorization: `Bearer ${token}` }}
+      );
+      setPathValidation(response.data);
+    } catch (error) {
+      setPathValidation({
+        existe: false,
+        error: error.response?.data?.detail || "Error al validar ruta"
+      });
+    } finally {
+      setValidatingPath(false);
+    }
+  };
+
+  const createFolder = async () => {
+    setCreatingFolder(true);
+    try {
+      const token = localStorage.getItem("token");
+      await axios.post(`${API}/backup/crear-carpeta`,
+        { ruta: config.ruta_local },
+        { headers: { Authorization: `Bearer ${token}` }}
+      );
+      toast.success("Carpeta creada exitosamente");
+      validatePath(config.ruta_local);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Error al crear carpeta");
+    } finally {
+      setCreatingFolder(false);
+    }
+  };
 
   const handleSaveConfig = async () => {
     setSaving(true);
@@ -378,17 +493,93 @@ export default function Backups() {
               )}
 
               {/* Ruta local */}
-              <div className="space-y-2">
+              <div className="space-y-2 md:col-span-2">
                 <Label className="text-zinc-400">Ruta Local de Backup</Label>
                 <div className="flex gap-2">
-                  <FolderOpen className="w-5 h-5 text-zinc-500 mt-2" />
-                  <Input
-                    value={config.ruta_local}
-                    onChange={(e) => setConfig({ ...config, ruta_local: e.target.value })}
-                    placeholder="/ruta/backups"
-                    className="bg-zinc-900 border-zinc-700 text-white"
-                  />
+                  <div className="relative flex-1">
+                    <FolderOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                    <Input
+                      value={config.ruta_local}
+                      onChange={(e) => {
+                        setConfig({ ...config, ruta_local: e.target.value });
+                        setPathValidation(null);
+                      }}
+                      onBlur={() => validatePath(config.ruta_local)}
+                      placeholder="C:\Backups\SecFind"
+                      className="bg-zinc-900 border-zinc-700 text-white pl-10"
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => openFolderBrowser("config")}
+                    className="border-zinc-700"
+                    title="Explorar carpetas"
+                  >
+                    <Folder className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => validatePath(config.ruta_local)}
+                    disabled={validatingPath}
+                    className="border-zinc-700"
+                    title="Validar ruta"
+                  >
+                    {validatingPath ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Check className="w-4 h-4" />
+                    )}
+                  </Button>
                 </div>
+                
+                {/* Path validation result */}
+                {pathValidation && (
+                  <div className={`p-3 rounded-lg text-sm ${
+                    pathValidation.existe && pathValidation.tiene_permisos_escritura
+                      ? "bg-green-500/10 border border-green-500/30"
+                      : "bg-amber-500/10 border border-amber-500/30"
+                  }`}>
+                    {pathValidation.existe && pathValidation.tiene_permisos_escritura ? (
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-400 mt-0.5" />
+                        <div>
+                          <p className="text-green-400 font-medium">Ruta válida</p>
+                          {pathValidation.espacio_disponible_humano && (
+                            <p className="text-zinc-400 text-xs mt-1">
+                              Espacio disponible: {pathValidation.espacio_disponible_humano} de {pathValidation.espacio_total_humano} 
+                              ({pathValidation.espacio_usado_porcentaje}% usado)
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5" />
+                        <div>
+                          <p className="text-amber-400 font-medium">
+                            {pathValidation.error || "Ruta no válida"}
+                          </p>
+                          {!pathValidation.existe && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={createFolder}
+                              disabled={creatingFolder}
+                              className="mt-2 h-7 text-xs border-amber-500/50 text-amber-400 hover:bg-amber-500/20"
+                            >
+                              {creatingFolder ? (
+                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                              ) : (
+                                <FolderPlus className="w-3 h-3 mr-1" />
+                              )}
+                              Crear carpeta
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -720,6 +911,106 @@ export default function Backups() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Folder Browser Dialog */}
+      <Dialog open={showFolderBrowser} onOpenChange={setShowFolderBrowser}>
+        <DialogContent className="bg-[#1c1c1e] border-zinc-800 text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FolderOpen className="w-5 h-5 text-indigo-400" />
+              Seleccionar Carpeta
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Navega y selecciona la carpeta donde guardar los backups
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Current path */}
+            <div className="flex items-center gap-2 p-2 bg-zinc-900 rounded-lg">
+              <FolderOpen className="w-4 h-4 text-zinc-500" />
+              <span className="text-sm text-zinc-300 truncate flex-1 font-mono">
+                {folderBrowserPath || "Unidades / Raíz"}
+              </span>
+              {folderBrowserPath && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={navigateUp}
+                  className="h-7 px-2"
+                >
+                  <ChevronUp className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+
+            {/* Folder list */}
+            <ScrollArea className="h-[300px] border border-zinc-800 rounded-lg">
+              {loadingFolders ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+                </div>
+              ) : folderList.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-zinc-500">
+                  No hay carpetas disponibles
+                </div>
+              ) : (
+                <div className="p-2 space-y-1">
+                  {folderList.map((folder, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
+                        folder.sin_acceso 
+                          ? "opacity-50 cursor-not-allowed" 
+                          : "hover:bg-zinc-800"
+                      }`}
+                      onClick={() => !folder.sin_acceso && navigateToFolder(folder.ruta)}
+                      onDoubleClick={() => !folder.sin_acceso && selectFolder(folder.ruta)}
+                    >
+                      {folder.es_drive ? (
+                        <HardDrive className="w-5 h-5 text-blue-400" />
+                      ) : (
+                        <Folder className="w-5 h-5 text-amber-400" />
+                      )}
+                      <span className="text-sm text-zinc-200 flex-1 truncate">
+                        {folder.nombre}
+                      </span>
+                      {folder.sin_acceso && (
+                        <Badge variant="outline" className="text-xs border-red-500/30 text-red-400">
+                          Sin acceso
+                        </Badge>
+                      )}
+                      <ChevronRight className="w-4 h-4 text-zinc-500" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+
+            <p className="text-xs text-zinc-500">
+              Haz doble clic en una carpeta para seleccionarla, o navega dentro y usa el botón Seleccionar
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowFolderBrowser(false)}
+              className="border-zinc-700"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => selectFolder(folderBrowserPath)}
+              disabled={!folderBrowserPath}
+              className="bg-indigo-600 hover:bg-indigo-700"
+            >
+              <Check className="w-4 h-4 mr-2" />
+              Seleccionar esta carpeta
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

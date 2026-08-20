@@ -2307,6 +2307,160 @@ async def descargar_backup(
         media_type="application/gzip"
     )
 
+@api_router.post("/backup/validar-ruta")
+async def validar_ruta_backup(
+    data: dict,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Validate backup path and return disk info (admin only)"""
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden validar rutas")
+    
+    ruta = data.get("ruta", "")
+    if not ruta:
+        raise HTTPException(status_code=400, detail="Ruta no especificada")
+    
+    import shutil
+    from pathlib import Path
+    
+    path = Path(ruta)
+    resultado = {
+        "ruta": ruta,
+        "existe": path.exists(),
+        "es_directorio": path.is_dir() if path.exists() else False,
+        "tiene_permisos_escritura": False,
+        "espacio_disponible": None,
+        "espacio_disponible_humano": None,
+        "error": None
+    }
+    
+    try:
+        if path.exists() and path.is_dir():
+            # Check write permissions by trying to create a temp file
+            test_file = path / ".secfind_test_write"
+            try:
+                test_file.touch()
+                test_file.unlink()
+                resultado["tiene_permisos_escritura"] = True
+            except (PermissionError, OSError):
+                resultado["tiene_permisos_escritura"] = False
+                resultado["error"] = "Sin permisos de escritura en esta carpeta"
+            
+            # Get disk space
+            try:
+                disk_usage = shutil.disk_usage(ruta)
+                resultado["espacio_disponible"] = disk_usage.free
+                resultado["espacio_disponible_humano"] = backup_service._formato_tamaño(disk_usage.free)
+                resultado["espacio_total"] = disk_usage.total
+                resultado["espacio_total_humano"] = backup_service._formato_tamaño(disk_usage.total)
+                resultado["espacio_usado_porcentaje"] = round((disk_usage.used / disk_usage.total) * 100, 1)
+            except Exception:
+                pass
+        elif not path.exists():
+            resultado["error"] = "La carpeta no existe"
+        else:
+            resultado["error"] = "La ruta especificada no es una carpeta"
+            
+    except Exception as e:
+        resultado["error"] = str(e)
+    
+    return resultado
+
+@api_router.post("/backup/crear-carpeta")
+async def crear_carpeta_backup(
+    data: dict,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """Create backup folder (admin only)"""
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden crear carpetas")
+    
+    ruta = data.get("ruta", "")
+    if not ruta:
+        raise HTTPException(status_code=400, detail="Ruta no especificada")
+    
+    from pathlib import Path
+    
+    try:
+        path = Path(ruta)
+        path.mkdir(parents=True, exist_ok=True)
+        
+        # Verify it was created
+        if path.exists() and path.is_dir():
+            return {"success": True, "message": f"Carpeta creada: {ruta}"}
+        else:
+            raise HTTPException(status_code=500, detail="No se pudo crear la carpeta")
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Sin permisos para crear la carpeta en esta ubicación")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al crear carpeta: {str(e)}")
+
+@api_router.get("/backup/listar-carpetas")
+async def listar_carpetas(
+    ruta: str = Query(default=""),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """List folders in a directory for folder browser (admin only)"""
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden listar carpetas")
+    
+    from pathlib import Path
+    import platform
+    
+    # If no path specified, return drives (Windows) or root (Linux)
+    if not ruta:
+        if platform.system() == "Windows":
+            import string
+            drives = []
+            for letter in string.ascii_uppercase:
+                drive = f"{letter}:\\"
+                if Path(drive).exists():
+                    drives.append({"nombre": drive, "ruta": drive, "es_drive": True})
+            return {"carpetas": drives, "ruta_actual": "", "es_raiz": True}
+        else:
+            ruta = "/"
+    
+    path = Path(ruta)
+    
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Ruta no encontrada")
+    
+    if not path.is_dir():
+        raise HTTPException(status_code=400, detail="La ruta no es un directorio")
+    
+    carpetas = []
+    try:
+        for item in sorted(path.iterdir()):
+            if item.is_dir() and not item.name.startswith('.'):
+                try:
+                    # Check if we can access it
+                    list(item.iterdir())
+                    carpetas.append({
+                        "nombre": item.name,
+                        "ruta": str(item),
+                        "es_drive": False
+                    })
+                except PermissionError:
+                    # Include but mark as inaccessible
+                    carpetas.append({
+                        "nombre": item.name,
+                        "ruta": str(item),
+                        "es_drive": False,
+                        "sin_acceso": True
+                    })
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Sin permisos para listar esta carpeta")
+    
+    # Get parent path
+    padre = str(path.parent) if str(path) != str(path.parent) else None
+    
+    return {
+        "carpetas": carpetas,
+        "ruta_actual": str(path),
+        "ruta_padre": padre,
+        "es_raiz": padre is None
+    }
+
 @api_router.post("/backup/google-drive/test")
 async def test_google_drive_connection(current_user: CurrentUser = Depends(get_current_user)):
     """Test Google Drive connection (admin only)"""
