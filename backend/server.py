@@ -6268,6 +6268,19 @@ async def startup_event():
     await migrate_nivel_riesgo()  # Migrate nivel_riesgo for "Primera emulación" 2024 or earlier
     await init_admin_user()
     await init_grc_data()  # Initialize GRC seed data
+    await init_backup_scheduler()  # Initialize backup scheduler
+
+async def init_backup_scheduler():
+    """Initialize the backup scheduler if automatic backups are enabled"""
+    try:
+        config = await backup_service.get_config()
+        if config.get("habilitado"):
+            await backup_scheduler.start()
+            print(f"Backup scheduler iniciado - Frecuencia: {config.get('frecuencia')} a las {config.get('hora_ejecucion')}")
+        else:
+            print("Backup automático deshabilitado - Scheduler no iniciado")
+    except Exception as e:
+        print(f"Error iniciando backup scheduler: {e}")
 
 async def init_grc_data():
     """Initialize GRC seed data (dominios and controles) if not exists"""
