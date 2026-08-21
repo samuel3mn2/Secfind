@@ -4364,6 +4364,11 @@ async def get_seguimiento_riesgos(
     if niveles_riesgo:
         query["nivel_riesgo"] = {"$in": niveles_riesgo}
     
+    # Get proveedor filter
+    proveedores = request.query_params.getlist("proveedor")
+    if proveedores:
+        query["proveedor"] = {"$in": proveedores}
+    
     # Get responsables filter
     responsables = request.query_params.getlist("responsable")
     if responsables:

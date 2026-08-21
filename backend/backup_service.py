@@ -532,9 +532,54 @@ class BackupScheduler:
             self.scheduler.start()
             self._running = True
             print("Backup scheduler started successfully")
+            
+            # Check if we missed today's backup and should run it now
+            await self._verificar_backup_perdido()
+            
         except Exception as e:
             print(f"Error starting backup scheduler: {e}")
             self._running = False
+    
+    async def _verificar_backup_perdido(self):
+        """Check if today's scheduled backup was missed and run it if needed"""
+        try:
+            from datetime import datetime
+            from zoneinfo import ZoneInfo
+            
+            config = await self.backup_service.get_config()
+            if not config.get("habilitado"):
+                return
+            
+            # Get current time in Santo Domingo timezone
+            tz = ZoneInfo("America/Santo_Domingo")
+            ahora = datetime.now(tz)
+            
+            # Parse scheduled time
+            hora_str = config.get("hora_ejecucion", "02:00")
+            hora, minuto = map(int, hora_str.split(":"))
+            
+            # Check if we're past the scheduled time today
+            hora_programada = ahora.replace(hour=hora, minute=minuto, second=0, microsecond=0)
+            
+            if ahora > hora_programada:
+                # We're past the scheduled time - check if backup ran today
+                desde_hoy = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
+                
+                # Get today's backup logs
+                logs_hoy = await self.backup_service.db.backup_logs.count_documents({
+                    "fecha": {"$gte": desde_hoy.isoformat()},
+                    "estado": "exitoso"
+                })
+                
+                if logs_hoy == 0:
+                    # No successful backup today - run one now
+                    print(f"Backup perdido detectado (programado: {hora_str}, ahora: {ahora.strftime('%H:%M')}). Ejecutando ahora...")
+                    await self._ejecutar_backup_programado()
+                else:
+                    print(f"Backup del día ya existe ({logs_hoy} exitosos hoy)")
+                    
+        except Exception as e:
+            print(f"Error verificando backup perdido: {e}")
     
     async def stop(self):
         """Stop the backup scheduler"""
@@ -589,7 +634,8 @@ class BackupScheduler:
                 trigger=trigger,
                 id="backup_programado",
                 name="Backup Programado de Base de Datos",
-                replace_existing=True
+                replace_existing=True,
+                misfire_grace_time=3600  # Si el backup se perdió por menos de 1 hora, ejecutarlo igual
             )
             print(f"Backup scheduled: {frecuencia} at {hora}:{minuto}")
             

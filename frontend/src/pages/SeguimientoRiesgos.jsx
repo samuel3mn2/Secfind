@@ -405,6 +405,7 @@ export default function SeguimientoRiesgos() {
   const [filterInstitucion, setFilterInstitucion] = useState([]);
   const [filterInforme, setFilterInforme] = useState([]);
   const [filterAplicacion, setFilterAplicacion] = useState([]);
+  const [filterProveedor, setFilterProveedor] = useState([]);
   
   // Vista de seguimiento (4 pestañas)
   const [vistaActiva, setVistaActiva] = useState("activas_con_fecha"); // activas_con_fecha | en_analisis | en_retest | historico
@@ -587,6 +588,7 @@ export default function SeguimientoRiesgos() {
       if (filterInforme.length > 0) filterInforme.forEach(v => params.append("informe_pentest", v));
       if (filterAplicacion.length > 0) filterAplicacion.forEach(v => params.append("aplicacion", v));
       if (filterResponsable.length > 0) filterResponsable.forEach(v => params.append("responsable", v));
+      if (filterProveedor.length > 0) filterProveedor.forEach(v => params.append("proveedor", v));
       
       // Búsqueda por código o nombre
       if (debouncedSearch && debouncedSearch.trim()) {
@@ -599,7 +601,7 @@ export default function SeguimientoRiesgos() {
       console.error("Error fetching vulnerabilidades:", error);
       toast.error("Error al cargar vulnerabilidades");
     }
-  }, [filterEstado, filterSeveridad, filterInstitucion, filterInforme, filterAplicacion, filterResponsable, filterMes, filterAño, filterNivelRiesgo, vistaActiva, debouncedSearch]);
+  }, [filterEstado, filterSeveridad, filterInstitucion, filterInforme, filterAplicacion, filterResponsable, filterProveedor, filterMes, filterAño, filterNivelRiesgo, vistaActiva, debouncedSearch]);
 
   const fetchResumenVulns = async () => {
     try {
@@ -1093,6 +1095,16 @@ export default function SeguimientoRiesgos() {
                     searchPlaceholder="Buscar informe..."
                     allLabel="Todos los informes"
                     data-testid="filter-informe"
+                  />
+
+                  <MultiSelectFilter
+                    options={options?.proveedores || []}
+                    selected={filterProveedor}
+                    onChange={setFilterProveedor}
+                    placeholder="Proveedor"
+                    searchPlaceholder="Buscar proveedor..."
+                    allLabel="Todos los proveedores"
+                    data-testid="filter-proveedor"
                   />
                 </>
               )}
