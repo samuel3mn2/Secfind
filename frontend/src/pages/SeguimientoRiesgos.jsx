@@ -1182,6 +1182,7 @@ export default function SeguimientoRiesgos() {
                       <TableHead className="text-zinc-400">Nivel Riesgo</TableHead>
                       <TableHead className="text-zinc-400">Institución</TableHead>
                       <TableHead className="text-zinc-400 min-w-[250px]">Vulnerabilidad</TableHead>
+                      <TableHead className="text-zinc-400">Informe</TableHead>
                       <TableHead className="text-zinc-400">Responsable</TableHead>
                       <TableHead className="text-zinc-400 text-right">Acciones</TableHead>
                     </TableRow>
@@ -1189,7 +1190,7 @@ export default function SeguimientoRiesgos() {
                   <TableBody>
                     {paginatedData.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-12 text-zinc-500">
+                        <TableCell colSpan={9} className="text-center py-12 text-zinc-500">
                           No hay vulnerabilidades pendientes
                         </TableCell>
                       </TableRow>
@@ -1260,6 +1261,11 @@ export default function SeguimientoRiesgos() {
                           <TableCell className="text-zinc-100">
                             <span className="whitespace-normal break-words line-clamp-2">
                               {vuln.vulnerabilidad || "-"}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-zinc-300 text-sm">
+                            <span className="whitespace-normal break-words line-clamp-2">
+                              {vuln.nombre_informe_pentest || "-"}
                             </span>
                           </TableCell>
                           <TableCell className="text-zinc-300">{vuln.responsable || "-"}</TableCell>
