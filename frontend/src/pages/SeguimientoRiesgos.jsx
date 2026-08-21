@@ -680,7 +680,7 @@ export default function SeguimientoRiesgos() {
       fetchVulnerabilidades();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, filterEstado, filterSeveridad, filterInstitucion, filterInforme, filterAplicacion, filterResponsable, filterMes, filterAño, filterNivelRiesgo, vistaActiva]);
+  }, [debouncedSearch, filterEstado, filterSeveridad, filterInstitucion, filterInforme, filterAplicacion, filterResponsable, filterProveedor, filterMes, filterAño, filterNivelRiesgo, vistaActiva]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -716,6 +716,7 @@ export default function SeguimientoRiesgos() {
     setFilterInforme([]);
     setFilterAplicacion([]);
     setFilterResponsable([]);
+    setFilterProveedor([]);
     setFilterMes("");
     setFilterAño("");
     setFilterNivelRiesgo([]);
