@@ -3327,7 +3327,7 @@ async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate, c
                     "resultado_retest": "Nota de Seguimiento",
                     "fecha_compromiso_asignada": None,
                     "notas_impedimento": f"⚠️ Vulnerabilidad reabierta. Fecha de cierre previa cancelada (Era: {fecha_cierre_anterior})",
-                    "usuario_registro": current_user.nombre or current_user.username
+                    "usuario_registro": current_user.nombre if current_user.nombre and current_user.nombre.strip() else current_user.username
                 }
                 # Inicializar historial si no existe
                 if existing.get("historial_impedimentos_seguimiento") is None:
@@ -3370,7 +3370,7 @@ async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate, c
                 "resultado_retest": "Nota de Seguimiento",
                 "fecha_compromiso_asignada": None,
                 "notas_impedimento": f"🆕 Aplicaciones agregadas: {', '.join(apps_agregadas)}. Vulnerabilidad reabierta para validar nuevas aplicaciones.",
-                "usuario_registro": current_user.nombre or current_user.username
+                "usuario_registro": current_user.nombre if current_user.nombre and current_user.nombre.strip() else current_user.username
             }
             await db.vulnerabilidades.update_one(
                 {"id": vuln_id},
@@ -3419,7 +3419,7 @@ async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate, c
             "resultado_retest": "Nota de Seguimiento",
             "fecha_compromiso_asignada": None,
             "notas_impedimento": f"📝 Edición de vulnerabilidad:\n" + "\n".join(cambios_texto),
-            "usuario_registro": current_user.nombre or current_user.username
+            "usuario_registro": current_user.nombre if current_user.nombre and current_user.nombre.strip() else current_user.username
         }
         
         # Inicializar historial si no existe
@@ -4561,13 +4561,16 @@ async def registrar_seguimiento(
         fecha_para_bitacora = data.fecha_compromiso_asignada
     
     # Crear entrada de bitácora
+    # Asegurar que siempre haya un usuario_registro válido
+    usuario_registro = current_user.nombre if current_user.nombre and current_user.nombre.strip() else current_user.username
+    
     entrada_bitacora = {
         "id_accion": str(uuid.uuid4()),
         "fecha_registro_nota": datetime.now(timezone.utc).isoformat(),
         "resultado_retest": resultado,
         "fecha_compromiso_asignada": fecha_para_bitacora,
         "notas_impedimento": data.notas_impedimento or "",
-        "usuario_registro": current_user.nombre or current_user.username,
+        "usuario_registro": usuario_registro,
         "aplicacion_especifica": data.aplicacion_especifica  # Null si es general, o nombre de app específica
     }
     
