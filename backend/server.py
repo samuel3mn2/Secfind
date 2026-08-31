@@ -795,10 +795,11 @@ async def procesar_cambio_resultado_aplicacion(
     
     # Registrar en la bitácora
     entrada_bitacora = {
+        "id_accion": str(uuid.uuid4()),
         "fecha_registro_nota": datetime.now(timezone.utc).isoformat(),
         "resultado_retest": nuevo_resultado,
         "notas_impedimento": f"📱 Resultado por aplicación [{aplicacion}]: {resultado_anterior or '(sin resultado)'} → {nuevo_resultado}" + (f"\n{notas}" if notas else ""),
-        "usuario": usuario,
+        "usuario_registro": usuario,
         "tipo": "cambio_resultado_aplicacion",
         "aplicacion_afectada": aplicacion,
         "resultado_anterior": resultado_anterior,
@@ -890,10 +891,11 @@ async def sincronizar_resultado_global_a_aplicaciones(
     
     # Registrar en bitácora
     entrada_bitacora = {
+        "id_accion": str(uuid.uuid4()),
         "fecha_registro_nota": datetime.now(timezone.utc).isoformat(),
         "resultado_retest": nuevo_resultado_global,
         "notas_impedimento": f"🔄 Cambio global de resultado: {resultado_anterior or '(sin resultado)'} → {nuevo_resultado_global}" + (" (aplicado a todas las aplicaciones)" if sobrescribir_personalizados else ""),
-        "usuario": usuario,
+        "usuario_registro": usuario,
         "tipo": "cambio_resultado_global",
         "sobrescribio_personalizados": sobrescribir_personalizados
     }
