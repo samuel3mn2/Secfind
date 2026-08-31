@@ -662,9 +662,22 @@ def normalizar_resultados_por_aplicacion(vulnerabilidad: dict) -> dict:
                 resultado_unico = list(resultados_unicos)[0]
                 if resultado_unico not in RESULTADOS_QUE_CIERRAN:
                     resultado_global_sugerido = resultado_unico
+                    # Si el resultado único es "Para Re Test", el estatus también debe serlo
+                    if resultado_unico == "Para Re Test":
+                        estatus_sugerido = "Para Re Test"
             elif len(resultados_unicos) > 1:
-                # Hay múltiples resultados diferentes, usar "Pendiente" como estado neutral
-                resultado_global_sugerido = "Pendiente"
+                # Hay múltiples resultados diferentes
+                # Priorizar "Para Re Test" si alguna app está en ese estado
+                if "Para Re Test" in resultados_unicos:
+                    resultado_global_sugerido = "Para Re Test"
+                    estatus_sugerido = "Para Re Test"
+                elif "Vulnerable" in resultados_unicos:
+                    resultado_global_sugerido = "Vulnerable"
+                elif "Impedimento" in resultados_unicos:
+                    resultado_global_sugerido = "Impedimento"
+                else:
+                    # Usar "Pendiente" como estado neutral
+                    resultado_global_sugerido = "Pendiente"
     
     return {
         "aplicaciones": aplicaciones_normalizadas,
@@ -4745,7 +4758,7 @@ async def registrar_seguimiento(
             "resultado_retest": "Nota de Seguimiento",
             "fecha_compromiso_asignada": None,
             "notas_impedimento": f"⚠️ Vulnerabilidad reabierta tras retest. Fecha de cierre previa cancelada (Era: {fecha_cierre_anterior})",
-            "usuario_registro": "Sistema"
+            "usuario_registro": usuario_registro
         }
         # Agregar la nota de reapertura también al historial
         update_ops["$push"]["historial_impedimentos_seguimiento"]["$each"] = [entrada_bitacora, nota_reapertura]
