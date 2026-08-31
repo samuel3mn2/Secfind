@@ -664,13 +664,13 @@ def normalizar_resultados_por_aplicacion(vulnerabilidad: dict) -> dict:
                     resultado_global_sugerido = resultado_unico
                     # Si el resultado único es "Para Re Test", el estatus también debe serlo
                     if resultado_unico == "Para Re Test":
-                        estatus_sugerido = "Para Re Test"
+                        estatus_sugerido = "En Retest"
             elif len(resultados_unicos) > 1:
                 # Hay múltiples resultados diferentes
                 # Priorizar "Para Re Test" si alguna app está en ese estado
                 if "Para Re Test" in resultados_unicos:
                     resultado_global_sugerido = "Para Re Test"
-                    estatus_sugerido = "Para Re Test"
+                    estatus_sugerido = "En Retest"
                 elif "Vulnerable" in resultados_unicos:
                     resultado_global_sugerido = "Vulnerable"
                 elif "Impedimento" in resultados_unicos:
@@ -4282,14 +4282,19 @@ async def get_seguimiento_riesgos(
         query["estatus"] = {"$in": ["Cerrado", "Corregido", "Desestimado"]}
         
     elif vista == "en_retest":
-        # VISTA: En Retest - Sin fecha y último estado es "Para Re Test"
-        query["estatus"] = {"$nin": ["Cerrado", "Corregido", "Desestimado"]}
-        query["$or"] = [
-            {"fecha_compromiso": {"$exists": False}},
-            {"fecha_compromiso": None},
-            {"fecha_compromiso": ""}
+        # VISTA: En Retest - Sin fecha y resultado es "Para Re Test" o estatus es "En Retest"
+        query["$and"] = [
+            {"estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]}},
+            {"$or": [
+                {"fecha_compromiso": {"$exists": False}},
+                {"fecha_compromiso": None},
+                {"fecha_compromiso": ""}
+            ]},
+            {"$or": [
+                {"resultado_re_test": "Para Re Test"},
+                {"estatus": "En Retest"}
+            ]}
         ]
-        query["resultado_re_test"] = "Para Re Test"
         
     elif vista == "en_analisis":
         # VISTA: En Análisis - Sin fecha y estado pendiente
