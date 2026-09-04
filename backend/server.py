@@ -3106,7 +3106,22 @@ async def get_vulnerabilidades(
     if severidades:
         query["severidad"] = {"$in": severidades}
     if estatus_list:
-        query["estatus"] = {"$in": estatus_list}
+        # CASO ESPECIAL: "En Retest" busca por resultado_re_test, no por estatus
+        estatus_normales = [e for e in estatus_list if e not in ["En Retest", "Para Re Test"]]
+        estatus_retest = [e for e in estatus_list if e in ["En Retest", "Para Re Test"]]
+        
+        if estatus_normales and estatus_retest:
+            # Buscar por estatus normal O por resultado_re_test = "Para Re Test"
+            query["$or"] = [
+                {"estatus": {"$in": estatus_normales}},
+                {"resultado_re_test": "Para Re Test"}
+            ]
+        elif estatus_retest:
+            # Solo buscar por resultado_re_test = "Para Re Test"
+            query["resultado_re_test"] = "Para Re Test"
+        else:
+            # Solo buscar por estatus normales
+            query["estatus"] = {"$in": estatus_normales}
     if instituciones:
         query["institucion"] = {"$in": instituciones}
     if aplicaciones:
