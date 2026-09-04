@@ -53,7 +53,7 @@ api_router = APIRouter(prefix="/api")
 # Default predefined values (fallback)
 DEFAULT_SEVERIDADES = ["Critica", "Alta", "Media", "Baja"]
 DEFAULT_ESTATUS = ["En Proceso", "Cerrado", "Pendiente", "En Retest"]
-DEFAULT_RESULTADO_RETEST = ["Corregido", "Pendiente", "Impedimento", "Vulnerable", "Desestimado", "En Retest", "Para Re Test", "Nota de Seguimiento"]
+DEFAULT_RESULTADO_RETEST = ["Corregido", "Pendiente", "Impedimento", "Vulnerable", "Desestimado", "En Retest", "Nota de Seguimiento"]
 
 # ============ PERMISSION MODELS ============
 
@@ -298,8 +298,7 @@ ResultadoRetestLiteral = Literal[
     "Impedimento",    # CASO B: Bloqueo operativo
     "Vulnerable",     # CASO C: Retest ejecutado, vulnerabilidad persiste
     "Desestimado",    # CASO A: Cierre por falso positivo/riesgo aceptado
-    "Para Re Test",   # CASO D: En proceso de validación con proveedor (legacy)
-    "En Retest",      # CASO D: En proceso de validación (nueva nomenclatura, normaliza a "Para Re Test" en BD)
+    "En Retest",      # CASO D: En proceso de validación con proveedor
     "Nota de Seguimiento"  # CASO F: Comentario puro sin alterar contadores
 ]
 
@@ -547,7 +546,7 @@ def calcular_cambios(original: dict, actualizado: dict, campos_excluir: list = N
 # Resultados que cierran una aplicación/vulnerabilidad
 RESULTADOS_QUE_CIERRAN = ["Corregido", "Desestimado"]
 # Resultados que mantienen pendiente
-RESULTADOS_PENDIENTES = ["Vulnerable", "Pendiente", "Impedimento", "En Retest", "Para Re Test"]
+RESULTADOS_PENDIENTES = ["Vulnerable", "Pendiente", "Impedimento", "En Retest"]
 
 def normalizar_resultados_por_aplicacion(vulnerabilidad: dict) -> dict:
     """
@@ -662,14 +661,14 @@ def normalizar_resultados_por_aplicacion(vulnerabilidad: dict) -> dict:
                 resultado_unico = list(resultados_unicos)[0]
                 if resultado_unico not in RESULTADOS_QUE_CIERRAN:
                     resultado_global_sugerido = resultado_unico
-                    # Si el resultado único es "Para Re Test", el estatus también debe serlo
-                    if resultado_unico == "Para Re Test":
+                    # Si el resultado único es "En Retest", el estatus también debe serlo
+                    if resultado_unico == "En Retest":
                         estatus_sugerido = "En Retest"
             elif len(resultados_unicos) > 1:
                 # Hay múltiples resultados diferentes
-                # Priorizar "Para Re Test" si alguna app está en ese estado
-                if "Para Re Test" in resultados_unicos:
-                    resultado_global_sugerido = "Para Re Test"
+                # Priorizar "En Retest" si alguna app está en ese estado
+                if "En Retest" in resultados_unicos:
+                    resultado_global_sugerido = "En Retest"
                     estatus_sugerido = "En Retest"
                 elif "Vulnerable" in resultados_unicos:
                     resultado_global_sugerido = "Vulnerable"
@@ -3107,18 +3106,18 @@ async def get_vulnerabilidades(
         query["severidad"] = {"$in": severidades}
     if estatus_list:
         # CASO ESPECIAL: "En Retest" busca por resultado_re_test, no por estatus
-        estatus_normales = [e for e in estatus_list if e not in ["En Retest", "Para Re Test"]]
-        estatus_retest = [e for e in estatus_list if e in ["En Retest", "Para Re Test"]]
+        estatus_normales = [e for e in estatus_list if e != "En Retest"]
+        estatus_retest = [e for e in estatus_list if e == "En Retest"]
         
         if estatus_normales and estatus_retest:
-            # Buscar por estatus normal O por resultado_re_test = "Para Re Test"
+            # Buscar por estatus normal O por resultado_re_test = "En Retest"
             query["$or"] = [
                 {"estatus": {"$in": estatus_normales}},
-                {"resultado_re_test": "Para Re Test"}
+                {"resultado_re_test": "En Retest"}
             ]
         elif estatus_retest:
-            # Solo buscar por resultado_re_test = "Para Re Test"
-            query["resultado_re_test"] = "Para Re Test"
+            # Solo buscar por resultado_re_test = "En Retest"
+            query["resultado_re_test"] = "En Retest"
         else:
             # Solo buscar por estatus normales
             query["estatus"] = {"$in": estatus_normales}
@@ -3135,14 +3134,7 @@ async def get_vulnerabilidades(
     if nivel_riesgo_filter:
         query["nivel_riesgo"] = {"$in": nivel_riesgo_filter}
     if resultado_retest_filter:
-        # Normalizar: "En Retest" en frontend = "Para Re Test" en BD
-        normalized = []
-        for r in resultado_retest_filter:
-            if r.lower() == "en retest":
-                normalized.append("Para Re Test")
-            else:
-                normalized.append(r)
-        query["resultado_re_test"] = {"$in": normalized}
+        query["resultado_re_test"] = {"$in": resultado_retest_filter}
     if años:
         # Multiple years - use $or with regex for each year
         year_conditions = [{"fecha_hallazgo": {"$regex": f"^{año}"}} for año in años]
@@ -3311,12 +3303,6 @@ async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate, c
     
     update_dict = vuln_data.model_dump(exclude_unset=True)
     
-    # NORMALIZACIÓN: "En Retest" del frontend -> "Para Re Test" en BD
-    if "resultado_re_test" in update_dict:
-        resultado_raw = (update_dict.get("resultado_re_test") or "").strip()
-        if resultado_raw.lower() == "en retest":
-            update_dict["resultado_re_test"] = "Para Re Test"
-    
     # ==========================================================================
     # DETECTAR SI LA VULNERABILIDAD ESTABA CERRADA (para lógica de reapertura)
     # ==========================================================================
@@ -3330,7 +3316,7 @@ async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate, c
     
     # Determinar si es un estado de cierre o de reapertura
     es_resultado_cierre = nuevo_resultado in ["corregido", "desestimado"]
-    es_resultado_reapertura = nuevo_resultado in ["vulnerable", "impedimento", "para re test", "pendiente"]
+    es_resultado_reapertura = nuevo_resultado in ["vulnerable", "impedimento", "en retest", "pendiente"]
     
     # ==========================================================================
     # LÓGICA DE SINCRONIZACIÓN AUTOMÁTICA estatus <-> resultado_re_test
@@ -3343,8 +3329,8 @@ async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate, c
             if not update_dict.get("fecha_cierre") and not existing.get("fecha_cierre"):
                 update_dict["fecha_cierre"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         elif es_resultado_reapertura:
-            # Para "Para Re Test", usar estatus "En Retest"
-            if nuevo_resultado == "para re test":
+            # Para "En Retest", usar estatus "En Retest"
+            if nuevo_resultado == "en retest":
                 update_dict["estatus"] = "En Retest"
                 update_dict["fecha_compromiso"] = None
             else:
@@ -3383,8 +3369,8 @@ async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate, c
     if info_aplicaciones["tiene_resultados_personalizados"] and "resultado_re_test" in update_dict:
         # Si no todas las aplicaciones están resueltas, mantener estado apropiado
         if not info_aplicaciones["todas_resueltas"]:
-            # Si el resultado sugerido es "Para Re Test", usar "En Retest"
-            if info_aplicaciones.get("resultado_global_sugerido") == "Para Re Test":
+            # Si el resultado sugerido es "En Retest", usar estatus "En Retest"
+            if info_aplicaciones.get("resultado_global_sugerido") == "En Retest":
                 update_dict["estatus"] = "En Retest"
             else:
                 update_dict["estatus"] = "Pendiente"
@@ -3893,8 +3879,8 @@ async def get_dashboard_stats(
     en_proceso_query = {**base_query, "estatus": "En Proceso"}
     en_proceso = await db.vulnerabilidades.count_documents(en_proceso_query)
     
-    # Para Re Test
-    para_retest_query = {**base_query, "estatus": {"$in": ["En Retest", "Para Re Test"]}}
+    # En Retest
+    para_retest_query = {**base_query, "estatus": "En Retest"}
     para_retest = await db.vulnerabilidades.count_documents(para_retest_query)
     
     severidad_pipeline = [
@@ -3993,7 +3979,7 @@ async def get_dashboard_tendencias(
             estatus = v.get("estatus", "")
             if estatus in ["Corregido", "Cerrado"]:
                 tendencias[periodo]["corregidas"] += 1
-            elif estatus in ["Pendiente", "En Proceso", "En Retest", "Para Re Test"]:
+            elif estatus in ["Pendiente", "En Proceso", "En Retest"]:
                 tendencias[periodo]["pendientes"] += 1
                 
         except:
@@ -4244,7 +4230,7 @@ async def get_kpi_detail(
     elif tipo == "en_proceso":
         query["estatus"] = "En Proceso"
     elif tipo == "para_retest":
-        query["estatus"] = {"$in": ["En Retest", "Para Re Test"]}
+        query["estatus"] = "En Retest"
     
     vulnerabilidades = await db.vulnerabilidades.find(query, {"_id": 0}).to_list(10000)
     return vulnerabilidades
@@ -4303,7 +4289,7 @@ async def get_seguimiento_riesgos(
         query["estatus"] = {"$in": ["Cerrado", "Corregido", "Desestimado"]}
         
     elif vista == "en_retest":
-        # VISTA: En Retest - Sin fecha y resultado es "Para Re Test" o estatus es "En Retest"
+        # VISTA: En Retest - Sin fecha y resultado/estatus es "En Retest"
         query["$and"] = [
             {"estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]}},
             {"$or": [
@@ -4312,7 +4298,7 @@ async def get_seguimiento_riesgos(
                 {"fecha_compromiso": ""}
             ]},
             {"$or": [
-                {"resultado_re_test": "Para Re Test"},
+                {"resultado_re_test": "En Retest"},
                 {"estatus": "En Retest"}
             ]}
         ]
@@ -4561,10 +4547,6 @@ async def registrar_seguimiento(
     # Determinar el tipo de caso según el resultado_retest
     resultado = data.resultado_retest
     
-    # NORMALIZACIÓN: "En Retest" del frontend -> "Para Re Test" en BD
-    if resultado == "En Retest":
-        resultado = "Para Re Test"
-    
     # ==========================================================================
     # LÓGICA DE REAPERTURA: Si la vulnerabilidad estaba cerrada y se reabre
     # ==========================================================================
@@ -4579,8 +4561,8 @@ async def registrar_seguimiento(
     # CASO A: Estados de Cierre ("Corregido" y "Desestimado")
     es_estado_cierre = resultado in ["Corregido", "Desestimado"]
     
-    # CASO D: Para Re Test - congelar tiempo
-    es_para_retest = resultado == "Para Re Test"
+    # CASO D: En Retest - congelar tiempo
+    es_en_retest = resultado == "En Retest"
     
     # CASO F: Nota de Seguimiento - comentario puro
     es_nota_seguimiento = resultado == "Nota de Seguimiento"
@@ -4596,7 +4578,7 @@ async def registrar_seguimiento(
     
     # Determinar fecha para la bitácora
     # Estados que fuerzan fecha null: Cierre, Para Re Test, Nota de Seguimiento
-    if es_estado_cierre or es_para_retest or es_nota_seguimiento:
+    if es_estado_cierre or es_en_retest or es_nota_seguimiento:
         fecha_para_bitacora = None
     else:
         fecha_para_bitacora = data.fecha_compromiso_asignada
@@ -4729,8 +4711,8 @@ async def registrar_seguimiento(
             inc_ops["veces_cambiada_fecha"] = 1
             fecha_cambio = True
             
-    elif es_para_retest:
-        # CASO D: Para Re Test
+    elif es_en_retest:
+        # CASO D: En Retest
         # - LIMPIA fecha_compromiso a null para que aparezca en vista "En Retest"
         # - NO incrementa veces_en_retest ni veces_cambiada_fecha
         # - Estatus "En Retest" para que aparezca en el filtro correspondiente
@@ -6015,7 +5997,7 @@ async def get_reporte_ejecutivo(
     corregidas = await db.vulnerabilidades.count_documents({**query, "estatus": {"$in": ["Corregido", "Cerrado"]}})
     pendientes = await db.vulnerabilidades.count_documents({**query, "estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]}})
     en_proceso = await db.vulnerabilidades.count_documents({**query, "estatus": "En Proceso"})
-    para_retest = await db.vulnerabilidades.count_documents({**query, "estatus": {"$in": ["En Retest", "Para Re Test"]}})
+    para_retest = await db.vulnerabilidades.count_documents({**query, "estatus": "En Retest"})
     
     stats = {
         "total_vulnerabilidades": total,
@@ -6034,7 +6016,7 @@ async def get_reporte_ejecutivo(
     
     # Get distribution by status
     por_estatus = {}
-    for est in ["Pendiente", "En Proceso", "Para Re Test", "Corregido", "Cerrado"]:
+    for est in ["Pendiente", "En Proceso", "En Retest", "Corregido", "Cerrado"]:
         count = await db.vulnerabilidades.count_documents({**query, "estatus": est})
         por_estatus[est] = count
     
@@ -6271,26 +6253,36 @@ async def get_reporte_vista_comite(
 @api_router.post("/admin/migrar-estatus-retest")
 async def migrar_estatus_retest(current_user: CurrentUser = Depends(get_current_user)):
     """
-    Migración: Actualiza el estatus a 'En Retest' para todas las vulnerabilidades
-    que tienen resultado_re_test = 'Para Re Test' pero estatus != 'En Retest'
+    Migración: Actualiza tanto resultado_re_test como estatus a 'En Retest' para todas las vulnerabilidades
+    que tienen resultado_re_test = 'Para Re Test'
     """
     if not current_user.es_admin:
         raise HTTPException(status_code=403, detail="Solo administradores pueden ejecutar migraciones")
     
-    # Buscar vulnerabilidades con resultado_re_test = "Para Re Test" pero estatus diferente
-    result = await db.vulnerabilidades.update_many(
-        {
-            "resultado_re_test": "Para Re Test",
-            "estatus": {"$ne": "En Retest"}
-        },
-        {
-            "$set": {"estatus": "En Retest"}
-        }
+    # Paso 1: Actualizar resultado_re_test de "Para Re Test" a "En Retest"
+    result1 = await db.vulnerabilidades.update_many(
+        {"resultado_re_test": "Para Re Test"},
+        {"$set": {"resultado_re_test": "En Retest", "estatus": "En Retest"}}
     )
     
+    # Paso 2: Actualizar estatus para las que tienen resultado_re_test = "En Retest" pero estatus diferente
+    result2 = await db.vulnerabilidades.update_many(
+        {
+            "resultado_re_test": "En Retest",
+            "estatus": {"$ne": "En Retest"}
+        },
+        {"$set": {"estatus": "En Retest"}}
+    )
+    
+    total = result1.modified_count + result2.modified_count
+    
     return {
-        "mensaje": f"Migración completada. {result.modified_count} vulnerabilidades actualizadas.",
-        "vulnerabilidades_actualizadas": result.modified_count
+        "mensaje": f"Migración completada. {total} vulnerabilidades actualizadas.",
+        "vulnerabilidades_actualizadas": total,
+        "detalle": {
+            "resultado_re_test_actualizados": result1.modified_count,
+            "estatus_actualizados": result2.modified_count
+        }
     }
 
 # Initialize and register GRC module routers
