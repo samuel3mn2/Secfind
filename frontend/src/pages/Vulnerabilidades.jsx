@@ -2266,7 +2266,7 @@ export default function Vulnerabilidades() {
                     onValueChange={(v) => {
                       // Sincronizar estatus en tiempo real según resultado_re_test
                       const estatusCierre = ["Corregido", "Desestimado"];
-                      const estatusPendiente = ["Vulnerable", "Impedimento", "En Retest", "Pendiente"];
+                      const estatusPendiente = ["Vulnerable", "Impedimento", "Pendiente"];
                       
                       let nuevoEstatus = formData.estatus;
                       let nuevaFechaCierre = formData.fecha_cierre;
@@ -2277,6 +2277,8 @@ export default function Vulnerabilidades() {
                         if (!nuevaFechaCierre) {
                           nuevaFechaCierre = new Date().toISOString().split('T')[0];
                         }
+                      } else if (v === "En Retest") {
+                        nuevoEstatus = "En Retest";
                       } else if (estatusPendiente.includes(v)) {
                         nuevoEstatus = "Pendiente";
                       }
@@ -2303,9 +2305,11 @@ export default function Vulnerabilidades() {
                     {formData.resultado_re_test ? 
                       (["Corregido", "Desestimado"].includes(formData.resultado_re_test) ? 
                         "⚡ Estatus se sincroniza a 'Cerrado'" : 
-                        ["Vulnerable", "Impedimento", "En Retest", "Pendiente"].includes(formData.resultado_re_test) ?
-                          "⚡ Estatus se sincroniza a 'Pendiente'" : 
-                          "") : 
+                        formData.resultado_re_test === "En Retest" ?
+                          "⚡ Estatus se sincroniza a 'En Retest'" :
+                          ["Vulnerable", "Impedimento", "Pendiente"].includes(formData.resultado_re_test) ?
+                            "⚡ Estatus se sincroniza a 'Pendiente'" : 
+                            "") : 
                       "Sin resultado = estatus libre"}
                   </p>
                 </div>
