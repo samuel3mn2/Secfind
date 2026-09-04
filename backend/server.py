@@ -3343,10 +3343,12 @@ async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate, c
             if not update_dict.get("fecha_cierre") and not existing.get("fecha_cierre"):
                 update_dict["fecha_cierre"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         elif es_resultado_reapertura:
-            update_dict["estatus"] = "Pendiente"
-            
+            # Para "Para Re Test", usar estatus "En Retest"
             if nuevo_resultado == "para re test":
+                update_dict["estatus"] = "En Retest"
                 update_dict["fecha_compromiso"] = None
+            else:
+                update_dict["estatus"] = "Pendiente"
             
             # Si estaba cerrada, limpiar fecha_cierre y agregar nota
             if estaba_cerrada and fecha_cierre_anterior:
@@ -3379,9 +3381,13 @@ async def update_vulnerabilidad(vuln_id: str, vuln_data: VulnerabilidadUpdate, c
     
     # Si hay resultados personalizados y el usuario está cambiando el resultado global
     if info_aplicaciones["tiene_resultados_personalizados"] and "resultado_re_test" in update_dict:
-        # Si no todas las aplicaciones están resueltas, forzar estado Pendiente
+        # Si no todas las aplicaciones están resueltas, mantener estado apropiado
         if not info_aplicaciones["todas_resueltas"]:
-            update_dict["estatus"] = "Pendiente"
+            # Si el resultado sugerido es "Para Re Test", usar "En Retest"
+            if info_aplicaciones.get("resultado_global_sugerido") == "Para Re Test":
+                update_dict["estatus"] = "En Retest"
+            else:
+                update_dict["estatus"] = "Pendiente"
             update_dict["fecha_cierre"] = None
     
     # Si se están agregando nuevas aplicaciones a una vulnerabilidad cerrada
@@ -6261,6 +6267,31 @@ async def get_reporte_vista_comite(
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+@api_router.post("/admin/migrar-estatus-retest")
+async def migrar_estatus_retest(current_user: CurrentUser = Depends(get_current_user)):
+    """
+    Migración: Actualiza el estatus a 'En Retest' para todas las vulnerabilidades
+    que tienen resultado_re_test = 'Para Re Test' pero estatus != 'En Retest'
+    """
+    if not current_user.es_admin:
+        raise HTTPException(status_code=403, detail="Solo administradores pueden ejecutar migraciones")
+    
+    # Buscar vulnerabilidades con resultado_re_test = "Para Re Test" pero estatus diferente
+    result = await db.vulnerabilidades.update_many(
+        {
+            "resultado_re_test": "Para Re Test",
+            "estatus": {"$ne": "En Retest"}
+        },
+        {
+            "$set": {"estatus": "En Retest"}
+        }
+    )
+    
+    return {
+        "mensaje": f"Migración completada. {result.modified_count} vulnerabilidades actualizadas.",
+        "vulnerabilidades_actualizadas": result.modified_count
+    }
 
 # Initialize and register GRC module routers
 def setup_grc_routers():
