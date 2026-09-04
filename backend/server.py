@@ -3873,7 +3873,7 @@ async def get_dashboard_stats(
     en_proceso = await db.vulnerabilidades.count_documents(en_proceso_query)
     
     # Para Re Test
-    para_retest_query = {**base_query, "estatus": "Para Re Test"}
+    para_retest_query = {**base_query, "estatus": "En Retest"}
     para_retest = await db.vulnerabilidades.count_documents(para_retest_query)
     
     severidad_pipeline = [
@@ -3972,7 +3972,7 @@ async def get_dashboard_tendencias(
             estatus = v.get("estatus", "")
             if estatus in ["Corregido", "Cerrado"]:
                 tendencias[periodo]["corregidas"] += 1
-            elif estatus in ["Pendiente", "En Proceso", "Para Re Test"]:
+            elif estatus in ["Pendiente", "En Proceso", "En Retest"]:
                 tendencias[periodo]["pendientes"] += 1
                 
         except:
@@ -4223,7 +4223,7 @@ async def get_kpi_detail(
     elif tipo == "en_proceso":
         query["estatus"] = "En Proceso"
     elif tipo == "para_retest":
-        query["estatus"] = "Para Re Test"
+        query["estatus"] = "En Retest"
     
     vulnerabilidades = await db.vulnerabilidades.find(query, {"_id": 0}).to_list(10000)
     return vulnerabilidades
@@ -4712,8 +4712,8 @@ async def registrar_seguimiento(
         # CASO D: Para Re Test
         # - LIMPIA fecha_compromiso a null para que aparezca en vista "En Retest"
         # - NO incrementa veces_en_retest ni veces_cambiada_fecha
-        # - Mantiene estatus "Pendiente" (para compatibilidad)
-        update_ops["$set"]["estatus"] = "Pendiente"
+        # - Estatus "En Retest" para que aparezca en el filtro correspondiente
+        update_ops["$set"]["estatus"] = "En Retest"
         # Limpiar fecha_compromiso para que aparezca en vista "en_retest"
         update_ops["$set"]["fecha_compromiso"] = None
         fecha_limpiada = True
@@ -5994,7 +5994,7 @@ async def get_reporte_ejecutivo(
     corregidas = await db.vulnerabilidades.count_documents({**query, "estatus": {"$in": ["Corregido", "Cerrado"]}})
     pendientes = await db.vulnerabilidades.count_documents({**query, "estatus": {"$nin": ["Cerrado", "Corregido", "Desestimado"]}})
     en_proceso = await db.vulnerabilidades.count_documents({**query, "estatus": "En Proceso"})
-    para_retest = await db.vulnerabilidades.count_documents({**query, "estatus": "Para Re Test"})
+    para_retest = await db.vulnerabilidades.count_documents({**query, "estatus": "En Retest"})
     
     stats = {
         "total_vulnerabilidades": total,
