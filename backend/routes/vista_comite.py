@@ -367,7 +367,7 @@ def create_router(db, get_current_user, CurrentUser):
                 try:
                     if data["fecha_mas_antigua"] is None or fecha_hallazgo < data["fecha_mas_antigua"]:
                         data["fecha_mas_antigua"] = fecha_hallazgo
-                except:
+                except Exception:
                     pass
             
             # Fecha compromiso máxima
@@ -375,7 +375,7 @@ def create_router(db, get_current_user, CurrentUser):
                 try:
                     if data["fecha_compromiso_max"] is None or fecha_compromiso > data["fecha_compromiso_max"]:
                         data["fecha_compromiso_max"] = fecha_compromiso
-                except:
+                except Exception:
                     pass
             
             # Contadores
@@ -457,7 +457,7 @@ def create_router(db, get_current_user, CurrentUser):
                     fecha_dt = datetime.strptime(data["fecha_compromiso_max"][:10], "%Y-%m-%d")
                     meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
                     fecha_compromiso_fmt = f"{meses[fecha_dt.month - 1]} {fecha_dt.year}"
-                except:
+                except Exception:
                     pass
             
             result.append({

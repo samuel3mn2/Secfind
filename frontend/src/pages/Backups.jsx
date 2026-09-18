@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
+import { BackupHistory } from "@/components/backups/BackupHistory";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,14 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -44,8 +37,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Database,
-  Download,
-  Trash2,
   Play,
   Settings,
   Cloud,
@@ -54,9 +45,7 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
-  RefreshCw,
   FolderOpen,
-  Calendar,
   Mail,
   TestTube,
   Folder,
@@ -101,7 +90,7 @@ export default function Backups() {
     email_notificacion: "",
   });
   
-  const [historial, setHistorial] = useState([]);
+  const [historyRevision, setHistoryRevision] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [ejecutando, setEjecutando] = useState(false);
@@ -141,26 +130,16 @@ export default function Backups() {
     }
   }, []);
 
-  const fetchHistorial = useCallback(async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const response = await axios.get(`${API}/backup/historial`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setHistorial(response.data);
-    } catch (error) {
-      console.error("Error fetching backup history:", error);
-    }
-  }, []);
+  const fetchHistorial = useCallback(() => setHistoryRevision(value => value + 1), []);
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchConfig(), fetchHistorial()]);
+      await fetchConfig();
       setLoading(false);
     };
     loadData();
-  }, [fetchConfig, fetchHistorial]);
+  }, [fetchConfig]);
 
   // Folder browser functions
   const openFolderBrowser = async (target = "config") => {
@@ -385,17 +364,6 @@ export default function Backups() {
     }
   };
 
-  const formatFecha = (fecha) => {
-    if (!fecha) return "-";
-    return new Date(fecha).toLocaleString("es-ES", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit"
-    });
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -405,13 +373,13 @@ export default function Backups() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6 [&_code]:break-all" data-testid="backups-page">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Database className="w-6 h-6 text-indigo-500" />
           <div>
-            <h2 className="text-xl font-semibold text-white">Backup de Base de Datos</h2>
+            <h2 className="text-base md:text-lg font-semibold text-white" data-testid="backups-heading">Backup de Base de Datos</h2>
             <p className="text-sm text-zinc-500">Configuración y gestión de respaldos</p>
           </div>
         </div>
@@ -438,7 +406,7 @@ export default function Backups() {
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Enable/Disable */}
-          <div className="flex items-center justify-between p-4 bg-zinc-900 rounded-lg">
+          <div className="flex items-center justify-between gap-3 p-4 bg-zinc-900 rounded-lg">
             <div className="flex items-center gap-3">
               <Clock className="w-5 h-5 text-zinc-400" />
               <div>
@@ -528,7 +496,7 @@ export default function Backups() {
               <div className="space-y-2 md:col-span-2">
                 <Label className="text-zinc-400">Ruta Local de Backup</Label>
                 <div className="flex gap-2">
-                  <div className="relative flex-1">
+                  <div className="relative min-w-0 flex-1">
                     <FolderOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
                     <Input
                       value={config.ruta_local}
@@ -618,7 +586,7 @@ export default function Backups() {
 
           {/* Mongodump Configuration Section */}
           <div className="pt-4 border-t border-zinc-800 space-y-4">
-            <div className="flex items-center justify-between p-4 bg-zinc-900 rounded-lg">
+            <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-zinc-900 rounded-lg">
               <div className="flex items-center gap-3">
                 <Terminal className="w-5 h-5 text-emerald-400" />
                 <div>
@@ -645,7 +613,7 @@ export default function Backups() {
               <div className="space-y-2">
                 <Label className="text-zinc-400">Ruta al ejecutable mongodump (opcional)</Label>
                 <div className="flex gap-2">
-                  <div className="relative flex-1">
+                  <div className="relative min-w-0 flex-1">
                     <Terminal className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
                     <Input
                       value={config.ruta_mongodump}
@@ -824,114 +792,7 @@ export default function Backups() {
         </CardContent>
       </Card>
 
-      {/* Historial Card */}
-      <Card className="bg-[#18181b] border-[#27272a]">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-white text-lg flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
-              Historial de Backups
-            </CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={fetchHistorial}
-              className="border-zinc-700"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Actualizar
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-zinc-700 hover:bg-transparent">
-                  <TableHead className="text-zinc-400">Fecha</TableHead>
-                  <TableHead className="text-zinc-400">Estado</TableHead>
-                  <TableHead className="text-zinc-400">Destino</TableHead>
-                  <TableHead className="text-zinc-400">Tamaño</TableHead>
-                  <TableHead className="text-zinc-400">Duración</TableHead>
-                  <TableHead className="text-zinc-400 text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {historial.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-zinc-500">
-                      No hay backups registrados
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  historial.map((backup) => (
-                    <TableRow key={backup.id} className="border-zinc-800">
-                      <TableCell className="text-zinc-300 font-mono text-sm">
-                        {formatFecha(backup.fecha)}
-                      </TableCell>
-                      <TableCell>
-                        {backup.estado === "exitoso" ? (
-                          <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-                            <CheckCircle2 className="w-3 h-3 mr-1" />
-                            Exitoso
-                          </Badge>
-                        ) : backup.estado === "en_progreso" ? (
-                          <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
-                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                            En progreso
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
-                            <XCircle className="w-3 h-3 mr-1" />
-                            Fallido
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-zinc-300">
-                        <div className="flex items-center gap-2">
-                          {backup.ruta_local && <HardDrive className="w-4 h-4 text-zinc-500" />}
-                          {backup.google_drive_file_id && <Cloud className="w-4 h-4 text-blue-400" />}
-                          <span className="capitalize">{backup.destino}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-zinc-300">
-                        {backup.tamaño_humano || "-"}
-                      </TableCell>
-                      <TableCell className="text-zinc-300">
-                        {backup.duracion_segundos ? `${backup.duracion_segundos.toFixed(1)}s` : "-"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {backup.ruta_local && backup.estado === "exitoso" && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDescargar(backup.id)}
-                              className="h-8 w-8 text-zinc-400 hover:text-cyan-400"
-                              title="Descargar"
-                            >
-                              <Download className="w-4 h-4" />
-                            </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setDeleteConfirm(backup.id)}
-                            className="h-8 w-8 text-zinc-400 hover:text-red-400"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+      <BackupHistory refreshKey={historyRevision} onDownload={handleDescargar} onDelete={setDeleteConfirm} />
 
       {/* Backup Manual Dialog */}
       <Dialog open={showBackupDialog} onOpenChange={setShowBackupDialog}>
@@ -1024,19 +885,20 @@ export default function Backups() {
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
-        <AlertDialogContent className="bg-[#1c1c1e] border-zinc-800">
+        <AlertDialogContent data-testid="backup-delete-dialog" className="bg-[#1c1c1e] border-zinc-800">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">¿Eliminar backup?</AlertDialogTitle>
-            <AlertDialogDescription className="text-zinc-400">
+            <AlertDialogTitle data-testid="backup-delete-title" className="text-white">¿Eliminar backup?</AlertDialogTitle>
+            <AlertDialogDescription data-testid="backup-delete-description" className="text-zinc-400">
               Esta acción eliminará el archivo de backup y su registro del historial.
               Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700">
+            <AlertDialogCancel data-testid="backup-delete-cancel" className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700">
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
+              data-testid="backup-delete-confirm"
               onClick={() => handleEliminar(deleteConfirm)}
               className="bg-red-600 hover:bg-red-700"
             >

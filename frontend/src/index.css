@@ -218,3 +218,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
     filter: invert(1) brightness(2.5) !important;
 }
+
+/* El esquema oscuro ya dibuja un icono claro; no invertirlo otra vez. */
+[data-testid="backup-history-filters"] input[type="date"]::-webkit-calendar-picker-indicator,
+[data-testid="backup-history-filters"] input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    filter: none !important;
+}

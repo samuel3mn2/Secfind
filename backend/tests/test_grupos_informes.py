@@ -61,7 +61,7 @@ class TestGruposInformesCRUD:
                     f"{BASE_URL}/api/config/grupos-informes/{grupo_id}",
                     headers=self.headers
                 )
-            except:
+            except Exception:
                 pass
     
     def test_get_grupos_informes(self):
@@ -406,7 +406,7 @@ class TestGruposInformesValidation:
                     f"{BASE_URL}/api/config/grupos-informes/{grupo_id}",
                     headers=self.headers
                 )
-            except:
+            except Exception:
                 pass
     
     def test_informe_cannot_be_in_multiple_groups(self):

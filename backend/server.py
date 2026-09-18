@@ -8,7 +8,7 @@ import re as regex_module
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional, Dict, Literal
+from typing import List, Optional, Dict, Literal, Union
 import uuid
 from datetime import datetime, timezone, date, timedelta
 import pandas as pd
@@ -18,6 +18,7 @@ import jwt
 from pdf_reports import generate_executive_report, generate_institution_report, generate_vista_comite_report
 from email_service import EmailService, generate_alert_email, generate_weekly_summary_email
 from backup_service import BackupService, BackupScheduler
+from backup_history import BackupLog, BackupHistoryPage, get_history_page, ensure_history_indexes, utc_iso
 
 # GRC Module Routes (Modular Architecture)
 from routes.dominios import create_dominios_router
@@ -1006,7 +1007,7 @@ async def get_optional_user(authorization: Optional[str] = Header(None)) -> Opti
         return None
     try:
         return await get_current_user(authorization)
-    except:
+    except HTTPException:
         return None
 
 # ============ AUTH ROUTES ============
@@ -2291,17 +2292,27 @@ async def ejecutar_backup(
     
     return resultado
 
-@api_router.get("/backup/historial")
+@api_router.get("/backup/historial", response_model=Union[BackupHistoryPage, List[BackupLog]])
 async def get_backup_historial(
-    limite: int = Query(default=50, le=200),
+    limite: int = Query(default=50, ge=1, le=200),
+    pagina: Optional[int] = Query(default=None, ge=1),
+    estado: Optional[Literal["exitoso", "fallido", "en_progreso"]] = None,
+    destino: Optional[Literal["local", "google_drive", "ambos"]] = None,
+    fecha_desde: Optional[datetime] = None,
+    fecha_hasta: Optional[datetime] = None,
     current_user: CurrentUser = Depends(get_current_user)
 ):
-    """Get backup history (admin only)"""
+    """Historial administrativo; con pagina devuelve metadatos y filtros.
+
+    fecha_desde es inclusiva y fecha_hasta exclusiva (ambas en ISO 8601).
+    Sin pagina se conserva la respuesta de lista para clientes anteriores.
+    """
     if not current_user.es_admin:
         raise HTTPException(status_code=403, detail="Solo administradores pueden ver el historial")
-    
-    historial = await backup_service.obtener_historial(limite)
-    return historial
+    if fecha_desde and fecha_hasta and utc_iso(fecha_desde) >= utc_iso(fecha_hasta):
+        raise HTTPException(status_code=422, detail="La fecha inicial debe ser anterior al límite final")
+    result = await get_history_page(db, pagina or 1, limite, estado, destino, fecha_desde, fecha_hasta)
+    return result if pagina is not None else result.items
 
 @api_router.delete("/backup/{backup_id}")
 async def eliminar_backup(
@@ -2642,14 +2653,16 @@ async def migrate_nivel_riesgo():
     """
     # Buscar vulnerabilidades de "Primera emulación" sin nivel_riesgo
     query = {
-        "$or": [
-            {"nombre_informe_pentest": {"$regex": "primera emulacion", "$options": "i"}},
-            {"nombre_informe_pentest": {"$regex": "primera emulación", "$options": "i"}}
-        ],
-        "$or": [
-            {"nivel_riesgo": {"$exists": False}},
-            {"nivel_riesgo": None},
-            {"nivel_riesgo": ""}
+        "$and": [
+            {"$or": [
+                {"nombre_informe_pentest": {"$regex": "primera emulacion", "$options": "i"}},
+                {"nombre_informe_pentest": {"$regex": "primera emulación", "$options": "i"}}
+            ]},
+            {"$or": [
+                {"nivel_riesgo": {"$exists": False}},
+                {"nivel_riesgo": None},
+                {"nivel_riesgo": ""}
+            ]}
         ]
     }
     
@@ -3059,7 +3072,7 @@ async def get_dropdown_options():
                 year = int(fecha[:4])
                 if 2000 <= year <= 2100:
                     años.add(year)
-            except:
+            except Exception:
                 pass
     
     return DropdownOptions(
@@ -3984,7 +3997,7 @@ async def get_dashboard_tendencias(
             elif estatus in ["Pendiente", "En Proceso", "En Retest"]:
                 tendencias[periodo]["pendientes"] += 1
                 
-        except:
+        except Exception:
             continue
     
     result = []
@@ -4114,7 +4127,7 @@ async def get_vista_comite(
                 current_oldest = informe_data[key]["fecha_mas_antigua"]
                 if current_oldest is None or fecha_hallazgo < current_oldest:
                     informe_data[key]["fecha_mas_antigua"] = fecha_hallazgo
-            except:
+            except Exception:
                 pass
         
         # Check if pending (not in closed statuses)
@@ -4163,7 +4176,7 @@ async def get_vista_comite(
                 months_diff = (today.year - fecha_date.year) * 12 + (today.month - fecha_date.month)
                 tiempo_activo_meses = max(0, months_diff)
                 fecha_orden = fecha_str[:10]  # ISO date for sorting
-            except:
+            except Exception:
                 tiempo_activo_meses = None
         
         result.append({
@@ -4442,7 +4455,7 @@ async def get_seguimiento_riesgos(
                     estado_seguimiento = "proximo"
                 else:
                     estado_seguimiento = "ok"
-            except:
+            except Exception:
                 pass
         
         result.append({
@@ -6181,7 +6194,7 @@ async def get_reporte_vista_comite(
                 current = informe_data[inf]["fecha_mas_antigua"]
                 if current is None or fecha < current:
                     informe_data[inf]["fecha_mas_antigua"] = fecha
-            except:
+            except Exception:
                 pass
         
         is_pending = est not in closed_statuses
@@ -6223,7 +6236,7 @@ async def get_reporte_vista_comite(
                 fecha_date = datetime.strptime(fecha_str[:10], "%Y-%m-%d").date()
                 months_diff = (today.year - fecha_date.year) * 12 + (today.month - fecha_date.month)
                 tiempo_activo_meses = max(0, months_diff)
-            except:
+            except Exception:
                 pass
         
         result.append({
@@ -6328,6 +6341,7 @@ logger = logging.getLogger(__name__)
 
 @app.on_event("startup")
 async def startup_event():
+    await ensure_history_indexes(db)
     await init_instituciones()
     await init_aplicaciones()
     await init_proveedores()

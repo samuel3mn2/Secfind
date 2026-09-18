@@ -1,0 +1,56 @@
+{
+  "summary": "Pruebas backend+frontend completadas para submódulo Backups. Se validaron paginación real servidor (10/25/50), filtros combinados (estado/destino/rango fechas), orden reciente primero, respuesta legacy sin pagina, validaciones 422/401, descargar/eliminar con confirmación, comportamiento en desktop 1920x800 y móvil 390x844 con espera 350ms tras resize. Se sembraron >60 registros TEST_BACKUP_HISTORY_ para cobertura de páginas y límites de fecha en backend tests, y registros UI temporales; toda la data temporal fue limpiada al finalizar sin tocar los 11 registros originales.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "startup init_admin_user (no endpoint público)",
+        "issue": "Desviación de playbook auth: init_admin_user solo crea admin si no existe; no actualiza credenciales/hash si el admin ya existe y cambia la contraseña esperada en seed."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Configuración > Backups (filtros de fecha)",
+        "issues": [
+          "El icono del input type=date se percibe oscuro/negro en tema oscuro (bajo contraste) y parece picker nativo del navegador; revisar legibilidad visual."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration35_backup_history.py",
+    "/app/test_reports/pytest/pytest_iteration35_backup_history.xml"
+  ],
+  "action_items": [
+    "Mejorar contraste de iconografía/calendario en inputs de fecha del historial (tema oscuro).",
+    "Si se desea alinear 100% con el playbook auth extendido, actualizar init_admin_user para sincronizar credenciales/hash del admin existente cuando cambien en configuración de seed."
+  ],
+  "critical_code_review_comments": [
+    "server.py sigue siendo monolítico (>6400 líneas). Riesgo de mantenibilidad; separar rutas por dominio en módulos pequeños.",
+    "CORS usa allow_credentials=True y allow_origins desde env; en runtime probado responde origen explícito (bien), pero el fallback '*' en código puede ser riesgoso si falta CORS_ORIGINS.",
+    "GET /api/backup/historial implementa correctamente validación de rango invertido y legacy mode sin pagina.",
+    "Migración nivel_riesgo ya usa $and de dos $or (sin $or duplicado): validado en revisión de código."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration35_backup_history.py",
+    "/app/tests/backup_history_seed_cleanup.py",
+    "/app/test_reports/iteration_35.json"
+  ],
+  "success_rate": {
+    "backend": "100% (20/20 pruebas backend)",
+    "frontend": "95% (flujos solicitados OK; 1 observación visual menor)"
+  },
+  "test_credentials": {
+    "user": "admin",
+    "password": "admin123"
+  },
+  "seed_data_creation": "Se crearon registros temporales TEST_BACKUP_HISTORY_ en pruebas backend (fixture con cleanup automático) y TEST_BACKUP_HISTORY_UI_ para E2E UI; limpieza ejecutada al final. No se modificó ni borró data original.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend regression listo en /app/backend/tests/test_iteration35_backup_history.py (cubre paginación/filtros/validaciones/auth/download/delete/boundaries). UI validada con viewport desktop+móvil y espera 350ms tras resize (sidebar overlay no bloquea). No quedaron registros temporales TEST en backup_logs.",
+  "rca of the issue": "Observación principal no bloqueante: el contraste del icono de calendario depende del picker nativo en tema oscuro y puede verse negro. En auth playbook extendido, la función de seed actual no reconcilia un admin preexistente con cambio de contraseña esperado, porque solo ejecuta la rama create cuando no existe usuario admin."
+}

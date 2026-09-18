@@ -1336,7 +1336,7 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
                     d = datetime.fromisoformat(v["fecha_hallazgo"].replace("Z", "+00:00")) if isinstance(v["fecha_hallazgo"], str) else v["fecha_hallazgo"]
                     meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
                     mes_deteccion = f"{meses[d.month - 1]} {d.year}"
-                except:
+                except Exception:
                     pass
             
             result.append({
@@ -1462,7 +1462,7 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
                         d = fecha_str
                     meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
                     mes_deteccion = f"{meses[d.month - 1]} {d.year}"
-                except:
+                except Exception:
                     pass
             
             result.append({
