@@ -1,0 +1,67 @@
+{
+  "summary": "Pruebas frontend completadas en /dashboard-grc > Análisis Avanzado (Pivot) con datos reales (284 vulnerabilidades, 184 hallazgos). Se validó cierre por X/Escape/clic fuera, apertura exclusiva entre filtros y ciclos repetidos (>=5) en ambos módulos. El bug original de reapertura masiva al cambiar de filtro NO se reprodujo (count .pvtFilterBox: 0 al cerrar, 1 al abrir siguiente). Persisten dos problemas: el mismo triángulo no alterna cerrar/abrir correctamente (permanece en 1) y en móvil el popup de filtro se sale del viewport horizontalmente.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Pivot filter trigger (módulo Vulnerabilidades, filtro estatus)",
+        "issue": "El mismo triángulo no alterna cerrar/abrir con un solo clic; al hacer click repetido el .pvtFilterBox se mantiene en count=1 (esperado: 1->0->1).",
+        "selector": "[data-testid='pivot-vuln-table-filter-estatus-trigger']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Responsive móvil de popup de filtros Pivot",
+        "issue": "En viewport 390x844, el popup de filtro queda parcialmente fuera del viewport (right=433 > vw=390), aunque el resto del layout no genera overflow global.",
+        "affected_selectors": [
+          ".pvtFilterBox",
+          "[data-testid='pivot-vuln-table-filter-nivel-riesgo-trigger']"
+        ]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "Dashboard GRC / dialogs",
+        "issues": [
+          "Warning de accesibilidad recurrente: 'Missing Description or aria-describedby={undefined} for {DialogContent}'.",
+          "Warnings repetidos de Recharts en consola: width(-1) y height(-1)."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/tests/test_pivot_filter_lifecycle_regression.py"
+  ],
+  "action_items": [
+    "Corregir toggle del mismo trigger de filtro (mismo triángulo debe cerrar/abrir sin doble clic ni estado pegado).",
+    "Ajustar posicionamiento móvil de .pvtFilterBox para mantenerlo dentro del viewport horizontal (390px).",
+    "Agregar descripción accesible a DialogContent para eliminar warning aria-describedby.",
+    "Revisar contenedores Recharts para evitar width/height -1 en render inicial."
+  ],
+  "critical_code_review_comments": [
+    "PivotAnalysis.jsx es muy grande (~1500+ líneas) y mezcla lógica, estilos forzados y rendering; conviene dividir en módulos para mantenibilidad.",
+    "FORCED_DARK_MODE_CSS incluye selectores globales (por ejemplo 'select', 'input') que pueden impactar componentes fuera de pivot por uso de !important.",
+    "El hook usePivotFilterLifecycle usa cierre por click nativo + listeners globales; la interacción con el click del mismo .pvtTriangle es el punto más probable del bug de toggle observado."
+  ],
+  "updated_files": [
+    "/app/tests/test_pivot_filter_lifecycle_regression.py",
+    "/app/test_reports/iteration_36.json"
+  ],
+  "success_rate": {
+    "backend": "0% (no ejecutado por alcance frontend-only)",
+    "frontend": "85%"
+  },
+  "test_credentials": {
+    "user": "admin",
+    "password": "admin123"
+  },
+  "seed_data_creation": "Se crearon vistas temporales TEST_PIVOT_FILTER_202602* durante validación de guardado. Fueron eliminadas al finalizar vía API (remaining_test_views=0).",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Cobertura fuerte ya ejecutada para ciclos de apertura/cierre en ambos módulos y layouts. No repetir intentos de selector de vistas desde Playwright sin instrumentar data-testid en trigger/items de Vistas Guardadas; se alcanzó límite práctico de reintentos en esa ruta UI. Evidencia móvil/desktop en /app/test_reports/artifacts/iteration36_run4/.",
+  "rca of the issue": "RCA probable del bug restante (toggle mismo triángulo): la capa de lifecycle agrega listeners globales de click/keydown y además delega cierres por click nativo de .pvtCloseX. En pruebas, al clickear repetidamente el mismo trigger la ventana no desmonta (count permanece 1), lo que sugiere interferencia entre el handler global y el toggle interno de react-pivottable para ese caso específico. Reproducción: 1) abrir filtro estatus en Vulnerabilidades, 2) click mismo trigger 2-3 veces, 3) observar count .pvtFilterBox=1 constante. Mitigación sugerida: en onClick del lifecycle, detectar trigger del mismo atributo abierto y permitir cierre explícito (sin except) o delegar completamente al toggle nativo para ese caso." 
+}

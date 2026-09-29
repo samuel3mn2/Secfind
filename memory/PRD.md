@@ -1,13 +1,33 @@
 # SecFind — Gestión de Vulnerabilidades y GRC
 
-Última actualización: **2026-09-18**. Idioma de comunicación y documentación: español.
+Última actualización: **2026-09-29**. Idioma de comunicación y documentación: español.
 
 ## Problema original y usuarios
 Aplicación web para gestionar vulnerabilidades de ciberseguridad y sustituir un flujo de trabajo basado en Excel. Incluye operaciones CRUD sobre hallazgos de pentest, seguimiento de remediación y paneles para presentaciones ejecutivas.
 
 Usuarios: administradores de seguridad, analistas de vulnerabilidades/GRC, responsables de remediación y comités ejecutivos. El usuario principal utiliza una instalación **local en Windows 11**: preservar compatibilidad multiplataforma, rutas Windows y mongodump configurable.
 
-## Solicitud vigente
+## Solicitud vigente — Filtros del Pivot GRC
+Usuario: «Bien estamos listo, en el ambiente local todo funciona correctamente. Necesito que revises el modulo de Dashboard GRC submodulo Análisis Avanzado (Pivot) tiene algunos errores por ejemplo si abro un tab ejemplo Nivel de riesgo hago mi selección lo cierro y abro otro tab por ejemplo Estatus vuelve abrir Nivel de riesgo y así sucesivamente sigue abriendo todos los tabs».
+
+Aclaración: «Sí son las ventanas de filtros, el error ocurre en ambos» (Vulnerabilidades y Hallazgos de Auditoría). Corregir el ciclo de apertura/cierre sin perder selecciones ni vistas guardadas.
+
+### Implementado y verificado 2026-09-29
+- Reproducido en ambos módulos: el cierre interceptaba eventos React y aplicaba `display:none`; un observador posterior reemplazaba `cssText` y reabría ventanas cuyo estado seguía abierto.
+- Eliminados observadores de estilos globales y cierres visuales. Se usa el cierre real de react-pivottable: la ventana se desmonta.
+- Una ventana activa por análisis; cierre mediante X, Escape, clic fuera o apertura de otro filtro. El mismo triángulo alterna correctamente.
+- Selecciones conservadas al cerrar/reabrir y al guardar/cargar vistas.
+- Se detectó otro fallo durante la regresión: `onChange` incluía funciones/aggregators/renderers que se serializaban como `{}`; restaurarlos provocaba `aggregators[aggregatorName] is not a function`. Se guardan/restauran únicamente preferencias serializables (campos, agregador, renderer, filtros y orden).
+- Posicionamiento sin cubrir el triángulo; móvil dentro de la pantalla. Eliminada transición de transform en el atributo con filtro abierto para no desplazar el popup fijo. Arrastre de la ventana pertenece a react-draggable, no se sobrescribe su transform en escritorio.
+- Atributos de prueba y accesibilidad en controles generados; descripciones de diálogos y dimensiones iniciales Recharts para eliminar avisos detectados.
+- Archivos: `components/PivotAnalysis.jsx`, `components/pivot/{usePivotFilterLifecycle.js,positionPivotFilter.js,pivotState.js,PivotResponsive.css}`, `pages/DashboardGRC.jsx` y dimensiones iniciales en `pages/Dashboard.jsx`.
+- Informe inicial: `test_reports/iteration_36.json`; correcciones verificadas después en `test_reports/iteration_36_followup.md`. El informe inicial conserva sus hallazgos; el seguimiento documenta su resolución.
+- Probadas seis combinaciones por tamaño (ambos módulos × tabla/gráfico/paralelo), filtros repetidos y selección conservada. Móvil390×844 sin overflow en las seis combinaciones; escritorio1920×800 sin overflow y triángulo accesible.
+- Vista temporal guardada, página recargada y vista restaurada con filtros conservados. Vistas TEST eliminadas (HTTP200), ninguna vista existente ni datos reales modificados.
+- Credenciales e integraciones sin cambios. Verificación en Windows local pendiente del usuario.
+- Compilación final `CI=false yarn build` correcta (iteration_36_final_build.log); sin advertencias en los archivos Pivot nuevos/modificados. Persisten avisos heredados de hooks en otros módulos y tamaño del bundle.
+
+## Solicitud anterior — Historial de backups (validada en Windows local)
 «Hay que revisar la vista del submodulo de backups. El historial de backups muestra todos los backups, y con el timepo este historial va crecer mucho hay que mejorar esa vista».
 
 Alcance aceptado por el usuario («Me parece bien el alcance»):
@@ -27,6 +47,7 @@ Alcance aceptado por el usuario («Me parece bien el alcance»):
 - Consulta paginada: `backend/backup_history.py` (modelos Pydantic, filtros, índices y consulta acotada).
 - Vista: `frontend/src/pages/Backups.jsx`, integrada en Configuración → Backups.
 - Componentes de historial: `frontend/src/components/backups/` contiene `BackupHistory`, filtros, tabla adaptable, paginación y hook de consulta independiente.
+- Pivot GRC: `PivotAnalysis.jsx` reutiliza react-pivottable y Plotly; `components/pivot/` contiene el ciclo de filtros, coordenadas responsivas y normalización de preferencias guardadas.
 - Integraciones existentes: extracción PDF con IA, Google Drive y SMTP. No se añadieron ni modificaron integraciones de almacenamiento/email en esta iteración.
 
 ## Requisitos funcionales vigentes
@@ -67,7 +88,7 @@ Compatibilidad: sin `pagina` devuelve la lista legacy, con límite predeterminad
 - `configuracion`: documento `id=config_backup` (habilitado, ruta_local, ruta_mongodump, frecuencia, hora, destinos, notificaciones).
 - Vulnerabilidades: estatus, resultado_re_test, aplicaciones_resultados, historial_impedimentos_seguimiento.
 
-## Verificación
+## Verificación anterior — Backups
 - Informe: `/app/test_reports/iteration_35.json`; **20/20 pruebas backend**, flujos frontend de alcance aprobados.
 - Pruebas: `/app/backend/tests/test_iteration35_backup_history.py` y semilla temporal `/app/tests/backup_history_seed_cleanup.py`.
 - Se probaron >60 registros temporales, combinaciones de filtros, límites de fechas Santo Domingo, descarga, cancelación/eliminación de registros TEST y reajuste de página.
@@ -86,9 +107,9 @@ Compatibilidad: sin `pagina` devuelve la lista legacy, con límite predeterminad
 - La reconciliación automática de contraseña admin sugerida por la guía ampliada **no se implementó**: no forma parte del alcance y podría sobrescribir contraseñas cambiadas por usuarios. Requiere política explícita, no es un fallo del historial.
 
 ## Estado y próximos pasos
-- P0: verificación del historial mejorado en Windows local por el usuario; verificar migración local anterior de «En Retest».
+- P0: verificar corrección de ventanas de filtros Pivot en Windows local. El usuario ya confirmó que el trabajo anterior funciona en local.
 - P1: modularizar gradualmente `server.py`, con regresiones por módulo.
-- P2: consolidar dominios duplicados; exportación CSV del historial como propuesta futura.
+- P2: consolidar dominios duplicados; exportación CSV del historial e indicador de filtros activos del Pivot como propuestas futuras.
 - Detalle de prioridades: `/app/memory/ROADMAP.md`.
 - Histórico completo previo y cambios de esta iteración: `/app/memory/CHANGELOG.md`. Sus menciones antiguas de «Para Re Test» son históricas y quedan superadas por la regla actual de «En Retest».
 - Documentación local: `/app/README.md`, `/app/INSTALACION_WINDOWS.md`, `/app/scripts/INSTRUCCIONES_TAREA_PROGRAMADA.md`.

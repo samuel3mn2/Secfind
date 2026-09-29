@@ -1,5 +1,15 @@
 # SecFind — Historial de cambios
 
+## 2026-09-29 — Ventanas de filtros del Pivot GRC
+- Usuario confirmó que las mejoras anteriores funcionan correctamente en Windows local.
+- Corregida reapertura de ventanas cerradas en Vulnerabilidades y Hallazgos: el cierre ahora actualiza el estado de react-pivottable en lugar de ocultar nodos con CSS. Retirado observador que sobrescribía estilos y recuperaba ventanas ocultas.
+- X, Escape, clic fuera, otro filtro y alternancia del mismo triángulo. Selecciones no se pierden. Instrumentación y teclado accesible en controles generados.
+- Ajustada posición desktop para no cubrir el disparador, diseño móvil sin overflow y exclusión de transición transform al abrir un popup fijo. React-draggable mantiene su desplazamiento propio en escritorio.
+- Detectado/corregido fallo adicional de vistas guardadas: funciones de renderers/aggregators serializadas como objetos vacíos rompían restauración. `cleanPivotState` limita guardado/carga a configuración editable.
+- Añadidas descripciones de diálogos GRC e initialDimension positivo en ResponsiveContainer para eliminar avisos reportados.
+- Pruebas: informe36 inicial, regresión dirigida posterior ambos módulos×3layouts, escritorio1920x800 y móvil390x844 sin overflow. Vista TEST guardada, página recargada, filtros restaurados; limpieza HTTP200.
+- No cambios backend, credenciales, migraciones, backups o datos de vulnerabilidades/hallazgos. Pendiente validación local del usuario para esta corrección Pivot.
+
 ## 2026-09-18 — Historial de backups paginado
 - Alcance aprobado: 10/25/50 registros por página, filtros de estado/destino/fechas, totales, recientes primero y conservación de descarga/eliminación con confirmación.
 - Nuevo módulo backend `backup_history.py`: consulta acotada, índices compuestos, Pydantic, validaciones y ajuste de página fuera de rango; compatibilidad de respuesta legacy sin `pagina`.

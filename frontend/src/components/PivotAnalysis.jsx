@@ -17,6 +17,9 @@ import {
 import { toast } from "sonner";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
+import { usePivotFilterLifecycle, usePivotFilterControls } from "@/components/pivot/usePivotFilterLifecycle";
+import "@/components/pivot/PivotResponsive.css";
+import { cleanPivotState } from "@/components/pivot/pivotState";
 
 // Crear componente Plot con Plotly
 const Plot = createPlotlyComponent(Plotly);
@@ -657,8 +660,7 @@ div.pvtFilterBox,
 
 /* BOTONES SELECT ALL / DESELECT ALL */
 .pvtFilterBox button,
-.pvtFilterBox .pvtButton,
-.pvtFilterBox a[role="button"] {
+.pvtFilterBox .pvtButton {
     background: #4f46e5 !important;
     background-color: #4f46e5 !important;
     color: #ffffff !important;
@@ -673,7 +675,7 @@ div.pvtFilterBox,
 }
 
 .pvtFilterBox button:hover,
-.pvtFilterBox a[role="button"]:hover {
+.pvtFilterBox .pvtButton:hover {
     background: #6366f1 !important;
     background-color: #6366f1 !important;
 }
@@ -975,6 +977,9 @@ export function PivotAnalysis({
   const hallChartRef = useRef(null);
   const vulnTableRef = useRef(null);
   const hallTableRef = useRef(null);
+  const analysisRef = useRef(null);
+  usePivotFilterLifecycle(analysisRef);
+  usePivotFilterControls(analysisRef, loading);
 
   // ============================================================================
   // SINCRONIZACIÓN CON PADRE (VISTAS GUARDADAS)
@@ -990,10 +995,10 @@ export function PivotAnalysis({
       // Marcar que estamos cargando desde el padre para evitar propagar de vuelta
       isLoadingFromParent.current = true;
       
-      if (pivotState.vulnTableState) setVulnTableState(pivotState.vulnTableState);
-      if (pivotState.vulnChartState) setVulnChartState(pivotState.vulnChartState);
-      if (pivotState.hallTableState) setHallTableState(pivotState.hallTableState);
-      if (pivotState.hallChartState) setHallChartState(pivotState.hallChartState);
+      if (pivotState.vulnTableState) setVulnTableState(cleanPivotState(pivotState.vulnTableState));
+      if (pivotState.vulnChartState) setVulnChartState(cleanPivotState(pivotState.vulnChartState));
+      if (pivotState.hallTableState) setHallTableState(cleanPivotState(pivotState.hallTableState));
+      if (pivotState.hallChartState) setHallChartState(cleanPivotState(pivotState.hallChartState));
       if (pivotState.activeModule) setActiveModule(pivotState.activeModule);
       if (pivotState.layoutMode) setLayoutMode(pivotState.layoutMode);
       
@@ -1044,187 +1049,6 @@ export function PivotAnalysis({
     return () => {
       const s = document.getElementById(styleId);
       if (s) s.remove();
-    };
-  }, []);
-
-  // Forzar estilos oscuros en dropdowns y filtros que aparezcan dinámicamente
-  useEffect(() => {
-    const applyDarkStyles = () => {
-      // Aplicar a pvtCheckContainer (lista de opciones de filtro)
-      document.querySelectorAll('.pvtCheckContainer').forEach(el => {
-        el.style.cssText = 'background-color: #27272a !important; border: 1px solid #3f3f46 !important; border-radius: 8px !important;';
-      });
-      
-      // Aplicar a pvtFilterBox (popup de filtros)
-      document.querySelectorAll('.pvtFilterBox').forEach(el => {
-        el.style.cssText = 'background-color: #1f1f23 !important; border: 2px solid #6366f1 !important; border-radius: 12px !important; color: #e4e4e7 !important;';
-      });
-      
-      // Aplicar a todos los párrafos dentro de pvtCheckContainer
-      document.querySelectorAll('.pvtCheckContainer p').forEach(el => {
-        el.style.cssText = 'background-color: transparent !important; color: #e4e4e7 !important;';
-      });
-      
-      // Aplicar a elementos seleccionados
-      document.querySelectorAll('.pvtCheckContainer p.selected').forEach(el => {
-        el.style.cssText = 'background-color: #3f3f46 !important; color: #e4e4e7 !important; border-radius: 4px !important;';
-      });
-
-      // FORZAR ESTILOS EN SELECT ELEMENTS (pvtRenderers, pvtAggregator)
-      document.querySelectorAll('.pvtUi select, .pvtRenderers, .pvtAggregator, select').forEach(el => {
-        if (el.tagName === 'SELECT' || el.querySelector('select')) {
-          const selectEl = el.tagName === 'SELECT' ? el : el.querySelector('select');
-          if (selectEl) {
-            selectEl.style.cssText = `
-              background-color: #18181b !important;
-              color: #ffffff !important;
-              border: 2px solid #6366f1 !important;
-              border-radius: 8px !important;
-              padding: 10px 36px 10px 14px !important;
-              font-weight: 600 !important;
-              font-size: 14px !important;
-              cursor: pointer !important;
-              -webkit-appearance: none !important;
-              -moz-appearance: none !important;
-              appearance: none !important;
-              min-width: 180px !important;
-            `;
-          }
-        }
-      });
-
-      // También aplicar a los options
-      document.querySelectorAll('.pvtUi select option, select option').forEach(el => {
-        el.style.cssText = 'background-color: #18181b !important; color: #ffffff !important; padding: 12px 14px !important;';
-      });
-
-      // FORZAR ESTILOS EN PVTDROPDOWN (selector de renderer y aggregator)
-      document.querySelectorAll('.pvtDropdown, .pvtRenderers .pvtDropdown, .pvtAggregator .pvtDropdown').forEach(el => {
-        el.style.cssText = `
-          background-color: #18181b !important;
-          border: 2px solid #6366f1 !important;
-          border-radius: 8px !important;
-          min-width: 180px !important;
-        `;
-      });
-
-      document.querySelectorAll('.pvtDropdownValue, .pvtDropdownCurrent').forEach(el => {
-        el.style.cssText = `
-          background-color: #18181b !important;
-          color: #ffffff !important;
-          padding: 10px 14px !important;
-          font-weight: 600 !important;
-          font-size: 14px !important;
-        `;
-      });
-
-      document.querySelectorAll('.pvtDropdownIcon').forEach(el => {
-        el.style.cssText = 'color: #ffffff !important;';
-      });
-
-      // Aplicar a menú desplegable cuando se abre
-      document.querySelectorAll('.pvtDropdownMenu').forEach(el => {
-        el.style.cssText = `
-          background-color: #1f1f23 !important;
-          border: 2px solid #6366f1 !important;
-          border-radius: 8px !important;
-          box-shadow: 0 12px 32px rgba(0, 0, 0, 0.9) !important;
-          z-index: 99999 !important;
-        `;
-      });
-
-      document.querySelectorAll('.pvtDropdownMenu .pvtDropdownValue').forEach(el => {
-        // Aplicar estilos individualmente para no sobrescribir event handlers
-        el.style.backgroundColor = 'transparent';
-        el.style.color = '#e4e4e7';
-        el.style.padding = '10px 14px';
-      });
-
-      // Añadir event listener al botón de cerrar para asegurar que funcione
-      document.querySelectorAll('.pvtCloseX').forEach(el => {
-        // Solo añadir si no tiene ya nuestro listener
-        if (!el.hasAttribute('data-close-listener-added')) {
-          el.setAttribute('data-close-listener-added', 'true');
-          el.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            // Encontrar el FilterBox padre y ocultarlo
-            const filterBox = el.closest('.pvtFilterBox');
-            if (filterBox) {
-              filterBox.style.display = 'none';
-            }
-          }, true);
-        }
-      });
-    };
-
-    // Crear MutationObserver para detectar cambios en el DOM
-    let debounceTimer = null;
-    const observer = new MutationObserver((mutations) => {
-      // Debounce para evitar aplicar estilos repetidamente
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        mutations.forEach((mutation) => {
-          if (mutation.addedNodes.length > 0) {
-            applyDarkStyles();
-          }
-        });
-      }, 100);
-    });
-
-    // Observar cambios en el DOM
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-
-    // Aplicar estilos iniciales
-    applyDarkStyles();
-
-    return () => observer.disconnect();
-  }, []);
-
-  // Listener para cerrar FilterBox con ESC y click fuera
-  useEffect(() => {
-    const closeFilterBox = () => {
-      const filterBoxes = document.querySelectorAll('.pvtFilterBox');
-      filterBoxes.forEach(fb => {
-        fb.style.display = 'none';
-      });
-    };
-
-    // Handler para tecla ESC
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        closeFilterBox();
-      }
-    };
-
-    // Handler para click fuera del FilterBox
-    const handleClickOutside = (e) => {
-      const filterBox = document.querySelector('.pvtFilterBox');
-      if (filterBox && filterBox.style.display !== 'none' && filterBox.offsetHeight > 0) {
-        // Verificar si el click fue fuera del FilterBox y fuera de elementos interactivos del pivot
-        const isInsideFilterBox = filterBox.contains(e.target);
-        const isOnAttribute = e.target.closest('.pvtAttr') || e.target.closest('.pvtTriangle');
-        const isOnPvtDropdown = e.target.closest('.pvtDropdown');
-        const isOnPvtDropdownMenu = e.target.closest('.pvtDropdownMenu');
-        const isOnPvtDropdownValue = e.target.closest('.pvtDropdownValue');
-        
-        // No cerrar si el click es en cualquier elemento interactivo del pivot
-        if (!isInsideFilterBox && !isOnAttribute && !isOnPvtDropdown && !isOnPvtDropdownMenu && !isOnPvtDropdownValue) {
-          closeFilterBox();
-        }
-      }
-    };
-
-    // Añadir listeners - usar 'click' en lugar de 'mousedown' para no interferir con selecciones
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('click', handleClickOutside);
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('click', handleClickOutside);
     };
   }, []);
 
@@ -1393,28 +1217,26 @@ export function PivotAnalysis({
   };
 
   // Sincronizar cambios
-  const handleVulnTableChange = (s) => {
-    // IMPORTANTE: Eliminar 'data' del state para evitar que sobrescriba los datos actuales
-    // Ver: https://github.com/plotly/react-pivottable/issues/57
-    delete s.data;
+  const handleVulnTableChange = (next) => {
+    const s = cleanPivotState(next);
     setVulnTableState(s);
     setVulnChartState(prev => ({ ...prev, rows: s.rows, cols: s.cols, aggregatorName: s.aggregatorName, vals: s.vals }));
   };
   
-  const handleVulnChartChange = (s) => {
-    delete s.data;
+  const handleVulnChartChange = (next) => {
+    const s = cleanPivotState(next);
     setVulnChartState(s);
     setVulnTableState(prev => ({ ...prev, rows: s.rows, cols: s.cols, aggregatorName: s.aggregatorName, vals: s.vals }));
   };
   
-  const handleHallTableChange = (s) => {
-    delete s.data;
+  const handleHallTableChange = (next) => {
+    const s = cleanPivotState(next);
     setHallTableState(s);
     setHallChartState(prev => ({ ...prev, rows: s.rows, cols: s.cols, aggregatorName: s.aggregatorName, vals: s.vals }));
   };
   
-  const handleHallChartChange = (s) => {
-    delete s.data;
+  const handleHallChartChange = (next) => {
+    const s = cleanPivotState(next);
     setHallChartState(s);
     setHallTableState(prev => ({ ...prev, rows: s.rows, cols: s.cols, aggregatorName: s.aggregatorName, vals: s.vals }));
   };
@@ -1429,12 +1251,12 @@ export function PivotAnalysis({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" ref={analysisRef} data-testid="pivot-analysis">
       {/* Header */}
       <Card className="bg-zinc-900/50 border-zinc-800">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <BarChart3 className="w-5 h-5 text-indigo-400" />
               <CardTitle className="text-lg text-white">Análisis Avanzado - Pivot Tables</CardTitle>
             </div>
@@ -1443,19 +1265,19 @@ export function PivotAnalysis({
         <CardContent className="space-y-4">
           {/* Tabs de módulos independientes */}
           <Tabs value={activeModule} onValueChange={setActiveModule} className="w-full">
-            <TabsList className="bg-zinc-800 border border-zinc-700 p-1 w-full grid grid-cols-2">
+            <TabsList className="bg-zinc-800 border border-zinc-700 p-1 w-full h-auto grid grid-cols-1 sm:grid-cols-2">
               <TabsTrigger 
                 value="vulnerabilidades"
-                className="data-[state=active]:bg-red-600 data-[state=active]:text-white text-zinc-400 flex items-center gap-2"
+                className="data-[state=active]:bg-red-600 data-[state=active]:text-white text-zinc-400 flex min-w-0 whitespace-normal items-center gap-2"
                 data-testid="module-vulnerabilidades"
               >
                 <Target className="w-4 h-4" />
-                <span className="font-semibold">PIVOT VULNERABILIDADES</span>
+                <span className="min-w-0 break-words font-semibold">PIVOT VULNERABILIDADES</span>
                 <Badge className="bg-red-900/50 text-red-200 ml-1">{vulnerabilidadesData.length}</Badge>
               </TabsTrigger>
               <TabsTrigger 
                 value="hallazgos"
-                className="data-[state=active]:bg-orange-600 data-[state=active]:text-white text-zinc-400 flex items-center gap-2"
+                className="data-[state=active]:bg-orange-600 data-[state=active]:text-white text-zinc-400 flex min-w-0 whitespace-normal items-center gap-2"
                 data-testid="module-hallazgos"
               >
                 <ClipboardList className="w-4 h-4" />
@@ -1475,6 +1297,7 @@ export function PivotAnalysis({
               variant={layoutMode === LAYOUT_TYPES.TABLE_ONLY ? "default" : "outline"}
               size="sm"
               onClick={() => setLayoutMode(LAYOUT_TYPES.TABLE_ONLY)}
+              data-testid="pivot-layout-table"
               className={layoutMode === LAYOUT_TYPES.TABLE_ONLY 
                 ? "bg-emerald-600 hover:bg-emerald-700 text-white" 
                 : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"}
@@ -1486,6 +1309,7 @@ export function PivotAnalysis({
               variant={layoutMode === LAYOUT_TYPES.CHART_ONLY ? "default" : "outline"}
               size="sm"
               onClick={() => setLayoutMode(LAYOUT_TYPES.CHART_ONLY)}
+              data-testid="pivot-layout-chart"
               className={layoutMode === LAYOUT_TYPES.CHART_ONLY 
                 ? "bg-emerald-600 hover:bg-emerald-700 text-white" 
                 : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"}
@@ -1497,6 +1321,7 @@ export function PivotAnalysis({
               variant={layoutMode === LAYOUT_TYPES.SPLIT ? "default" : "outline"}
               size="sm"
               onClick={() => setLayoutMode(LAYOUT_TYPES.SPLIT)}
+              data-testid="pivot-layout-split"
               className={layoutMode === LAYOUT_TYPES.SPLIT 
                 ? "bg-emerald-600 hover:bg-emerald-700 text-white" 
                 : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"}
@@ -1514,6 +1339,7 @@ export function PivotAnalysis({
                 activeModule === "vulnerabilidades" ? vulnerabilidadesData : hallazgosData,
                 activeModule === "vulnerabilidades" ? "pivot_vulnerabilidades" : "pivot_hallazgos"
               )}
+              data-testid="pivot-export-csv"
               className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
             >
               <Download className="w-4 h-4 mr-2" />
@@ -1542,7 +1368,7 @@ export function PivotAnalysis({
           </div>
 
           {/* Leyenda */}
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <span className="text-sm text-zinc-500">Escala de Riesgo:</span>
             {Object.entries(RISK_COLORS).map(([nivel, color]) => (
               <div key={nivel} className="flex items-center gap-1.5">
@@ -1566,7 +1392,7 @@ export function PivotAnalysis({
             <Card className="bg-zinc-900/50 border-zinc-800 border-l-4 border-l-red-500">
               <CardHeader className="pb-2 border-b border-zinc-800">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Shield className="w-4 h-4 text-red-400" />
                     <CardTitle className="text-sm text-white">Tabla - Vulnerabilidades Pentest</CardTitle>
                     <Badge variant="outline" className="bg-red-500/20 text-red-300 border-red-500/30 text-xs">
@@ -1577,7 +1403,7 @@ export function PivotAnalysis({
               </CardHeader>
               <CardContent className="p-4 overflow-x-auto">
                 {vulnerabilidadesData.length > 0 ? (
-                  <div className="pivot-container" ref={vulnTableRef}>
+                  <div className="pivot-container" ref={vulnTableRef} data-pivot-id="vuln-table" data-testid="pivot-vuln-table">
                     <PivotTableUI
                       data={vulnerabilidadesData}
                       onChange={handleVulnTableChange}
@@ -1599,7 +1425,7 @@ export function PivotAnalysis({
           {(layoutMode === LAYOUT_TYPES.SPLIT || layoutMode === LAYOUT_TYPES.CHART_ONLY) && (
             <Card className="bg-zinc-900/50 border-zinc-800 border-l-4 border-l-red-500">
               <CardHeader className="pb-2 border-b border-zinc-800">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <BarChart3 className="w-4 h-4 text-red-400" />
                   <CardTitle className="text-sm text-white">Gráfico - Vulnerabilidades Pentest</CardTitle>
                   <Badge variant="outline" className="bg-red-500/20 text-red-300 border-red-500/30 text-xs">
@@ -1609,7 +1435,7 @@ export function PivotAnalysis({
               </CardHeader>
               <CardContent className="p-4 overflow-x-auto">
                 {vulnerabilidadesData.length > 0 ? (
-                  <div className="pivot-container" ref={vulnChartRef}>
+                  <div className="pivot-container" ref={vulnChartRef} data-pivot-id="vuln-chart" data-testid="pivot-vuln-chart">
                     <PivotTableUI
                       data={vulnerabilidadesData}
                       onChange={handleVulnChartChange}
@@ -1641,7 +1467,7 @@ export function PivotAnalysis({
             <Card className="bg-zinc-900/50 border-zinc-800 border-l-4 border-l-orange-500">
               <CardHeader className="pb-2 border-b border-zinc-800">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-orange-400" />
                     <CardTitle className="text-sm text-white">Tabla - Hallazgos Auditoría</CardTitle>
                     <Badge variant="outline" className="bg-orange-500/20 text-orange-300 border-orange-500/30 text-xs">
@@ -1652,7 +1478,7 @@ export function PivotAnalysis({
               </CardHeader>
               <CardContent className="p-4 overflow-x-auto">
                 {hallazgosData.length > 0 ? (
-                  <div className="pivot-container" ref={hallTableRef}>
+                  <div className="pivot-container" ref={hallTableRef} data-pivot-id="hall-table" data-testid="pivot-hall-table">
                     <PivotTableUI
                       data={hallazgosData}
                       onChange={handleHallTableChange}
@@ -1674,7 +1500,7 @@ export function PivotAnalysis({
           {(layoutMode === LAYOUT_TYPES.SPLIT || layoutMode === LAYOUT_TYPES.CHART_ONLY) && (
             <Card className="bg-zinc-900/50 border-zinc-800 border-l-4 border-l-orange-500">
               <CardHeader className="pb-2 border-b border-zinc-800">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <BarChart3 className="w-4 h-4 text-orange-400" />
                   <CardTitle className="text-sm text-white">Gráfico - Hallazgos Auditoría</CardTitle>
                   <Badge variant="outline" className="bg-orange-500/20 text-orange-300 border-orange-500/30 text-xs">
@@ -1684,7 +1510,7 @@ export function PivotAnalysis({
               </CardHeader>
               <CardContent className="p-4 overflow-x-auto">
                 {hallazgosData.length > 0 ? (
-                  <div className="pivot-container" ref={hallChartRef}>
+                  <div className="pivot-container" ref={hallChartRef} data-pivot-id="hall-chart" data-testid="pivot-hall-chart">
                     <PivotTableUI
                       data={hallazgosData}
                       onChange={handleHallChartChange}

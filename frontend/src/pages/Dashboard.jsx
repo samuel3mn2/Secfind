@@ -686,7 +686,7 @@ export default function Dashboard() {
         <CardContent>
           <div className="h-[300px]">
             {tendencias.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
                 <LineChart data={tendencias}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
                   <XAxis 
@@ -758,7 +758,7 @@ export default function Dashboard() {
           <CardContent>
             <div className="h-[280px]">
               {formatSeverityData().length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
                   <PieChart>
                     <Pie
                       data={formatSeverityData()}
@@ -799,7 +799,7 @@ export default function Dashboard() {
           <CardContent>
             <div className="h-[280px]">
               {formatStatusData().length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
                   <BarChart data={formatStatusData()} layout="vertical">
                     <XAxis type="number" stroke="#71717a" fontSize={12} />
                     <YAxis
@@ -834,7 +834,7 @@ export default function Dashboard() {
           <CardContent>
             <div className="h-[280px]">
               {formatInstitutionData().length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
                   <BarChart data={formatInstitutionData()}>
                     <XAxis
                       dataKey="name"

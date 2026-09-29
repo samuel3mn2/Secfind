@@ -17,6 +17,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -601,7 +602,7 @@ const SeverityPanel = ({ data, onBarClick }) => {
 
   return (
     <div className="h-[280px]">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
         <BarChart data={chartData} layout="vertical" margin={{ left: 0, right: 20 }}>
           <XAxis type="number" stroke="#71717a" fontSize={12} />
           <YAxis 
@@ -643,7 +644,7 @@ const TopDominiosChart = ({ data }) => {
 
   return (
     <div className="h-[300px]">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
         <BarChart data={chartData} margin={{ left: 0, right: 20, bottom: 60 }}>
           <XAxis 
             dataKey="name" 
@@ -1008,7 +1009,7 @@ export default function DashboardGRC() {
           {/* Saved Views Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">
+              <Button variant="outline" data-testid="grc-saved-views-trigger" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">
                 <Eye className="w-4 h-4 mr-2" />
                 {selectedVista ? selectedVista.nombre : "Vistas Guardadas"}
                 <ChevronDown className="w-4 h-4 ml-2" />
@@ -1018,6 +1019,7 @@ export default function DashboardGRC() {
               <DropdownMenuItem
                 className="text-zinc-300 focus:text-white focus:bg-zinc-800 cursor-pointer"
                 onClick={() => applyVista(null)}
+                data-testid="grc-saved-views-clear"
               >
                 <X className="w-4 h-4 mr-2" />
                 Sin Vista (Limpiar)
@@ -1033,6 +1035,7 @@ export default function DashboardGRC() {
                     <button
                       className="flex-1 flex items-center gap-2 text-left text-zinc-300 text-sm py-1"
                       onClick={() => applyVista(vista)}
+                      data-testid={`grc-saved-view-load-${vista.id}`}
                     >
                       {vista.es_publica ? <Globe className="w-3 h-3 text-green-400" /> : <Lock className="w-3 h-3 text-zinc-500" />}
                       <span className="truncate">{vista.nombre}</span>
@@ -1042,6 +1045,7 @@ export default function DashboardGRC() {
                       size="icon"
                       className="h-6 w-6 text-zinc-500 hover:text-red-400"
                       onClick={(e) => { e.stopPropagation(); handleDeleteView(vista.id); }}
+                      data-testid={`grc-saved-view-delete-${vista.id}`}
                     >
                       <Trash2 className="w-3 h-3" />
                     </Button>
@@ -1051,6 +1055,7 @@ export default function DashboardGRC() {
               <DropdownMenuSeparator className="bg-zinc-700" />
               <DropdownMenuItem
                 className="text-indigo-400 focus:text-indigo-300 focus:bg-zinc-800 cursor-pointer"
+                data-testid="grc-saved-view-save"
                 onClick={() => {
                   setSaveViewName(selectedVista?.nombre || "");
                   setSaveViewPublic(selectedVista?.es_publica || false);
@@ -1390,12 +1395,13 @@ export default function DashboardGRC() {
 
       {/* Save View Modal */}
       <Dialog open={showSaveModal} onOpenChange={setShowSaveModal}>
-        <DialogContent className="bg-zinc-900 border-zinc-700 text-white max-w-md">
+        <DialogContent data-testid="grc-save-view-dialog" className="bg-zinc-900 border-zinc-700 text-white max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Save className="w-5 h-5 text-indigo-400" />
               {selectedVista ? "Actualizar Vista" : "Guardar Vista"}
             </DialogTitle>
+            <DialogDescription className="sr-only">Nombre y visibilidad de la configuración actual del análisis.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -1411,6 +1417,7 @@ export default function DashboardGRC() {
             <div className="flex items-center gap-2">
               <Checkbox
                 id="public-view"
+                data-testid="grc-save-view-public"
                 checked={saveViewPublic}
                 onCheckedChange={setSaveViewPublic}
                 className="border-zinc-600"
@@ -1435,6 +1442,7 @@ export default function DashboardGRC() {
             <Button
               variant="outline"
               onClick={() => setShowSaveModal(false)}
+              data-testid="grc-save-view-cancel"
               className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
             >
               Cancelar
@@ -1462,6 +1470,7 @@ export default function DashboardGRC() {
                 {matrixDetailData?.count || 0} hallazgos
               </Badge>
             </DialogTitle>
+            <DialogDescription className="sr-only">Hallazgos de la celda seleccionada de la matriz de riesgo.</DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-3 pr-4">
@@ -1510,6 +1519,7 @@ export default function DashboardGRC() {
                 {severityDetailData?.count || 0} vulnerabilidades
               </Badge>
             </DialogTitle>
+            <DialogDescription className="sr-only">Vulnerabilidades de la severidad seleccionada.</DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-3 pr-4">
@@ -1566,6 +1576,7 @@ export default function DashboardGRC() {
                 </Badge>
               )}
             </DialogTitle>
+            <DialogDescription className="sr-only">Vulnerabilidades y hallazgos de la celda seleccionada del mapa de calor.</DialogDescription>
           </DialogHeader>
           
           {/* Resumen */}
