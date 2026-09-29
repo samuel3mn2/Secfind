@@ -31,7 +31,7 @@ export const usePivotFilterLifecycle = (rootRef) => {
         closeFilters();
         trigger?.focus({ preventScroll: true });
       } else if (['Enter', ' '].includes(event.key) && rootRef.current?.contains(event.target)
-        && event.target.matches('.pvtTriangle, .pvtCloseX, .pvtButton, .pvtOnly, .pvtCheckContainer p')) {
+        && event.target.matches('.pvtTriangle, .pvtCloseX, .pvtButton, .pvtOnly, .pvtCheckContainer p, .pvtDropdownCurrent, .pvtDropdownMenu .pvtDropdownValue')) {
         event.preventDefault();
         event.target.click();
       }
@@ -62,6 +62,16 @@ export const usePivotFilterControls = (rootRef, loading) => {
       }
     };
     const annotate = () => root.querySelectorAll('.pivot-container').forEach(panel => {
+      const panelId = `pivot-${panel.dataset.pivotId}`;
+      const renderer = panel.querySelector('.pvtRenderers');
+      mark(renderer?.querySelector('.pvtDropdownCurrent'), `${panelId}-renderer-trigger`, 'Tipo de visualización', 'button');
+      mark(renderer?.querySelector('.pvtDropdownMenu'), `${panelId}-renderer-menu`);
+      renderer?.querySelectorAll('.pvtDropdownMenu .pvtDropdownValue').forEach(option => {
+        const name = option.textContent.trim();
+        mark(option, `${panelId}-renderer-${name.toLowerCase().replace(/\s+/g, '-')}`, name, 'button');
+      });
+      mark(panel.querySelector('.pvtTable'), `${panelId}-results`);
+      panel.querySelectorAll('.pvtTable td').forEach((cell, index) => mark(cell, `${panelId}-cell-${index}`));
       panel.querySelectorAll('li[data-id]').forEach(item => {
         const name = item.getAttribute('data-id');
         const prefix = `pivot-${panel.dataset.pivotId}-filter-${name.replaceAll('_', '-')}`;

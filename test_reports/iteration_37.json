@@ -1,0 +1,59 @@
+{
+  "summary": "Testing frontend-only ejecutado en Dashboard GRC > tab-pivot con foco en renderers de tabla heatmap, testids y regresión unitaria. Se validó por UI que Table Heatmap sí aplica color inline/computed en celdas numéricas y totales (texto #111111), celdas vacías permanecen oscuras y grand total sigue oscuro. Se detectó falla crítica/intermitente al intentar continuar a Table Col Heatmap/Table Row Heatmap vía selector instrumentado (3 intentos fallidos consecutivos). Se agregaron y ejecutaron pruebas unitarias nuevas para tableHeatmapColorScale + renderers react-pivottable (10/10 pass).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Pivot renderer selector (Vulnerabilidades tabla)",
+        "issue": "Tras cambiar a Table Heatmap, la opción instrumentada 'Table Col Heatmap' no se pudo seleccionar en 3 intentos (timeout sobre data-testid pivot-vuln-table-renderer-table-col-heatmap). Bloquea validar ciclo completo Table -> 3 heatmaps -> Table desde automatización.",
+        "selector": "[data-testid='pivot-vuln-table-renderer-table-col-heatmap']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Renderer menu instrumentation + interacción continua",
+        "issue": "El menú/estado del renderer no mantiene comportamiento estable para automatización en cambios encadenados; se observó estado donde la opción requerida deja de estar clickeable/localizable aunque previamente existía.",
+        "affected_selectors": [
+          "[data-testid='pivot-vuln-table-renderer-trigger']",
+          "[data-testid='pivot-vuln-table-renderer-menu']",
+          "[data-testid='pivot-vuln-table-renderer-table-col-heatmap']"
+        ]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/frontend/src/components/pivot/tableHeatmap.test.js"
+  ],
+  "action_items": [
+    "Corregir estabilidad/clickabilidad del selector de renderer para permitir elegir Table Col Heatmap y Table Row Heatmap de forma consistente tras seleccionar Table Heatmap.",
+    "Revalidar flujo completo solicitado (ambos módulos: vulnerabilidades/hallazgos) después del fix del selector.",
+    "Ejecutar retest E2E de guardado/carga/eliminación de vista TEST_PIVOT_HEATMAP_ (quedó bloqueado por el fallo del renderer selector en esta iteración)."
+  ],
+  "critical_code_review_comments": [
+    "PivotAnalysis.jsx sigue muy grande (~1500 líneas) y mezcla CSS forzado, lógica de estado, sincronización y UI; alto riesgo de regresiones en interacciones como renderer/filter.",
+    "La estrategia de estilos forzados con selectores muy agresivos y !important puede interferir con estados visuales/interactivos dinámicos de react-pivottable.",
+    "El hook de anotación por MutationObserver depende de mutaciones del DOM de librería; conviene reforzar la estabilidad de testids para menús dinámicos del renderer."
+  ],
+  "updated_files": [
+    "/app/frontend/src/components/pivot/tableHeatmap.test.js",
+    "/app/test_reports/iteration_37.json"
+  ],
+  "success_rate": {
+    "backend": "0% (no ejecutado por alcance frontend-only)",
+    "frontend": "65%"
+  },
+  "test_credentials": {
+    "user": "admin",
+    "password": "admin123"
+  },
+  "seed_data_creation": "No se crearon datos persistentes. No se alcanzó guardado de vista temporal por bloqueo en selector renderer.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Se debe evitar nuevos intentos repetidos sobre el mismo selector sin fix previo (se alcanzaron 3 fallos consecutivos en pivot-vuln-table-renderer-table-col-heatmap). Pruebas unitarias nuevas de escala/renderers están pasando (10/10) y sirven como red de regresión para normalización global/row/col y casos NaN/Infinity/[]/negativos.",
+  "rca of the issue": "RCA preliminar: el selector instrumentado del renderer presenta estado no estable tras transición a Table Heatmap. Reproducción: login -> /dashboard-grc -> tab-pivot -> renderer Table -> renderer Table Heatmap -> intentar seleccionar Table Col Heatmap; timeout en opción testid. Posibles causas: estado de menú no abierto/cerrado correctamente tras selección previa o anotación testid dinámica no consistente en re-render del dropdown."
+}

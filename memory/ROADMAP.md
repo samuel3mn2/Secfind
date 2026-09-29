@@ -3,6 +3,7 @@
 Actualizado: 2026-09-29.
 
 ## P0 — Verificación del usuario
+- [ ] Verificar en Windows local Table → Table Heatmap → Table Col Heatmap → Table Row Heatmap → Table en ambos módulos. Deben cambiar colores según valores/global/columna/fila, no las cifras ni la disposición de ejes.
 - [ ] Verificar en Windows local: Dashboard GRC → Análisis Avanzado → Nivel de riesgo → seleccionar → cerrar → Estatus/Estado. Repetir en Vulnerabilidades y Hallazgos.
 - [x] Historial de backups: el usuario confirmó «en el ambiente local todo funciona correctamente» el2026-09-29.
 - No hay fallos bloqueantes conocidos del Pivot tras la verificación final. El endpoint de migración anterior En Retest sigue disponible; no se ejecutó ni se modificó en este trabajo.
@@ -14,6 +15,7 @@ Actualizado: 2026-09-29.
 - [ ] Consolidar dominios duplicados «Seguridad EndPoints»/«Seguridad de Endpoints» preservando referencias.
 - [ ] Propuesta para el usuario: exportar el historial filtrado a CSV para auditoría. No implementada.
 - [ ] Propuesta: contador visible de filtros activos en el Pivot. No implementada.
+- [ ] Propuesta: leyenda de intensidad relativa para las tablas Heatmap. No implementada.
 - [ ] Prueba adicional de permisos de historial con usuario no-admin cuando se faciliten credenciales. No se crearon usuarios en esta iteración.
 
 ## Backlog histórico — Requiere priorización antes de iniciar
@@ -25,6 +27,11 @@ Actualizado: 2026-09-29.
 - No sincronizar automáticamente contraseñas admin con un seed sin política explícita de rotación; la recomendación genérica del informe35 no es un bug funcional del historial.
 
 ## Completado en la iteración actual
+- [x] Modos Heatmap de ambas tablas visibles: corrección de fondos CSS forzados y contraste de cifras.
+- [x] Escala segura para celdas vacías/valores iguales/únicos y normalización nativa global/fila/columna;10/10unitarias.
+- [x] Ciclos completos4modos, filtros y vistas guardadas conservados; pruebas escritorio/móvil y gráfico en paralelo sin overflow.
+
+## Completado anteriormente — Ventanas Pivot
 - [x] Cierre real de ventanas de filtros Pivot en ambos módulos, sin reapertura acumulativa.
 - [x] Un filtro abierto a la vez; X/Escape/fuera/otro campo y alternancia del mismo triángulo.
 - [x] Ventanas dentro del viewport móvil y desktop sin tapar el triángulo;6combinaciones por tamaño verificadas.

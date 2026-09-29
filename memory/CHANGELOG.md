@@ -1,5 +1,14 @@
 # SecFind — Historial de cambios
 
+## 2026-09-29 — Tipos de tabla y mapas de calor Pivot (iteración37)
+- Usuario informó que Table/Heatmap/Col Heatmap/Row Heatmap lucían iguales en Vulnerabilidades y Hallazgos, mientras gráficos funcionaban.
+- Confirmado: fondos CSS!important ocultaban colores inline del renderer. Eliminadas reglas de tabla duplicadas y fondos forzados; hover respeta colores.
+- Se mantiene agrupación nativa react-pivottable. Escala blanco→rojo segura para valores iguales, únicos, nulos y no finitos; texto oscuro legible, total general oscuro y tabla normal restaurable.
+- Añadida instrumentación de selector/celdas. Menú permanece abierto tras seleccionar opción distinta por diseño de biblioteca; informe inicial de inestabilidad de testids fue problema de secuencia de la prueba, no del producto.
+- Pruebas10/10 (escala/contraste y renderers2×3), E2E ambos módulos y4modos desktop/móvil, filtros y vistas guardadas conservados; vistaTEST limpiada.
+- Detectado y ajustado ancho de gráfico en paralelo mediante medición del panel, sin modificar lógica ni datos de gráficos. Overflow final[] a1920×800 y390×844.
+- Informe de cierre: `test_reports/iteration_37_followup.md`. Sin cambios de DB/auth/integraciones; verificación Windows local pendiente.
+
 ## 2026-09-29 — Ventanas de filtros del Pivot GRC
 - Usuario confirmó que las mejoras anteriores funcionan correctamente en Windows local.
 - Corregida reapertura de ventanas cerradas en Vulnerabilidades y Hallazgos: el cierre ahora actualiza el estado de react-pivottable en lugar de ocultar nodos con CSS. Retirado observador que sobrescribía estilos y recuperaba ventanas ocultas.

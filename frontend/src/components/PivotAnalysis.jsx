@@ -20,6 +20,8 @@ import { jsPDF } from "jspdf";
 import { usePivotFilterLifecycle, usePivotFilterControls } from "@/components/pivot/usePivotFilterLifecycle";
 import "@/components/pivot/PivotResponsive.css";
 import { cleanPivotState } from "@/components/pivot/pivotState";
+import { tableHeatmapColorScale } from "@/components/pivot/tableHeatmap";
+import { usePivotChartWidth } from "@/components/pivot/usePivotChartWidth";
 
 // Crear componente Plot con Plotly
 const Plot = createPlotlyComponent(Plotly);
@@ -318,43 +320,6 @@ div.pvtDropdownMenu {
     text-decoration: underline !important;
 }
 
-/* TABLA PRINCIPAL DE DATOS */
-.pvtUi table.pvtTable,
-table.pvtTable,
-.pvtTable {
-    background: #18181b !important;
-    background-color: #18181b !important;
-}
-
-.pvtTable td,
-.pvtTable th,
-table.pvtTable td,
-table.pvtTable th {
-    background: #27272a !important;
-    background-color: #27272a !important;
-    color: #e4e4e7 !important;
-    border: 1px solid #3f3f46 !important;
-    padding: 10px 14px !important;
-}
-
-.pvtTable th,
-table.pvtTable th {
-    background: #3f3f46 !important;
-    background-color: #3f3f46 !important;
-    font-weight: 700 !important;
-}
-
-/* TOTALES */
-.pvtTotal,
-.pvtGrandTotal,
-td.pvtTotal,
-td.pvtGrandTotal {
-    background: #1f1f23 !important;
-    background-color: #1f1f23 !important;
-    color: #a5b4fc !important;
-    font-weight: 700 !important;
-}
-
 /* ============================================================================
    SELECTORES Y DROPDOWNS - SOLUCIÓN ULTRA-AGRESIVA
    ============================================================================ */
@@ -478,12 +443,16 @@ input::placeholder {
 
 .pvtTable th,
 .pvtTable td {
-    background: #27272a !important;
     border: 1px solid #3f3f46 !important;
     padding: 12px 16px !important;
     color: #ffffff !important;
     font-weight: 500 !important;
     font-size: 13px !important;
+}
+
+/* Superar el tema base sin !important: los colores inline del Heatmap ganan. */
+.pivot-container .pvtTable td {
+    background: #27272a;
 }
 
 .pvtTable th {
@@ -495,8 +464,13 @@ input::placeholder {
     letter-spacing: 0.5px !important;
 }
 
-.pvtTable tbody tr:hover td {
-    background: #353538 !important;
+.pivot-container .pvtTable tbody tr:hover td {
+    background: #353538;
+}
+
+/* Texto oscuro sobre la escala blanco→rojo; el tema no debe ocultar los datos. */
+.pivot-container .pvtUi .pvtTable td[style*="background-color"] {
+    color: #111111 !important;
 }
 
 /* TOTALES - ALTA VISIBILIDAD */
@@ -505,9 +479,10 @@ input::placeholder {
 td.pvtTotal,
 td.pvtGrandTotal,
 th.pvtTotal,
-th.pvtGrandTotal {
-    background: #1e1e21 !important;
-    background-color: #1e1e21 !important;
+th.pvtGrandTotal,
+.pivot-container .pvtTable td.pvtTotal,
+.pivot-container .pvtTable td.pvtGrandTotal {
+    background: #1e1e21;
     font-weight: 700 !important;
     color: #a5b4fc !important;
     border-color: #4f46e5 !important;
@@ -980,6 +955,8 @@ export function PivotAnalysis({
   const analysisRef = useRef(null);
   usePivotFilterLifecycle(analysisRef);
   usePivotFilterControls(analysisRef, loading);
+  const vulnChartWidth = usePivotChartWidth(vulnChartRef, activeModule, layoutMode, loading);
+  const hallChartWidth = usePivotChartWidth(hallChartRef, activeModule, layoutMode, loading);
 
   // ============================================================================
   // SINCRONIZACIÓN CON PADRE (VISTAS GUARDADAS)
@@ -1408,6 +1385,7 @@ export function PivotAnalysis({
                       data={vulnerabilidadesData}
                       onChange={handleVulnTableChange}
                       renderers={TableRenderers}
+                      tableColorScaleGenerator={tableHeatmapColorScale}
                       unusedOrientationCutoff={Infinity}
                       {...vulnTableState}
                     />
@@ -1440,6 +1418,7 @@ export function PivotAnalysis({
                       data={vulnerabilidadesData}
                       onChange={handleVulnChartChange}
                       renderers={PlotlyRenderers}
+                      plotlyOptions={vulnChartWidth ? { width: vulnChartWidth } : {}}
                       {...vulnChartState}
                       unusedOrientationCutoff={Infinity}
                     />
@@ -1483,6 +1462,7 @@ export function PivotAnalysis({
                       data={hallazgosData}
                       onChange={handleHallTableChange}
                       renderers={TableRenderers}
+                      tableColorScaleGenerator={tableHeatmapColorScale}
                       unusedOrientationCutoff={Infinity}
                       {...hallTableState}
                     />
@@ -1515,6 +1495,7 @@ export function PivotAnalysis({
                       data={hallazgosData}
                       onChange={handleHallChartChange}
                       renderers={PlotlyRenderers}
+                      plotlyOptions={hallChartWidth ? { width: hallChartWidth } : {}}
                       {...hallChartState}
                       unusedOrientationCutoff={Infinity}
                     />

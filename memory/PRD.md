@@ -7,7 +7,24 @@ Aplicación web para gestionar vulnerabilidades de ciberseguridad y sustituir un
 
 Usuarios: administradores de seguridad, analistas de vulnerabilidades/GRC, responsables de remediación y comités ejecutivos. El usuario principal utiliza una instalación **local en Windows 11**: preservar compatibilidad multiplataforma, rutas Windows y mongodump configurable.
 
-## Solicitud vigente — Filtros del Pivot GRC
+## Solicitud vigente — Tipos de tabla del Pivot GRC
+Usuario: «Sigamos en el mismo lugar en la tabla me acabo de dar cuenta de algo, ver imagen al cambiar el tipo de tabla no cambia el diseño de la tabla. Probe los graficos y los graficos si funcionan correctamente». Imagen: selector Table / Table Heatmap / Table Col Heatmap / Table Row Heatmap. Confirmación: «Así tanto en vulnerabilidaes como en Hallazgos».
+
+### Implementado y verificado 2026-09-29 (iteración37)
+- Reproducción: al elegir Heatmap el renderer calculaba colores inline, pero los estilos oscuros `background:... !important` los tapaban; el color computado permanecía gris en ambos módulos.
+- Eliminadas reglas duplicadas de celdas y prioridad forzada en fondos de datos/totales/hover. Se conserva el estilo oscuro como reserva y la tabla normal sin colores residuales.
+- Colores blanco→rojo del renderer de tablas: global, por columna o por fila según opción. Cálculo de grupos/ejes/agregaciones sigue en react-pivottable, sin cambios en node_modules.
+- `tableHeatmapColorScale` maneja valores iguales, filas/columnas únicas, cero/negativos, vacíos y números no finitos. Vacíos sin color; min=max usa intensidad media válida, sin NaN. Texto `#111111` en celdas coloreadas, contraste mínimo≥4.5.
+- Totales parciales reciben su escala y total general permanece oscuro. Cambiar modo no cambia cifras, filtros ni agrupaciones.
+- Test IDs y teclado en selector de renderer y celdas. Se conserva el comportamiento nativo del menú (permanece abierto tras elegir otra opción).
+- Regresión en vista paralela detectó ancho de gráfico calculado a partir de toda la ventana: `usePivotChartWidth` ahora mide el panel y descuenta los controles. No modifica datos, tipos ni cálculo de gráficos.
+- Archivos: `PivotAnalysis.jsx`, `pivot/tableHeatmap.js`, `pivot/usePivotChartWidth.js`, `pivot/usePivotFilterLifecycle.js`; pruebas en `pivot/tableHeatmap.test.js`.
+- Verificación:10/10pruebas unitarias, ciclos de los4tipos en ambos módulos, colores inline=computado, hover, filtros, Plotly y vista temporal guardada/recargada/restaurada. Vista TEST eliminada (HTTP200), sin modificar datos originales.
+- Escritorio1920×800 y móvil390×844: ambos módulos y paralelo sin overflow. Informes `iteration_37.json` y `iteration_37_followup.md` (el primero quedó parcial por secuencia del menú en la automatización; el segundo documenta verificación completa y RCA).
+- Sin cambios backend, credenciales ni integraciones. No requiere migración. Pendiente comprobación del usuario en Windows local.
+- Compilación final aprobada (`iteration_37_final_build.log`,41.35s); solo advertencias heredadas de hooks fuera de Pivot y tamaño del bundle, sin errores.
+
+## Solicitud anterior — Filtros del Pivot GRC
 Usuario: «Bien estamos listo, en el ambiente local todo funciona correctamente. Necesito que revises el modulo de Dashboard GRC submodulo Análisis Avanzado (Pivot) tiene algunos errores por ejemplo si abro un tab ejemplo Nivel de riesgo hago mi selección lo cierro y abro otro tab por ejemplo Estatus vuelve abrir Nivel de riesgo y así sucesivamente sigue abriendo todos los tabs».
 
 Aclaración: «Sí son las ventanas de filtros, el error ocurre en ambos» (Vulnerabilidades y Hallazgos de Auditoría). Corregir el ciclo de apertura/cierre sin perder selecciones ni vistas guardadas.
@@ -107,9 +124,9 @@ Compatibilidad: sin `pagina` devuelve la lista legacy, con límite predeterminad
 - La reconciliación automática de contraseña admin sugerida por la guía ampliada **no se implementó**: no forma parte del alcance y podría sobrescribir contraseñas cambiadas por usuarios. Requiere política explícita, no es un fallo del historial.
 
 ## Estado y próximos pasos
-- P0: verificar corrección de ventanas de filtros Pivot en Windows local. El usuario ya confirmó que el trabajo anterior funciona en local.
+- P0: verificar tipos de tabla Heatmap y corrección anterior de ventanas de filtros Pivot en Windows local. El usuario ya confirmó que Backups funciona en local.
 - P1: modularizar gradualmente `server.py`, con regresiones por módulo.
-- P2: consolidar dominios duplicados; exportación CSV del historial e indicador de filtros activos del Pivot como propuestas futuras.
+- P2: consolidar dominios duplicados; exportación CSV del historial, indicador de filtros activos y leyenda de intensidad Heatmap como propuestas futuras.
 - Detalle de prioridades: `/app/memory/ROADMAP.md`.
 - Histórico completo previo y cambios de esta iteración: `/app/memory/CHANGELOG.md`. Sus menciones antiguas de «Para Re Test» son históricas y quedan superadas por la regla actual de «En Retest».
 - Documentación local: `/app/README.md`, `/app/INSTALACION_WINDOWS.md`, `/app/scripts/INSTRUCCIONES_TAREA_PROGRAMADA.md`.
