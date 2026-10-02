@@ -19,5 +19,6 @@ export const usePanelQuery = (endpoint, query, revision = 0) => {
     return () => controller.abort();
   }, [key, revision, retry]);
   return { ...result, loading: result.loading || result.key !== key,
+    previousData: result.data,
     data: result.key === key ? result.data : null, retry: () => setRetry(value => value + 1) };
 };

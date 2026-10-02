@@ -92,6 +92,8 @@ class FiltrosVista(BaseModel):
     estados_hallazgo: List[str] = Field(default_factory=list)
     niveles_riesgo_vulnerabilidad: List[str] = Field(default_factory=list)
     severidades_vulnerabilidad: List[str] = Field(default_factory=list)
+    aplicaciones_vulnerabilidad: List[Optional[str]] = Field(default_factory=list)
+    estatus_vulnerabilidad: List[str] = Field(default_factory=list)
 
 
 class PivotConfig(BaseModel):
@@ -229,7 +231,9 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
             "estados_vulnerabilidad": filtros.get("estados_vulnerabilidad", []),
             "estados_hallazgo": filtros.get("estados_hallazgo", []),
             "niveles_riesgo_vulnerabilidad": filtros.get("niveles_riesgo_vulnerabilidad", []),
-            "severidades_vulnerabilidad": filtros.get("severidades_vulnerabilidad", [])
+            "severidades_vulnerabilidad": filtros.get("severidades_vulnerabilidad", []),
+            "aplicaciones_vulnerabilidad": filtros.get("aplicaciones_vulnerabilidad", []),
+            "estatus_vulnerabilidad": filtros.get("estatus_vulnerabilidad", [])
         }
         
         if vista_id:

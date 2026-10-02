@@ -640,6 +640,8 @@ export default function DashboardGRC() {
   const [selectedEstadosHall, setSelectedEstadosHall] = useState([]);
   const [selectedRisks, setSelectedRisks] = useState([]);
   const [selectedSeverities, setSelectedSeverities] = useState([]);
+  const [selectedPanelApplications, setSelectedPanelApplications] = useState([]);
+  const [selectedPanelStatuses, setSelectedPanelStatuses] = useState([]);
   const [panelRevision, setPanelRevision] = useState(0);
   
   // Saved Views
@@ -783,6 +785,8 @@ export default function DashboardGRC() {
     setSelectedGrupos([]);
     setSelectedRisks(vista?.filtros?.niveles_riesgo_vulnerabilidad || []);
     setSelectedSeverities(vista?.filtros?.severidades_vulnerabilidad || []);
+    setSelectedPanelApplications(vista?.filtros?.aplicaciones_vulnerabilidad || []);
+    setSelectedPanelStatuses(vista?.filtros?.estatus_vulnerabilidad || []);
     if (!vista) {
       // Clear all filters
       setSelectedInformes([]);
@@ -834,6 +838,8 @@ export default function DashboardGRC() {
           estados_hallazgo: selectedEstadosHall,
           niveles_riesgo_vulnerabilidad: selectedRisks,
           severidades_vulnerabilidad: selectedSeverities,
+          aplicaciones_vulnerabilidad: selectedPanelApplications,
+          estatus_vulnerabilidad: selectedPanelStatuses,
         },
         pivot_config: pivotConfig,  // Configuración de tabla pivote
         active_tab: activeTab       // Pestaña activa (dashboard o pivot)
@@ -871,6 +877,8 @@ export default function DashboardGRC() {
 
   // Clear all filters
   const clearFilters = () => {
+    setSelectedPanelApplications([]);
+    setSelectedPanelStatuses([]);
     setSelectedRisks([]);
     setSelectedSeverities([]);
     setSelectedGrupos([]);
@@ -883,7 +891,7 @@ export default function DashboardGRC() {
   };
 
   const hasActiveFilters = selectedGrupos.length > 0 || selectedInformes.length > 0 || selectedDominios.length > 0 || 
-    selectedResponsables.length > 0 || selectedEstadosVuln.length > 0 || selectedEstadosHall.length > 0 || selectedRisks.length > 0 || selectedSeverities.length > 0;
+    selectedResponsables.length > 0 || selectedEstadosVuln.length > 0 || selectedEstadosHall.length > 0 || selectedRisks.length > 0 || selectedSeverities.length > 0 || selectedPanelApplications.length > 0 || selectedPanelStatuses.length > 0;
 
   // Grupo toggle handler
   const handleGrupoToggle = (grupoId) => {
@@ -1235,7 +1243,9 @@ export default function DashboardGRC() {
           </div>
 
       <VulnerabilityPanels globalQuery={buildQueryParams()} risks={selectedRisks} severities={selectedSeverities}
-        setRisks={setSelectedRisks} setSeverities={setSelectedSeverities} revision={panelRevision} />
+        applications={selectedPanelApplications} statuses={selectedPanelStatuses}
+        setRisks={setSelectedRisks} setSeverities={setSelectedSeverities}
+        setApplications={setSelectedPanelApplications} setStatuses={setSelectedPanelStatuses} revision={panelRevision} />
 
       {/* Top Dominios */}
       <Card className="bg-zinc-900/50 border-zinc-800">
@@ -1346,6 +1356,8 @@ export default function DashboardGRC() {
                 {selectedEstadosVuln.length > 0 && <li>Estados vuln: {selectedEstadosVuln.join(', ')}</li>}
                 {selectedRisks.length > 0 && <li data-testid="save-view-risk-summary">Niveles de riesgo: {selectedRisks.join(', ')}</li>}
                 {selectedSeverities.length > 0 && <li data-testid="save-view-severity-summary">Severidades: {selectedSeverities.join(', ')}</li>}
+                {selectedPanelApplications.length > 0 && <li className="break-words [overflow-wrap:anywhere]" data-testid="save-view-applications-summary">Aplicaciones: {selectedPanelApplications.map(value => value ?? 'Sin aplicación asignada').join(', ')}</li>}
+                {selectedPanelStatuses.length > 0 && <li className="break-words [overflow-wrap:anywhere]" data-testid="save-view-statuses-summary">Estatus: {selectedPanelStatuses.join(', ')}</li>}
                 {selectedEstadosHall.length > 0 && <li>Estados hall: {selectedEstadosHall.join(', ')}</li>}
                 {!hasActiveFilters && <li className="text-zinc-600">Sin filtros activos</li>}
               </ul>

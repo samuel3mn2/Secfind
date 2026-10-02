@@ -3,6 +3,7 @@
 Actualizado: 2026-10-02.
 
 ## P0 — Verificación del usuario
+- [ ] Comprobar en Windows local aplicaciones seleccionadas (una/varias), filtro por estatus, etiquetas por aplicación y Estatus: en cada detalle. No requiere migración.
 - [ ] Comprobar en Windows local el nuevo Panel por Nivel de riesgo, multiselección con Severidad, aplicaciones y detalle paginado. No requiere migración.
 - [ ] Verificar en Windows local Table → Table Heatmap → Table Col Heatmap → Table Row Heatmap → Table en ambos módulos. Deben cambiar colores según valores/global/columna/fila, no las cifras ni la disposición de ejes.
 - [ ] Verificar en Windows local: Dashboard GRC → Análisis Avanzado → Nivel de riesgo → seleccionar → cerrar → Estatus/Estado. Repetir en Vulnerabilidades y Hallazgos.
@@ -11,6 +12,7 @@ Actualizado: 2026-10-02.
 
 ## P1 — Mantenimiento próximo (no iniciado)
 - [ ] Refactorizar `server.py` en routers modulares con pruebas de regresión por dominio.
+- [ ] Evaluar protección frente a intentos fallidos del inicio de sesión: el informe39 observó6respuestas401sin bloqueo visible. Hallazgo ajeno al alcance de paneles, no auditoría concluyente; requiere revisión específica y política antes de modificar autenticación. No reiniciar contraseñas existentes desde el seed.
 
 ## P2 — Calidad de datos y propuestas
 - [ ] Consolidar dominios duplicados «Seguridad EndPoints»/«Seguridad de Endpoints» preservando referencias.
@@ -29,6 +31,12 @@ Actualizado: 2026-10-02.
 - No sincronizar automáticamente contraseñas admin con un seed sin política explícita de rotación; la recomendación genérica del informe35 no es un bug funcional del historial.
 
 ## Completado en la iteración actual
+- [x] Selector de aplicaciones múltiple con búsqueda y limpieza; restricción de filas a aplicaciones seleccionadas, sin duplicar totales.
+- [x] Resumen de estatus seleccionable, conteos por aplicación y Estatus: destacado en detalle; Sin estado para vacíos reales.
+- [x] Combinación con riesgo/severidad/filtros generales y persistencia en Vistas con compatibilidad hacia atrás.
+- [x]13pruebas backend de la mejora aprobadas, UI desktop/móvil y build; fixtures y vistasTEST limpiados, datos reales intactos.
+
+## Completado anteriormente — Paneles de riesgo/aplicaciones
 - [x] Panel Nivel de riesgo a la derecha de Severidad y aplicaciones afectadas debajo.
 - [x] Multiselección OR dentro de dimensiones, AND entre riesgos/severidades y respeto de filtros generales.
 - [x] Aplicaciones buscables/paginadas, detalle completo10por página, conteos correctos para múltiples aplicaciones y grupo sin asignar.

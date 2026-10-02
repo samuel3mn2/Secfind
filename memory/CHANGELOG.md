@@ -1,5 +1,15 @@
 # SecFind — Historial de cambios
 
+## 2026-10-02 — Aplicaciones seleccionadas y estatus GRC (iteración39)
+- Añadido selector múltiple de aplicaciones con búsqueda, incluye Sin aplicación asignada y evita mostrar aplicaciones asociadas no seleccionadas.
+- Nuevo resumen de estatus con multiselección y conteos; etiquetas de estatus por aplicación y línea Estatus: destacada en cada vulnerabilidad del detalle.
+- Vacíos/null/missing/espacios normalizados en lectura a Sin estado, sin mutación de datos.
+- Queryparams repetidos para aplicaciones/estatus preservan comas/ampersand/Unicode; filtros OR por dimensión y AND entre dimensiones. Facetas cruzadas mantienen opciones alternativas y total único de vulnerabilidades.
+- Vistas guardadas conservan nuevas selecciones y siguen admitiendo vistas anteriores. No cambios auth/credenciales/integraciones/migración.
+-13pruebas backend aprobadas (8+5); regresión38 8/8. Caso opcional sin fixture real omitido en suite general, cubierto con fixtures dedicados; limpieza porIDs únicos+informe. Baseline152activas conservado.
+- UI desktop1920×800/móvil390×844 sin overflow, estatus explícito confirmado; guardar/cargar/eliminar vistaTEST verificado. Build aprobado33.13s.
+- Informe39 incluyó una observación de lockout ajena al alcance de la tarea; se registra para evaluación independiente, sin cambiar contraseñas/seed ni introducir políticas de bloqueo no aprobadas.
+
 ## 2026-10-02 — Panel de riesgo y aplicaciones afectadas GRC (iteración38)
 - Nuevo panel Nivel de riesgo junto al de Severidad, ambos seleccionables, y aplicaciones afectadas debajo. OR dentro de riesgos/severidades y AND entre ambos; filtros generales preservados.
 - Distribuciones cruzadas mantienen alternativas; barra seleccionada/chips/limpiar. Aplicaciones con búsqueda,8por página, recuento sin duplicados por aplicación y grupo sin aplicación asignada.

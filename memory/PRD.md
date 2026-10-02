@@ -7,7 +7,38 @@ Aplicación web para gestionar vulnerabilidades de ciberseguridad y sustituir un
 
 Usuarios: administradores de seguridad, analistas de vulnerabilidades/GRC, responsables de remediación y comités ejecutivos. El usuario principal utiliza una instalación **local en Windows 11**: preservar compatibilidad multiplataforma, rutas Windows y mongodump configurable.
 
-## Solicitud vigente — Nivel de riesgo y aplicaciones afectadas en Dashboard GRC
+## Solicitud vigente — Selección de aplicaciones y estatus en Dashboard GRC
+Usuario: «Excelente vista!, algunos puntos de mejoras poder filtrar aplicación por si solo quieren verse algunas seleccionadas especificas y necesito el el estatus de esas vulnerabilidades ya que en el detalle no se muestran(te dejo libertad para eso crea una panel o como entiendas que se vea mejor, pero en el detalle de la vulnerabilidad pon el estatus tambien)».
+
+Alcance aprobado («Aprobado»): selector múltiple de aplicaciones con búsqueda que afecta los paneles; resumen por estatus seleccionable; estatus visible en cada detalle y «Sin estado» cuando falta. Se mantienen activas por defecto; cerradas/corregidas/desestimadas mediante filtro general de estados.
+
+### Implementado y verificado 2026-10-02 (iteración39)
+- Selector Aplicaciones encima de los paneles, con búsqueda, casillas, contador y limpieza. Admite varias aplicaciones y grupo Sin aplicación asignada. Conserva opciones/selección mientras se actualizan los resultados.
+- Filtrar por una aplicación solo muestra esa fila aunque una vulnerabilidad esté asociada a otras. Seleccionar varias usa OR sin duplicar el total de vulnerabilidades; riesgo, severidad y estatus se combinan con AND entre dimensiones.
+- Nuevo resumen **Estatus de las vulnerabilidades**, con conteos, colores y multiselección reversible. Respeta los filtros generales y locales; ignora su propia selección al calcular opciones para poder añadir otros estados.
+- Cada aplicación muestra sus conteos desglosados por estatus. Cada vulnerabilidad tiene una línea independiente **Estatus:** con etiqueta destacada. Valores missing/null/vacíos/solo espacios se muestran como **Sin estado**, sin asignar un estado inventado ni modificar la BD.
+- Filtros activos de aplicación/estatus se ven como etiquetas removibles. Se guardan/cargan en Vistas, compatibles con vistas anteriores, incluidos valores null para Sin aplicación.
+- Detalle, paginación, recomendaciones y filtros anteriores se conservan; las selecciones nuevas solo afectan estos paneles y el detalle, no los demásKPIs/Pivot.
+- Datos de comprobación: Active Directory+MBP=24vulnerabilidades (20Pendiente,4EnProceso), seleccionando EnProceso quedan4 y solo aparece ActiveDirectory. Baseline152activas intacto tras limpieza de fixtures.
+
+### Contrato ampliado
+- Nuevos parámetros repetidos (NO CSV) en `/api/dashboard/vulnerabilidades/paneles` y `/detalle`: `aplicaciones=<nombre>` y `estatus=<estado>`. Se preservan comas, `&`, Unicode y nombres largos. `incluir_sin_aplicacion=true` combina ese grupo por OR con las aplicaciones elegidas.
+- `aplicacion` y `sin_aplicacion` singulares siguen siendo el destino del detalle, aplicando también los filtros locales y generales.
+- Resumen añade `estatus[{valor,total}]`, `opciones_aplicaciones[{aplicacion,total}]` y `aplicaciones[].estatus{estado:conteo}`. Opciones de aplicación ignoran la selección de aplicación pero respetan las otras dimensiones.
+- `FiltrosVista.aplicaciones_vulnerabilidad: List[Optional[str]]` y `estatus_vulnerabilidad: List[str]`, vacíos por defecto.
+- Sin cambios de credenciales, integraciones o lógica de autenticación. Sin migración.
+
+### Archivos y pruebas
+- Frontend: `ApplicationSelector.jsx`, `StatusSummary.jsx`, `StatusBadge.jsx` y ajustes de componentes existentes en `components/grc-vulnerabilities/`; estados y Vistas en `DashboardGRC.jsx`.
+- Backend: ampliaciones en `vulnerability_panel_data.py`, `vulnerability_panels.py` y modelo/sanitización de Vistas en `dashboard.py`.
+-13pruebas backend aprobadas (8generales+5casos controlados). El caso opcional de nombres especiales de la suite original se omite al no existir dato real; está cubierto plenamente con fixtures aislados en la suite adicional.8pruebas previas de iteración38 también aprobadas.
+- UI: selección múltiple, chips, resumen/contadores, estatus del detalle, guardar/cargar/eliminar vista temporal. Capturas válidas del agente principal1920×800 y390×844, sin overflow (sesión20261002_140936).
+- Compilación aprobada (`iteration_39_build.log`,33.13s), sin errores; advertencias heredadas de hooks en otros módulos y tamaño de bundle.
+- Reportes: `iteration_39.json`, `iteration_39_edge_followup.json`, `iteration_39_followup.md`. Regresiones: `test_iteration39_vulnerability_panels.py` y `test_iteration39_edge_cases.py`.
+- La prueba adicional ahora usa IDs únicos por ejecución y elimina únicamente sus propios IDs/informe en finally; no borra registros preexistentes.
+- Pendiente comprobación Windows local. Recomendación de protección anti-intentos fallidos del login observada fuera del alcance registrada aparte en ROADMAP; no se ha cambiado autenticación ni se afirma una auditoría completa.
+
+## Solicitud anterior — Nivel de riesgo y aplicaciones afectadas en Dashboard GRC
 Usuario: «En el dashboard GRC, Dashboard Necesito un \"Panel por Nivel de riesgo - Vulnerabilidades\" puede ser justo al lado del Panel de Severidad ya que hay un espacio ahí disponible que se ve muy vació (ver imagen adjunta) y debajo un nuevo panel por aplicaciones afectadas, necesito que este panel sea intuitivo por ejemplo si selecciono nivel de riesgo alto el panel debe actualizar la vista y al hacer click pueda ver el detalle de las vulnerabilidades (tomar en cuenta que pueda seleccionar varios niveles de riesgo o severidad)».
 
 Alcance aprobado literalmente («Aprobado»): riesgo junto a severidad, aplicaciones debajo, selección múltiple reversible; OR dentro de cada grupo y AND entre riesgo/severidad; pulsar aplicación abre sus vulnerabilidades filtradas, respetando filtros generales.
@@ -161,8 +192,9 @@ Compatibilidad: sin `pagina` devuelve la lista legacy, con límite predeterminad
 - La reconciliación automática de contraseña admin sugerida por la guía ampliada **no se implementó**: no forma parte del alcance y podría sobrescribir contraseñas cambiadas por usuarios. Requiere política explícita, no es un fallo del historial.
 
 ## Estado y próximos pasos
-- P0: comprobar nuevos paneles GRC y detalle filtrado en Windows local. El usuario ya confirmó que Backups funciona en local; no hay fallos conocidos bloqueantes en el alcance GRC actual.
+- P0: comprobar selector múltiple de aplicaciones, resumen de estatus y estatus explícito en detalle en Windows local. No hay fallos conocidos bloqueantes de estos flujos GRC.
 - P1: modularizar gradualmente `server.py`, con regresiones por módulo.
+- P1 separado: evaluar protección frente a intentos fallidos del login. Observación de pruebas fuera del alcance actual, no corregida ni tratada como auditoría de seguridad completa.
 - P2: consolidar dominios duplicados; exportación CSV del historial/detalle filtrado de aplicaciones y leyenda de intensidad Heatmap como propuestas futuras. El indicador de filtros activos ya está implementado en los paneles GRC, no en Pivot.
 - Detalle de prioridades: `/app/memory/ROADMAP.md`.
 - Histórico completo previo y cambios de esta iteración: `/app/memory/CHANGELOG.md`. Sus menciones antiguas de «Para Re Test» son históricas y quedan superadas por la regla actual de «En Retest».

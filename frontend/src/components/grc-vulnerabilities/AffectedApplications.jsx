@@ -5,10 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { PanelPagination } from './PanelPagination';
 import { PanelSelections } from './PanelSelections';
-import { RISK_COLORS, appName } from './constants';
+import { StatusBadge } from './StatusBadge';
+import { RISK_COLORS, appName, slug } from './constants';
 
 const SIZE = 8;
-export const AffectedApplications = ({ data, loading, risks, severities, onRisk, onSeverity, onClear, onOpen }) => {
+export const AffectedApplications = ({ data, loading, risks, severities, applications, statuses, onRisk, onSeverity, onApplication, onStatus, onClear, onOpen }) => {
   const [search, setSearch] = useState('');
   const [requestedPage, setPage] = useState(1);
   useEffect(() => { setPage(1); }, [data]);
@@ -28,10 +29,10 @@ export const AffectedApplications = ({ data, loading, risks, severities, onRisk,
         </div>
         <Button variant="outline" size="sm" className="border-zinc-700" onClick={() => onOpen({ tipo: 'todos' })} disabled={loading || !data?.total} data-testid="applications-view-all"><Eye className="mr-2 h-4 w-4" />Ver todas</Button>
       </header>
-      <PanelSelections risks={risks} severities={severities} onRisk={onRisk} onSeverity={onSeverity} onClear={onClear} />
+      <PanelSelections risks={risks} severities={severities} applications={applications} statuses={statuses} onRisk={onRisk} onSeverity={onSeverity} onApplication={onApplication} onStatus={onStatus} onClear={onClear} />
       <div className="relative my-4 max-w-md">
         <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-zinc-500" />
-        <Input value={search} onChange={event => { setSearch(event.target.value); setPage(1); }} aria-label="Buscar aplicación" placeholder="Buscar aplicación…" data-testid="search-aplicaciones-input" className="border-zinc-700 bg-zinc-900 pl-9 text-white" />
+        <Input value={search} onChange={event => { setSearch(event.target.value); setPage(1); }} aria-label="Buscar aplicación en resultados" placeholder="Buscar en resultados…" data-testid="search-aplicaciones-input" className="border-zinc-700 bg-zinc-900 pl-9 text-white" />
       </div>
       <div className="min-h-28" data-testid="applications-list">
         {loading ? <div role="status" className="flex items-center justify-center gap-2 py-10 text-sm text-zinc-400" data-testid="applications-loading"><Loader2 className="h-5 w-5 animate-spin" />Cargando aplicaciones…</div> : items.length ? items.slice((page - 1) * SIZE, page * SIZE).map((item, index) => (
@@ -41,6 +42,7 @@ export const AffectedApplications = ({ data, loading, risks, severities, onRisk,
             <Monitor className="h-5 w-5 text-zinc-500" />
             <div className="min-w-0"><span className="block break-words text-sm font-medium text-zinc-200 [overflow-wrap:anywhere]" data-testid={`application-name-${(page - 1) * SIZE + index}`}>{appName(item.aplicacion)}</span>
               <span className="mt-2 flex h-1.5 w-full max-w-80 overflow-hidden rounded-sm bg-zinc-800" aria-hidden="true">{Object.entries(item.niveles).filter(([, count]) => count > 0).map(([risk, count]) => <span key={risk} style={{ width: `${count / item.total * 100}%`, backgroundColor: RISK_COLORS[risk] }} />)}</span>
+              <span className="mt-2 flex flex-wrap gap-1.5" aria-label="Distribución por estatus">{Object.entries(item.estatus || {}).sort(([a], [b]) => a.localeCompare(b, 'es')).map(([status, count]) => <StatusBadge key={status} status={status} count={count} testId={`application-status-${(page - 1) * SIZE + index}-${slug(status)}`} />)}</span>
             </div>
             <span className="text-base font-semibold tabular-nums text-white" data-testid={`application-count-${(page - 1) * SIZE + index}`}>{item.total}</span><ChevronRight className="h-4 w-4 text-zinc-400" />
           </button>
