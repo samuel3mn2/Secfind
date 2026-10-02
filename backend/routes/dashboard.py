@@ -7,6 +7,7 @@ from typing import List, Optional, Callable
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 import uuid
+from .vulnerability_panels import create_vulnerability_panels_router
 
 
 # ============================================================
@@ -89,6 +90,8 @@ class FiltrosVista(BaseModel):
     responsables: List[str] = Field(default_factory=list)
     estados_vulnerabilidad: List[str] = Field(default_factory=list)
     estados_hallazgo: List[str] = Field(default_factory=list)
+    niveles_riesgo_vulnerabilidad: List[str] = Field(default_factory=list)
+    severidades_vulnerabilidad: List[str] = Field(default_factory=list)
 
 
 class PivotConfig(BaseModel):
@@ -224,7 +227,9 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
             "dominios": filtros.get("dominios", []),
             "responsables": filtros.get("responsables", []),
             "estados_vulnerabilidad": filtros.get("estados_vulnerabilidad", []),
-            "estados_hallazgo": filtros.get("estados_hallazgo", [])
+            "estados_hallazgo": filtros.get("estados_hallazgo", []),
+            "niveles_riesgo_vulnerabilidad": filtros.get("niveles_riesgo_vulnerabilidad", []),
+            "severidades_vulnerabilidad": filtros.get("severidades_vulnerabilidad", [])
         }
         
         if vista_id:
@@ -1514,4 +1519,5 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
             "estados_hallazgo": estados_hall
         }
 
+    router.include_router(create_vulnerability_panels_router(db, get_current_user, NIVEL_RIESGO_COMPUTED_STAGE))
     return router

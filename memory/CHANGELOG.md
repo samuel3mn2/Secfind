@@ -1,5 +1,15 @@
 # SecFind — Historial de cambios
 
+## 2026-10-02 — Panel de riesgo y aplicaciones afectadas GRC (iteración38)
+- Nuevo panel Nivel de riesgo junto al de Severidad, ambos seleccionables, y aplicaciones afectadas debajo. OR dentro de riesgos/severidades y AND entre ambos; filtros generales preservados.
+- Distribuciones cruzadas mantienen alternativas; barra seleccionada/chips/limpiar. Aplicaciones con búsqueda,8por página, recuento sin duplicados por aplicación y grupo sin aplicación asignada.
+- Detalle completo con10vulnerabilidades por página servidas por API; no se trunca a20ni100caracteres. Campos clave y recomendaciones expandibles.
+- Nuevos routers/modelos Pydantic read-only; normalización de aliases/nombres de aplicación y regla de riesgo existente. Respuestas Mongo sin ObjectId.
+- Guardar/cargar vistas conserva nuevas selecciones y reportes de grupos; compatible con vistas previas.
+- Corregidos menú con nombres largos (min-width/shrink), leyendas móviles y ancho de contenedor de notificaciones.
+-8/8pruebas backend contra Mongo, alias canónico equivalente; UI escritorio/móvil, persistencia y eliminación de vistaTEST víaUI, detalle37resultados/4páginas y reintentos tras errores de red aprobados. Overflow[] en1920×800 y390×844.
+- No nuevas credenciales/integraciones, no migración, no modificaciones a vulnerabilidades o vistas originales. Pendiente validación local Windows.
+
 ## 2026-09-29 — Tipos de tabla y mapas de calor Pivot (iteración37)
 - Usuario informó que Table/Heatmap/Col Heatmap/Row Heatmap lucían iguales en Vulnerabilidades y Hallazgos, mientras gráficos funcionaban.
 - Confirmado: fondos CSS!important ocultaban colores inline del renderer. Eliminadas reglas de tabla duplicadas y fondos forzados; hover respeta colores.

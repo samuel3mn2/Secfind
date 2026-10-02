@@ -63,6 +63,7 @@ import {
 } from "lucide-react";
 import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
 import { PivotAnalysis } from "@/components/PivotAnalysis";
+import { VulnerabilityPanels } from "@/components/grc-vulnerabilities/VulnerabilityPanels";
 import {
   BarChart,
   Bar,
@@ -71,7 +72,6 @@ import {
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
   Legend,
-  Cell,
 } from "recharts";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -185,22 +185,6 @@ const PROBABILIDAD_LABELS = {
 };
 
 // ============ COMPONENTS ============
-
-const CustomBarTooltip = ({ active, payload, label }) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 shadow-lg">
-        <p className="text-white text-sm font-medium">{label}</p>
-        {payload.map((entry, index) => (
-          <p key={index} className="text-sm" style={{ color: entry.fill || entry.color }}>
-            {entry.name}: {entry.value}
-          </p>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
 
 // Tooltip for Top Dominios chart (needs full domain name from payload)
 const DominiosTooltip = ({ active, payload, label }) => {
@@ -442,7 +426,7 @@ const UnifiedRiskHeatmap = ({ data, onCellClick }) => {
       </div>
       
       {/* Legend */}
-      <div className="flex items-center justify-center gap-4 pt-3 border-t border-zinc-800">
+      <div className="flex flex-wrap items-center justify-center gap-4 pt-3 border-t border-zinc-800">
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded bg-emerald-500"></div>
           <span className="text-xs text-zinc-500">Bajo</span>
@@ -570,7 +554,7 @@ const RiskMatrix = ({ data, onCellClick }) => {
       </div>
       
       {/* Legend */}
-      <div className="flex items-center justify-center gap-4 mt-4 pt-3 border-t border-zinc-800">
+      <div className="flex flex-wrap items-center justify-center gap-4 mt-4 pt-3 border-t border-zinc-800">
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded" style={{ backgroundColor: '#22c55e' }}></div>
           <span className="text-xs text-zinc-500">Bajo</span>
@@ -588,44 +572,6 @@ const RiskMatrix = ({ data, onCellClick }) => {
           <span className="text-xs text-zinc-500">Crítico</span>
         </div>
       </div>
-    </div>
-  );
-};
-
-// Panel de Severidad (Bar Chart)
-const SeverityPanel = ({ data, onBarClick }) => {
-  const chartData = data?.por_severidad?.map(item => ({
-    name: item.severidad,
-    value: item.count,
-    fill: SEVERITY_COLORS[item.severidad] || '#6b7280'
-  })) || [];
-
-  return (
-    <div className="h-[280px]">
-      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
-        <BarChart data={chartData} layout="vertical" margin={{ left: 0, right: 20 }}>
-          <XAxis type="number" stroke="#71717a" fontSize={12} />
-          <YAxis 
-            dataKey="name" 
-            type="category" 
-            stroke="#71717a" 
-            fontSize={12}
-            width={70}
-            tick={{ fill: '#a1a1aa' }}
-          />
-          <RechartsTooltip content={<CustomBarTooltip />} />
-          <Bar 
-            dataKey="value" 
-            radius={[0, 4, 4, 0]}
-            onClick={(data) => onBarClick && onBarClick(data)}
-            cursor="pointer"
-          >
-            {chartData.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.fill} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
     </div>
   );
 };
@@ -692,6 +638,9 @@ export default function DashboardGRC() {
   const [selectedResponsables, setSelectedResponsables] = useState([]);
   const [selectedEstadosVuln, setSelectedEstadosVuln] = useState([]);
   const [selectedEstadosHall, setSelectedEstadosHall] = useState([]);
+  const [selectedRisks, setSelectedRisks] = useState([]);
+  const [selectedSeverities, setSelectedSeverities] = useState([]);
+  const [panelRevision, setPanelRevision] = useState(0);
   
   // Saved Views
   const [vistas, setVistas] = useState([]);
@@ -704,8 +653,6 @@ export default function DashboardGRC() {
   // Detail modals
   const [showMatrixDetail, setShowMatrixDetail] = useState(false);
   const [matrixDetailData, setMatrixDetailData] = useState(null);
-  const [showSeverityDetail, setShowSeverityDetail] = useState(false);
-  const [severityDetailData, setSeverityDetailData] = useState(null);
   const [showHeatmapDetail, setShowHeatmapDetail] = useState(false);
   const [heatmapDetailData, setHeatmapDetailData] = useState(null);
   
@@ -763,6 +710,7 @@ export default function DashboardGRC() {
 
   // Refresh function for manual refresh
   const refreshData = useCallback(async () => {
+    setPanelRevision(value => value + 1);
     setRefreshing(true);
     try {
       const queryString = buildQueryParams();
@@ -832,6 +780,9 @@ export default function DashboardGRC() {
 
   // Apply saved view
   const applyVista = (vista) => {
+    setSelectedGrupos([]);
+    setSelectedRisks(vista?.filtros?.niveles_riesgo_vulnerabilidad || []);
+    setSelectedSeverities(vista?.filtros?.severidades_vulnerabilidad || []);
     if (!vista) {
       // Clear all filters
       setSelectedInformes([]);
@@ -875,12 +826,14 @@ export default function DashboardGRC() {
         ...(selectedVista?.id ? { id: selectedVista.id } : {}),
         nombre: saveViewName.trim(),
         es_publica: saveViewPublic,
-        informes_seleccionados: selectedInformes,
+        informes_seleccionados: combinedInformes,
         filtros: {
           dominios: selectedDominios,
           responsables: selectedResponsables,
           estados_vulnerabilidad: selectedEstadosVuln,
           estados_hallazgo: selectedEstadosHall,
+          niveles_riesgo_vulnerabilidad: selectedRisks,
+          severidades_vulnerabilidad: selectedSeverities,
         },
         pivot_config: pivotConfig,  // Configuración de tabla pivote
         active_tab: activeTab       // Pestaña activa (dashboard o pivot)
@@ -918,6 +871,8 @@ export default function DashboardGRC() {
 
   // Clear all filters
   const clearFilters = () => {
+    setSelectedRisks([]);
+    setSelectedSeverities([]);
     setSelectedGrupos([]);
     setSelectedInformes([]);
     setSelectedDominios([]);
@@ -928,7 +883,7 @@ export default function DashboardGRC() {
   };
 
   const hasActiveFilters = selectedGrupos.length > 0 || selectedInformes.length > 0 || selectedDominios.length > 0 || 
-    selectedResponsables.length > 0 || selectedEstadosVuln.length > 0 || selectedEstadosHall.length > 0;
+    selectedResponsables.length > 0 || selectedEstadosVuln.length > 0 || selectedEstadosHall.length > 0 || selectedRisks.length > 0 || selectedSeverities.length > 0;
 
   // Grupo toggle handler
   const handleGrupoToggle = (grupoId) => {
@@ -960,16 +915,6 @@ export default function DashboardGRC() {
   const handleMatrixCellClick = (cellData) => {
     setMatrixDetailData(cellData);
     setShowMatrixDetail(true);
-  };
-
-  // Handle severity bar click
-  const handleSeverityBarClick = (barData) => {
-    const severidad = barData.name;
-    const severityData = dashboardData?.panel_severidad?.por_severidad?.find(s => s.severidad === severidad);
-    if (severityData) {
-      setSeverityDetailData(severityData);
-      setShowSeverityDetail(true);
-    }
   };
 
   // Handle heatmap GRC cell click
@@ -1005,13 +950,13 @@ export default function DashboardGRC() {
           </p>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           {/* Saved Views Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" data-testid="grc-saved-views-trigger" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">
+              <Button variant="outline" data-testid="grc-saved-views-trigger" title={selectedVista?.nombre || 'Vistas Guardadas'} className="min-w-0 max-w-full border-zinc-700 text-zinc-300 hover:bg-zinc-800">
                 <Eye className="w-4 h-4 mr-2" />
-                {selectedVista ? selectedVista.nombre : "Vistas Guardadas"}
+                <span className="min-w-0 truncate">{selectedVista ? selectedVista.nombre : "Vistas Guardadas"}</span>
                 <ChevronDown className="w-4 h-4 ml-2" />
               </Button>
             </DropdownMenuTrigger>
@@ -1031,19 +976,22 @@ export default function DashboardGRC() {
                 </div>
               ) : (
                 vistas.map(vista => (
-                  <div key={vista.id} className="flex items-center justify-between px-2 py-1 hover:bg-zinc-800 rounded-sm">
+                  <div key={vista.id} data-testid={`grc-saved-view-row-${vista.id}`} className="flex min-w-0 items-center justify-between gap-1 px-2 py-1 hover:bg-zinc-800 rounded-sm">
                     <button
-                      className="flex-1 flex items-center gap-2 text-left text-zinc-300 text-sm py-1"
+                      className="flex min-w-0 flex-1 items-center gap-2 py-1 text-left text-sm text-zinc-300"
+                      title={vista.nombre}
                       onClick={() => applyVista(vista)}
                       data-testid={`grc-saved-view-load-${vista.id}`}
                     >
-                      {vista.es_publica ? <Globe className="w-3 h-3 text-green-400" /> : <Lock className="w-3 h-3 text-zinc-500" />}
+                      {vista.es_publica ? <Globe className="h-3 w-3 shrink-0 text-green-400" /> : <Lock className="h-3 w-3 shrink-0 text-zinc-500" />}
                       <span className="truncate">{vista.nombre}</span>
                     </button>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 text-zinc-500 hover:text-red-400"
+                      className="h-8 w-8 shrink-0 text-zinc-500 hover:text-red-400"
+                      title={`Eliminar ${vista.nombre}`}
+                      aria-label={`Eliminar ${vista.nombre}`}
                       onClick={(e) => { e.stopPropagation(); handleDeleteView(vista.id); }}
                       data-testid={`grc-saved-view-delete-${vista.id}`}
                     >
@@ -1286,45 +1234,8 @@ export default function DashboardGRC() {
             />
           </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Severity Panel */}
-        <Card className="bg-zinc-900/50 border-zinc-800">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-white text-base flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-red-500"></div>
-              Panel de Severidad - Vulnerabilidades
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <Info className="w-4 h-4 text-zinc-500" />
-                  </TooltipTrigger>
-                  <TooltipContent className="bg-zinc-800 text-white border-zinc-700 max-w-xs">
-                    Vulnerabilidades activas agrupadas por severidad.
-                    Click en una barra para ver detalles.
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <SeverityPanel 
-              data={dashboardData?.panel_severidad}
-              onBarClick={handleSeverityBarClick}
-            />
-            <div className="mt-4 grid grid-cols-4 gap-2 text-center">
-              {['Critica', 'Alta', 'Media', 'Baja'].map(sev => (
-                <div key={sev} className="bg-zinc-800/50 rounded-lg p-2">
-                  <div className="text-lg font-bold text-white">
-                    {dashboardData?.panel_severidad?.resumen?.[sev] || 0}
-                  </div>
-                  <div className="text-xs" style={{ color: SEVERITY_COLORS[sev] }}>{sev}</div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <VulnerabilityPanels globalQuery={buildQueryParams()} risks={selectedRisks} severities={selectedSeverities}
+        setRisks={setSelectedRisks} setSeverities={setSelectedSeverities} revision={panelRevision} />
 
       {/* Top Dominios */}
       <Card className="bg-zinc-900/50 border-zinc-800">
@@ -1433,6 +1344,8 @@ export default function DashboardGRC() {
                 {selectedDominios.length > 0 && <li>{selectedDominios.length} dominios</li>}
                 {selectedResponsables.length > 0 && <li>{selectedResponsables.length} responsables</li>}
                 {selectedEstadosVuln.length > 0 && <li>Estados vuln: {selectedEstadosVuln.join(', ')}</li>}
+                {selectedRisks.length > 0 && <li data-testid="save-view-risk-summary">Niveles de riesgo: {selectedRisks.join(', ')}</li>}
+                {selectedSeverities.length > 0 && <li data-testid="save-view-severity-summary">Severidades: {selectedSeverities.join(', ')}</li>}
                 {selectedEstadosHall.length > 0 && <li>Estados hall: {selectedEstadosHall.join(', ')}</li>}
                 {!hasActiveFilters && <li className="text-zinc-600">Sin filtros activos</li>}
               </ul>
@@ -1502,56 +1415,6 @@ export default function DashboardGRC() {
               ))}
               {(!matrixDetailData?.hallazgos || matrixDetailData.hallazgos.length === 0) && (
                 <p className="text-zinc-500 text-center py-8">No hay hallazgos en esta celda</p>
-              )}
-            </div>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
-
-      {/* Severity Detail Modal */}
-      <Dialog open={showSeverityDetail} onOpenChange={setShowSeverityDetail}>
-        <DialogContent className="bg-zinc-900 border-zinc-700 text-white max-w-2xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Shield className="w-5 h-5" style={{ color: SEVERITY_COLORS[severityDetailData?.severidad] }} />
-              Vulnerabilidades {severityDetailData?.severidad}
-              <Badge variant="outline" className="ml-2 border-zinc-600">
-                {severityDetailData?.count || 0} vulnerabilidades
-              </Badge>
-            </DialogTitle>
-            <DialogDescription className="sr-only">Vulnerabilidades de la severidad seleccionada.</DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="max-h-[60vh]">
-            <div className="space-y-3 pr-4">
-              {severityDetailData?.vulnerabilidades?.map((v, idx) => (
-                <div key={v.id || idx} className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        {v.codigo && <span className="text-indigo-400 font-mono text-xs">{v.codigo}</span>}
-                        <Badge 
-                          variant="outline" 
-                          className={`text-xs ${
-                            ['Cerrado', 'Corregido'].includes(v.estatus) ? 'border-green-500/50 text-green-400' :
-                            v.estatus === 'En Proceso' ? 'border-yellow-500/50 text-yellow-400' :
-                            'border-zinc-600 text-zinc-400'
-                          }`}
-                        >
-                          {v.estatus}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-zinc-300 line-clamp-2">{v.vulnerabilidad}</p>
-                      <div className="flex items-center gap-4 mt-2 text-xs text-zinc-500">
-                        {v.institucion && <span>Inst: <span className="text-zinc-300">{v.institucion}</span></span>}
-                        {v.aplicaciones?.length > 0 && <span>Apps: <span className="text-zinc-300">{v.aplicaciones.join(', ')}</span></span>}
-                        {v.responsable && <span>Resp: <span className="text-zinc-300">{v.responsable}</span></span>}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {(!severityDetailData?.vulnerabilidades || severityDetailData.vulnerabilidades.length === 0) && (
-                <p className="text-zinc-500 text-center py-8">No hay vulnerabilidades de esta severidad</p>
               )}
             </div>
           </ScrollArea>

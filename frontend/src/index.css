@@ -4,6 +4,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Sonner usa width:100% más un margen izquierdo en móvil. Acotar también
+   el contenedor, no solo la notificación, evita desbordamientos del documento. */
+@media (max-width: 600px) {
+    .toaster[data-sonner-toaster] {
+        width: calc(100% - var(--mobile-offset-left) - var(--mobile-offset-right));
+    }
+    .toaster[data-sonner-toaster] [data-sonner-toast] {
+        width: 100%;
+    }
+}
+
 @layer base {
     :root {
         --background: 240 10% 3.9%;

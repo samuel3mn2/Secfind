@@ -1,120 +1,122 @@
 {
-  "identity": {
-    "persona": "E1 - The Anti-AI Designer",
-    "mission": "Create a Cybersecurity Vulnerability Management Dashboard that feels like a modern command center—authoritative, precise, and vigilant. Avoid generic 'admin panel' looks.",
-    "principles": [
-      "Fusion over Imitation: Mix 'Swiss Style' clarity with 'Cyberpunk' aesthetics.",
-      "Emotion First: The UI should feel 'Secure' and 'Alert'.",
-      "Content is King: Vulnerability data must be instantly scannable.",
-      "Negative Space: Use deep dark backgrounds to make data pop.",
-      "Contrast: High contrast for critical alerts."
-    ]
+  "project_title": "GRC Dashboard - Vulnerability Risk Level & Affected Applications Blueprint",
+  "theme": {
+    "type": "dark",
+    "background": "bg-slate-950",
+    "surface": "bg-slate-900/90",
+    "card_bg": "bg-slate-900/80 backdrop-blur-md border border-slate-800/80",
+    "card_header": "border-b border-slate-800/60 pb-3 mb-4",
+    "text_primary": "text-slate-100",
+    "text_secondary": "text-slate-400",
+    "text_muted": "text-slate-500",
+    "accent_primary": "bg-indigo-600 hover:bg-indigo-500 text-white",
+    "accent_secondary": "bg-slate-800 hover:bg-slate-700 text-slate-200"
+  },
+  "color_palette": {
+    "severity": {
+      "Critica": { "color": "#ef4444", "bg_badge": "bg-red-500/15 text-red-400 border-red-500/30" },
+      "Alta": { "color": "#f97316", "bg_badge": "bg-orange-500/15 text-orange-400 border-orange-500/30" },
+      "Media": { "color": "#eab308", "bg_badge": "bg-amber-500/15 text-amber-400 border-amber-500/30" },
+      "Baja": { "color": "#3b82f6", "bg_badge": "bg-blue-500/15 text-blue-400 border-blue-500/30" },
+      "Informativa": { "color": "#64748b", "bg_badge": "bg-slate-500/15 text-slate-400 border-slate-500/30" }
+    },
+    "risk_level": {
+      "Critico": { "color": "#dc2626", "bg_badge": "bg-red-600/20 text-red-300 border-red-600/40" },
+      "Alto": { "color": "#ea580c", "bg_badge": "bg-orange-600/20 text-orange-300 border-orange-600/40" },
+      "MedioAlto": { "color": "#d97706", "bg_badge": "bg-amber-600/20 text-amber-300 border-amber-600/40" },
+      "Medio": { "color": "#ca8a04", "bg_badge": "bg-yellow-600/20 text-yellow-300 border-yellow-600/40" },
+      "Bajo": { "color": "#2563eb", "bg_badge": "bg-blue-600/20 text-blue-300 border-blue-600/40" }
+    }
   },
   "typography": {
-    "font_family": {
-      "headings": "Sora, sans-serif",
-      "body": "Inter, sans-serif",
-      "data": "JetBrains Mono, monospace"
-    },
-    "installation": {
-      "google_fonts_link": "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Sora:wght@400;600;700&display=swap"
-    },
-    "rules": [
-      "Use 'Sora' for all section headings and KPIs to give a modern tech feel.",
-      "Use 'Inter' for body text and UI labels for maximum readability.",
-      "Use 'JetBrains Mono' for IP addresses, CVE IDs, and raw data fields.",
-      "Headings must be 'tracking-tight'.",
-      "Data cells must be 'tracking-normal' or 'tracking-wide' for legibility."
-    ]
+    "font_family_heading": "Manrope, sans-serif",
+    "font_family_body": "IBM Plex Sans, sans-serif",
+    "heading_xl": "text-2xl font-bold tracking-tight text-slate-100",
+    "heading_lg": "text-lg font-semibold tracking-tight text-slate-200",
+    "heading_md": "text-base font-semibold text-slate-200",
+    "body_regular": "text-sm text-slate-300 leading-relaxed",
+    "caption": "text-xs font-medium text-slate-400 uppercase tracking-wider"
   },
-  "colors": {
-    "theme": "dark",
-    "palette": {
-      "background": "#09090b", 
-      "surface": "#18181b",
-      "surface_highlight": "#27272a",
-      "border": "#27272a",
-      "primary": "#6366f1", 
-      "primary_foreground": "#ffffff",
-      "secondary": "#3b82f6",
-      "accent": "#06b6d4",
-      "danger": "#ef4444",
-      "warning": "#f97316",
-      "success": "#22c55e",
-      "text_primary": "#f4f4f5",
-      "text_secondary": "#a1a1aa",
-      "text_muted": "#71717a"
+  "layout_architecture": {
+    "grid_structure": "grid grid-cols-1 lg:grid-cols-12 gap-6",
+    "row_1_distribution": {
+      "severity_panel": "lg:col-span-6 col-span-1",
+      "risk_level_panel": "lg:col-span-6 col-span-1"
     },
-    "severity_colors": {
-      "critical": "#ef4444",
-      "high": "#f97316",
-      "medium": "#eab308",
-      "low": "#3b82f6"
+    "row_2_applications": {
+      "affected_apps_panel": "col-span-full"
     },
-    "gradients": {
-      "primary_glow": "linear-gradient(135deg, rgba(99,102,241,0.2) 0%, rgba(99,102,241,0) 100%)",
-      "danger_glow": "linear-gradient(135deg, rgba(239,68,68,0.2) 0%, rgba(239,68,68,0) 100%)"
+    "mobile_behavior": "At 390px, stack vertically in 1 column (`grid-cols-1`), add horizontal overflow scrolling for tables, reduce padding to `p-4`, ensure touch targets are minimum 44px height."
+  },
+  "key_components": {
+    "risk_level_panel": {
+      "description": "Interactive horizontal bar chart / distribution list placed alongside Severity Panel.",
+      "interactive_features": [
+        "Clickable risk bars (Crítico, Alto, Medio-Alto, Medio, Bajo) with multi-select state",
+        "Visual active indicator (glow/border highlight when selected)",
+        "Counter badge for total vulnerabilities per risk level",
+        "Clear multi-select filter button inside card header"
+      ],
+      "data_testids": {
+        "panel_container": "panel-nivel-riesgo",
+        "risk_bar": "risk-bar-{level}",
+        "clear_filters_btn": "clear-risk-filter-btn"
+      }
+    },
+    "multi_select_filtering_logic": {
+      "operator_within_group": "OR (Selecting 'Alto' and 'Medio-Alto' returns vulnerabilities matching either risk level)",
+      "operator_between_groups": "AND (Combining Risk Level filters with Severity filters requires vulnerabilities to satisfy both condition sets)",
+      "filter_bar_toggle": {
+        "description": "Unified interactive filter pill bar above or within chart headers displaying active selections",
+        "data_testid": "filter-group-toggle-bar"
+      }
+    },
+    "affected_applications_panel": {
+      "description": "Grid / Table view located below distribution charts showcasing affected software applications.",
+      "features": [
+        "Real-time updated vulnerability counts respecting active severity & risk filters",
+        "Instant text search input for application names",
+        "Pagination controls (rows per page & page switcher)",
+        "Vulnerability severity breakdown chips per application card/row",
+        "Clicking an application opens the detailed vulnerability drill-down modal"
+      ],
+      "data_testids": {
+        "panel_container": "panel-aplicaciones-afectadas",
+        "search_input": "search-aplicaciones-input",
+        "app_card_or_row": "app-item-{app_id}",
+        "pagination_prev": "apps-pagination-prev",
+        "pagination_next": "apps-pagination-next"
+      }
+    },
+    "vulnerability_detail_modal": {
+      "description": "Full detail paginated dialog displaying vulnerabilities for the selected application under active global filters.",
+      "components": [
+        "Header showing App Name, Total Count, Active Filters Summary",
+        "Search & status filter within modal",
+        "Paginated table with columns: Code, Name, Severity, Risk Level, Status, Remediation Date, Actions",
+        "Close button and export action"
+      ],
+      "data_testids": {
+        "modal_container": "vulnerability-detail-modal",
+        "modal_close": "vulnerability-detail-modal-close",
+        "modal_table": "vulnerability-detail-table",
+        "modal_pagination": "vulnerability-modal-pagination"
+      }
     }
   },
-  "components": {
-    "cards": {
-      "style": "glass",
-      "instructions": "Use a deep dark background (#18181b) with a subtle 1px border (#27272a). Add a faint 'glow' effect on hover. Do NOT use heavy drop shadows. Use 'backdrop-blur-md' if overlaying on complex backgrounds."
-    },
-    "buttons": {
-      "primary": "bg-primary text-white hover:bg-primary/90 shadow-[0_0_15px_rgba(99,102,241,0.3)] transition-all duration-300",
-      "secondary": "bg-secondary/10 text-secondary border border-secondary/20 hover:bg-secondary/20",
-      "destructive": "bg-red-900/20 text-red-500 border border-red-900/50 hover:bg-red-900/30"
-    },
-    "inputs": {
-      "style": "bg-black/20 border-white/10 text-white placeholder:text-white/30 focus:border-primary/50 focus:ring-1 focus:ring-primary/50"
-    },
-    "charts": {
-      "library": "recharts",
-      "instructions": "Use Recharts (via Shadcn charts). Customize tooltips to be dark and minimal. Use neon colors (Cyan, Purple, Orange) for lines/bars against the dark background. Ensure grid lines are very subtle (opacity 0.1)."
-    },
-    "tables": {
-      "style": "dense",
-      "instructions": "Use a high-density layout. Headers should be uppercase, small text (text-xs), and muted color. Rows should have hover effects (bg-white/5). Critical vulnerabilities should have a subtle red left-border indicator."
-    }
-  },
-  "layout": {
-    "spacing_scale": "generous",
-    "grid_system": "bento",
-    "dashboard_structure": [
-      "Header: Logo + Navigation + User Profile",
-      "Top Row: 4 KPI Cards (Total, Critical, Fixed, Pending) - Use 'Tetris' grid logic.",
-      "Middle Row: Charts (Pie Chart for Severity, Bar Chart for Status) - 2/3 + 1/3 split.",
-      "Bottom Row: Detailed Vulnerability Table or 'Recent Findings' list."
-    ],
-    "container_padding": "p-6 md:p-8 lg:p-12"
-  },
-  "assets": {
-    "images": {
-      "login_bg": "https://images.unsplash.com/photo-1762279389006-43963a0cee55?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDJ8MHwxfHNlYXJjaHwxfHxjeWJlcnNlY3VyaXR5JTIwYWJzdHJhY3QlMjB0ZWNobm9sb2d5JTIwZGFyayUyMGJsdWUlMjBuZXR3b3JrfGVufDB8fHx8MTc3MzIzOTA5Nnww&ixlib=rb-4.1.0&q=85",
-      "dashboard_hero_abstract": "https://images.unsplash.com/photo-1762279388956-1c098163a2a8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDJ8MHwxfHNlYXJjaHwzfHxjeWJlcnNlY3VyaXR5JTIwYWJzdHJhY3QlMjB0ZWNobm9sb2d5JTIwZGFyayUyMGJsdWUlMjBuZXR3b3JrfGVufDB8fHx8MTc3MzIzOTA5Nnww&ixlib=rb-4.1.0&q=85",
-      "user_avatar": "https://images.unsplash.com/photo-1737574821698-862e77f044c1?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDB8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBleGVjdXRpdmUlMjBwb3J0cmFpdCUyMGNvcnBvcmF0ZXxlbnwwfHx8fDE3NzMyMzkwOTd8MA&ixlib=rb-4.1.0&q=85"
-    },
-    "icons_library": "lucide-react"
-  },
-  "instructions_to_main_agent": [
-    "Implement the 'Dark Mode' theme by default. Add 'class' strategy in Tailwind config if not present.",
-    "Use 'Sora' font for all headings to establish the tech identity.",
-    "For the Dashboard, implement the 'Bento Grid' layout. Don't just stack cards vertically.",
-    "The Vulnerability Table MUST be dense and sortable. Use Shadcn Table with sorting/filtering features.",
-    "Charts must use the specified palette. Do not use default Recharts colors.",
-    "Import/Export feature should be a clean modal or a prominent button group in the Table header.",
-    "Ensure all text has sufficient contrast (AA standard minimum).",
-    "Add 'data-testid' to all interactive elements (buttons, inputs, row actions).",
-    "Use the provided image URLs for the login page background or dashboard widgets where appropriate."
+  "general_ui_ux_guidelines": [
+    "Preserve dark GRC aesthetic consistent with DashboardGRC.jsx using slate color palette.",
+    "Ensure contrast ratio exceeds WCAG AA standards (4.5:1 for normal text).",
+    "Containers with borders MUST have internal padding (p-5 or p-6) to prevent text collision.",
+    "NO complete transparent background in headers, dropdowns, or overlays.",
+    "All interactive elements MUST include explicit hover, focus, and active states with text color specified.",
+    "Include data-testid on all buttons, filters, search inputs, modal containers, and pagination controls for automated testing."
   ],
-  "universal_guidelines": [
-    "Do NOT use gradients for text.",
-    "Avoid 'center-everything'. Use left alignment for data and forms.",
-    "Use 'sonner' for all toast notifications.",
-    "Components must use named exports.",
-    "Pages must use default exports.",
-    "Interactive elements must have hover/focus states defined.",
-    "Language is Spanish (Es). Ensure all labels, buttons, and messages are in Spanish."
+  "instructions_to_main_agent": [
+    "Integrate 'Panel Nivel de Riesgo' next to 'Panel de Severidad' in DashboardGRC.jsx.",
+    "Place 'Panel de Aplicaciones Afectadas' directly below both panels spanning full width.",
+    "Implement multi-selection toggle state for Risk Levels and Severities with OR within group and AND between groups logic.",
+    "Ensure global dashboard filters (period, domain, institution) are preserved and passed down to vulnerability detail queries.",
+    "Provide responsive design for 390px mobile view and desktop 1920px view."
   ]
 }
