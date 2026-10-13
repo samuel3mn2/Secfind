@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import axios from "axios";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
@@ -99,6 +99,8 @@ import BulkEntryModal from "@/components/BulkEntryModal";
 import { TimelineSeguimiento } from "@/components/TimelineSeguimiento";
 import { DeleteWithJustificationModal } from "@/components/DeleteWithJustificationModal";
 import { ConfirmChangesModal } from "@/components/ConfirmChangesModal";
+import { ApplicationStatusScope } from "@/components/vulnerabilities/ApplicationStatusScope";
+import "@/components/vulnerabilities/VulnerabilityTable.css";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -468,7 +470,11 @@ export default function Vulnerabilidades() {
     }
   }, []);
 
+  const vulnerabilityRequest = useRef(null);
   const fetchVulnerabilidades = useCallback(async (resetPage = true) => {
+    vulnerabilityRequest.current?.abort();
+    const controller = new AbortController();
+    vulnerabilityRequest.current = controller;
     try {
       const params = new URLSearchParams();
       if (search) params.append("search", search);
@@ -486,16 +492,18 @@ export default function Vulnerabilidades() {
       if (filterResultadoRetest.length > 0) filterResultadoRetest.forEach(v => params.append("resultado_retest", v));
       if (filterCorreccionParcial) params.append("correccion_parcial", "true");
 
-      const response = await axios.get(`${API}/vulnerabilidades?${params.toString()}`);
+      const response = await axios.get(`${API}/vulnerabilidades?${params.toString()}`, { signal: controller.signal });
+      if (controller.signal.aborted) return;
       setVulnerabilidades(response.data);
       if (resetPage) {
         setCurrentPage(1);
       }
     } catch (error) {
+      if (controller.signal.aborted) return;
       console.error("Error fetching vulnerabilidades:", error);
       toast.error("Error al cargar vulnerabilidades");
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, [search, filterSeveridad, filterEstatus, filterInstitucion, filterAño, filterAplicacion, filterInforme, filterResponsable, filterDominio, filterControl, filterNivelRiesgo, filterProveedor, filterResultadoRetest, filterCorreccionParcial]);
 
@@ -508,7 +516,7 @@ export default function Vulnerabilidades() {
     const debounce = setTimeout(() => {
       fetchVulnerabilidades();
     }, 300);
-    return () => clearTimeout(debounce);
+    return () => { clearTimeout(debounce); vulnerabilityRequest.current?.abort(); };
   }, [fetchVulnerabilidades]);
 
   const handleView = (vuln) => {
@@ -592,6 +600,8 @@ export default function Vulnerabilidades() {
         v.id === vulnActualizada.id ? vulnActualizada : v
       ));
       setViewingVuln(vulnActualizada);
+      // Volver a evaluar la pertenencia al filtro tras cambiar una aplicación.
+      fetchVulnerabilidades(false);
       
       // Cerrar editor y refrescar bitácora
       setEditingAppResult(null);
@@ -876,6 +886,8 @@ export default function Vulnerabilidades() {
       if (filterControl.length > 0) filterControl.forEach(v => params.append("control", v));
       if (filterNivelRiesgo.length > 0) filterNivelRiesgo.forEach(v => params.append("nivel_riesgo", v));
       if (filterProveedor.length > 0) filterProveedor.forEach(v => params.append("proveedor", v));
+      if (filterResultadoRetest.length > 0) filterResultadoRetest.forEach(v => params.append("resultado_retest", v));
+      if (filterCorreccionParcial) params.append("correccion_parcial", "true");
       
       // Add visible columns
       if (visibleColumns.length > 0) {
@@ -1065,7 +1077,7 @@ export default function Vulnerabilidades() {
           )}
         </div>
         {canAdd && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               onClick={() => setShowBulkEntryModal(true)}
               variant="outline"
@@ -1127,7 +1139,7 @@ export default function Vulnerabilidades() {
               />
 
               <MultiSelectFilter
-                options={options?.estatus || []}
+                options={[...new Set([...(options?.estatus || []), ...(filterAplicacion.length ? ['Corregido', 'Desestimado', 'En Retest'] : []), ...filterEstatus].map(value => value === 'Para Re Test' ? 'En Retest' : value))]}
                 selected={filterEstatus}
                 onChange={setFilterEstatus}
                 placeholder="Estatus"
@@ -1251,7 +1263,7 @@ export default function Vulnerabilidades() {
               </div>
 
               {/* Import/Export */}
-              <div className="flex gap-2 ml-auto">
+              <div className="flex max-w-full flex-wrap gap-2 ml-auto">
                 {isAdmin && (
                   <>
                     <label className="cursor-pointer">
@@ -1409,8 +1421,12 @@ export default function Vulnerabilidades() {
       {/* Table */}
       <Card className="bg-[#18181b] border-[#27272a]">
         <CardContent className="p-0">
+          {canModify && <div className="flex items-center gap-2 border-b border-zinc-800 p-4 md:hidden">
+            <Checkbox id="select-all-mobile" checked={paginatedData.length > 0 && selectedIds.length === paginatedData.length} disabled={!paginatedData.length} onCheckedChange={toggleSelectAll} data-testid="select-all-mobile-checkbox" className="border-zinc-600" />
+            <label htmlFor="select-all-mobile" data-testid="select-all-mobile-label" className="text-sm text-zinc-300">Seleccionar página</label>
+          </div>}
           <div className="overflow-x-auto">
-            <Table className="vuln-table">
+            <Table className="vuln-table" data-testid="vulnerability-results-table">
               <TableHeader>
                 <TableRow className="border-zinc-700 hover:bg-transparent">
                   {canModify && (
@@ -1459,7 +1475,7 @@ export default function Vulnerabilidades() {
                       data-testid={`vuln-row-${vuln.id}`}
                     >
                       {canModify && (
-                        <TableCell>
+                        <TableCell data-label="Seleccionar">
                           <Checkbox
                             checked={selectedIds.includes(vuln.id)}
                             onCheckedChange={() => toggleSelect(vuln.id)}
@@ -1469,58 +1485,59 @@ export default function Vulnerabilidades() {
                         </TableCell>
                       )}
                       {isColumnVisible("codigo") && (
-                        <TableCell className="text-zinc-300 font-mono text-xs">
+                        <TableCell data-label="Código" className="text-zinc-300 font-mono text-xs">
                           {vuln.codigo || "-"}
                         </TableCell>
                       )}
                       {isColumnVisible("fecha_hallazgo") && (
-                        <TableCell className="text-zinc-300 font-mono text-xs">
+                        <TableCell data-label="Fecha" className="text-zinc-300 font-mono text-xs">
                           {vuln.fecha_hallazgo || "-"}
                         </TableCell>
                       )}
                       {isColumnVisible("institucion") && (
-                        <TableCell className="text-zinc-300">{vuln.institucion || "-"}</TableCell>
+                        <TableCell data-label="Institución" className="text-zinc-300">{vuln.institucion || "-"}</TableCell>
                       )}
                       {isColumnVisible("aplicaciones") && (
-                        <TableCell className="text-zinc-300">
+                        <TableCell data-label="Aplicaciones" className="text-zinc-300">
                           <span className="whitespace-normal break-words" title={formatAplicaciones(vuln)}>
                             {formatAplicaciones(vuln)}
                           </span>
                         </TableCell>
                       )}
                       {isColumnVisible("vulnerabilidad") && (
-                        <TableCell className="text-zinc-100">
+                        <TableCell data-label="Vulnerabilidad" className="text-zinc-100">
                           <span className="whitespace-normal break-words">
                             {vuln.vulnerabilidad || "-"}
                           </span>
                         </TableCell>
                       )}
                       {isColumnVisible("descripcion_riesgo") && (
-                        <TableCell className="text-zinc-300">
+                        <TableCell data-label="Descripción del riesgo" className="text-zinc-300">
                           <span className="whitespace-normal break-words text-sm">
                             {vuln.descripcion_riesgo || "-"}
                           </span>
                         </TableCell>
                       )}
                       {isColumnVisible("recomendaciones") && (
-                        <TableCell className="text-zinc-300">
+                        <TableCell data-label="Recomendaciones" className="text-zinc-300">
                           <span className="whitespace-normal break-words text-sm">
                             {vuln.recomendaciones || "-"}
                           </span>
                         </TableCell>
                       )}
                       {isColumnVisible("severidad") && (
-                        <TableCell>
+                        <TableCell data-label="Severidad">
                           <SeverityBadge severity={vuln.severidad} />
                         </TableCell>
                       )}
                       {isColumnVisible("nivel_riesgo") && (
-                        <TableCell>
+                        <TableCell data-label="Nivel de riesgo">
                           <NivelRiesgoBadge nivel={vuln.nivel_riesgo} />
                         </TableCell>
                       )}
                       {isColumnVisible("estatus") && (
-                        <TableCell>
+                        <TableCell data-label="Estatus">
+                          {vuln.aplicaciones_coincidentes?.length ? <ApplicationStatusScope matches={vuln.aplicaciones_coincidentes} globalStatus={vuln.estatus} prefix={`vuln-${vuln.id}`} /> : (
                           <div className="flex items-center gap-1">
                             <StatusBadge status={vuln.estatus} />
                             {vuln.es_correccion_parcial && (
@@ -1544,37 +1561,38 @@ export default function Vulnerabilidades() {
                               </TooltipProvider>
                             )}
                           </div>
+                          )}
                         </TableCell>
                       )}
                       {isColumnVisible("responsable") && (
-                        <TableCell className="text-zinc-300">{vuln.responsable || "-"}</TableCell>
+                        <TableCell data-label="Responsable" className="text-zinc-300">{vuln.responsable || "-"}</TableCell>
                       )}
                       {isColumnVisible("fecha_compromiso") && (
-                        <TableCell className="text-zinc-300 font-mono text-xs">{vuln.fecha_compromiso || "-"}</TableCell>
+                        <TableCell data-label="Fecha de compromiso" className="text-zinc-300 font-mono text-xs">{vuln.fecha_compromiso || "-"}</TableCell>
                       )}
                       {isColumnVisible("dominio") && (
-                        <TableCell className="text-zinc-300 text-sm">{vuln.nombre_dominio || "-"}</TableCell>
+                        <TableCell data-label="Dominio" className="text-zinc-300 text-sm">{vuln.nombre_dominio || "-"}</TableCell>
                       )}
                       {isColumnVisible("control_asociado") && (
-                        <TableCell className="text-zinc-300 text-sm">{vuln.codigo_control || "-"}</TableCell>
+                        <TableCell data-label="Control" className="text-zinc-300 text-sm">{vuln.codigo_control || "-"}</TableCell>
                       )}
                       {isColumnVisible("resultado_re_test") && (
-                        <TableCell className="text-zinc-300">{vuln.resultado_re_test || "-"}</TableCell>
+                        <TableCell data-label="Resultado Re Test global" className="text-zinc-300">{vuln.resultado_re_test || "-"}</TableCell>
                       )}
                       {isColumnVisible("veces_en_retest") && (
-                        <TableCell className="text-zinc-300 text-center">{vuln.veces_en_retest || 0}</TableCell>
+                        <TableCell data-label="Veces en retest" className="text-zinc-300 text-center">{vuln.veces_en_retest || 0}</TableCell>
                       )}
                       {isColumnVisible("nombre_informe_pentest") && (
-                        <TableCell className="text-zinc-300">
+                        <TableCell data-label="Informe" className="text-zinc-300">
                           <span className="whitespace-normal break-words" title={vuln.nombre_informe_pentest}>
                             {vuln.nombre_informe_pentest || "-"}
                           </span>
                         </TableCell>
                       )}
                       {isColumnVisible("proveedor") && (
-                        <TableCell className="text-zinc-300">{vuln.proveedor || "-"}</TableCell>
+                        <TableCell data-label="Proveedor" className="text-zinc-300">{vuln.proveedor || "-"}</TableCell>
                       )}
-                      <TableCell className="text-right">
+                      <TableCell data-label="Acciones" className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button
                             variant="ghost"
@@ -1618,7 +1636,7 @@ export default function Vulnerabilidades() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-800">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-zinc-800">
               <p className="text-sm text-zinc-500">
                 Página {currentPage} de {totalPages}
               </p>
@@ -1700,7 +1718,7 @@ export default function Vulnerabilidades() {
           setActiveDetailTab("info");
         }
       }}>
-        <DialogContent className="bg-[#18181b] border-[#27272a] text-white max-w-3xl max-h-[90vh]">
+        <DialogContent data-testid="vulnerability-view-modal" className="bg-[#18181b] border-[#27272a] text-white max-w-3xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="text-xl flex items-center gap-2">
               <Eye className="w-5 h-5 text-cyan-500" />
@@ -1714,7 +1732,7 @@ export default function Vulnerabilidades() {
                 <div className="flex flex-wrap gap-3 items-center">
                   <SeverityBadge severity={viewingVuln.severidad} />
                   <NivelRiesgoBadge nivel={viewingVuln.nivel_riesgo} />
-                  <StatusBadge status={viewingVuln.estatus} />
+                  <span className="flex flex-wrap items-center gap-1.5" data-testid="vulnerability-detail-global-status"><span className="text-xs text-zinc-400">Global:</span><StatusBadge status={viewingVuln.estatus} /></span>
                   {viewingVuln.es_correccion_parcial && (
                     <TooltipProvider>
                       <Tooltip>
@@ -1737,14 +1755,20 @@ export default function Vulnerabilidades() {
                   )}
                 </div>
 
+                {viewingVuln.aplicaciones_coincidentes?.length > 0 && (
+                  <section className="rounded-md border border-zinc-700 bg-zinc-900 p-3" data-testid="vulnerability-matching-applications">
+                    <h3 data-testid="vulnerability-matching-applications-title" className="mb-2 text-sm font-medium text-zinc-300">Aplicaciones que coinciden</h3>
+                    <ApplicationStatusScope matches={viewingVuln.aplicaciones_coincidentes} globalStatus={viewingVuln.estatus} prefix={`detail-vuln-${viewingVuln.id}`} />
+                  </section>
+                )}
                 {/* Tabs para Info/Bitácora */}
                 <Tabs value={activeDetailTab} onValueChange={setActiveDetailTab} className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 bg-zinc-800">
-                    <TabsTrigger value="info" className="data-[state=active]:bg-zinc-700">
+                  <TabsList className="grid h-auto w-full grid-cols-2 bg-zinc-800">
+                    <TabsTrigger value="info" data-testid="vulnerability-detail-info-tab" className="min-w-0 whitespace-normal data-[state=active]:bg-zinc-700">
                       <FileText className="w-4 h-4 mr-2" />
                       Información
                     </TabsTrigger>
-                    <TabsTrigger value="bitacora" className="data-[state=active]:bg-zinc-700">
+                    <TabsTrigger value="bitacora" data-testid="vulnerability-detail-history-tab" className="min-w-0 whitespace-normal data-[state=active]:bg-zinc-700">
                       <History className="w-4 h-4 mr-2" />
                       Bitácora de Seguimiento
                     </TabsTrigger>

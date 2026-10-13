@@ -64,26 +64,10 @@ import {
 import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
 import { PivotAnalysis } from "@/components/PivotAnalysis";
 import { VulnerabilityPanels } from "@/components/grc-vulnerabilities/VulnerabilityPanels";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  Legend,
-} from "recharts";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 // ============ CONSTANTS ============
-const SEVERITY_COLORS = {
-  Critica: "#dc2626",
-  Alta: "#ea580c",
-  Media: "#ca8a04",
-  Baja: "#2563eb",
-};
-
 // Colores estáticos para la Matriz de Riesgo 4x4
 // Basado en metodología clásica: Verde (bajo), Amarillo (medio), Naranja (alto), Rojo (crítico)
 const MATRIX_COLORS = {
@@ -185,24 +169,6 @@ const PROBABILIDAD_LABELS = {
 };
 
 // ============ COMPONENTS ============
-
-// Tooltip for Top Dominios chart (needs full domain name from payload)
-const DominiosTooltip = ({ active, payload, label }) => {
-  if (active && payload && payload.length) {
-    const fullName = payload[0]?.payload?.fullName || label;
-    return (
-      <div className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 shadow-lg">
-        <p className="text-white text-sm font-medium mb-2">{fullName}</p>
-        {payload.map((entry, index) => (
-          <p key={index} className="text-sm" style={{ color: entry.fill }}>
-            {entry.name}: {entry.value}
-          </p>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
 
 const KPICard = ({ title, value, subtitle, icon: Icon, color = "indigo", trend, onClick }) => {
   const colorClasses = {
@@ -572,49 +538,6 @@ const RiskMatrix = ({ data, onCellClick }) => {
           <span className="text-xs text-zinc-500">Crítico</span>
         </div>
       </div>
-    </div>
-  );
-};
-
-// Top Dominios (Stacked Bar Chart)
-const TopDominiosChart = ({ data }) => {
-  const chartData = data?.map(item => ({
-    name: item.dominio?.length > 15 ? item.dominio.substring(0, 15) + '...' : item.dominio,
-    fullName: item.dominio,
-    Criticas: item.vuln_criticas || 0,
-    Altas: item.vuln_altas || 0,
-    Medias: item.vuln_medias || 0,
-    Bajas: item.vuln_bajas || 0,
-    Hallazgos: item.hallazgos || 0,
-  })) || [];
-
-  return (
-    <div className="h-[300px]">
-      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
-        <BarChart data={chartData} margin={{ left: 0, right: 20, bottom: 60 }}>
-          <XAxis 
-            dataKey="name" 
-            stroke="#71717a" 
-            fontSize={11}
-            angle={-45}
-            textAnchor="end"
-            height={60}
-            tick={{ fill: '#a1a1aa' }}
-          />
-          <YAxis stroke="#71717a" fontSize={12} />
-          <RechartsTooltip content={<DominiosTooltip />} />
-          <Legend 
-            wrapperStyle={{ paddingTop: '10px' }}
-            iconType="circle"
-            iconSize={8}
-          />
-          <Bar dataKey="Criticas" stackId="vulns" fill={SEVERITY_COLORS.Critica} name="Críticas" />
-          <Bar dataKey="Altas" stackId="vulns" fill={SEVERITY_COLORS.Alta} name="Altas" />
-          <Bar dataKey="Medias" stackId="vulns" fill={SEVERITY_COLORS.Media} name="Medias" />
-          <Bar dataKey="Bajas" stackId="vulns" fill={SEVERITY_COLORS.Baja} name="Bajas" />
-          <Bar dataKey="Hallazgos" fill="#8b5cf6" name="Hallazgos" />
-        </BarChart>
-      </ResponsiveContainer>
     </div>
   );
 };
@@ -1246,29 +1169,6 @@ export default function DashboardGRC() {
         applications={selectedPanelApplications} statuses={selectedPanelStatuses}
         setRisks={setSelectedRisks} setSeverities={setSelectedSeverities}
         setApplications={setSelectedPanelApplications} setStatuses={setSelectedPanelStatuses} revision={panelRevision} />
-
-      {/* Top Dominios */}
-      <Card className="bg-zinc-900/50 border-zinc-800">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-white text-base flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
-            Top 5 Dominios - Carga Combinada
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger>
-                  <Info className="w-4 h-4 text-zinc-500" />
-                </TooltipTrigger>
-                <TooltipContent className="bg-zinc-800 text-white border-zinc-700 max-w-xs">
-                  Dominios con mayor carga combinada de vulnerabilidades (por severidad) y hallazgos de auditoría.
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <TopDominiosChart data={dashboardData?.top_dominios} />
-        </CardContent>
-      </Card>
 
       {/* Mapa de Calor GRC - Matriz Unificada Probabilidad × Impacto */}
       <Card className="bg-zinc-900/50 border-zinc-800">

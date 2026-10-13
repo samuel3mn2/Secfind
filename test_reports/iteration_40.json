@@ -1,0 +1,46 @@
+{
+  "summary": "Pruebas backend+frontend completadas para iteración 40 (filtros por aplicación/estatus en /vulnerabilidades, correlación estatus+resultado por misma app, export CSV/Excel, eliminación Top5 en Dashboard GRC, y smoke responsive desktop/móvil).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Vulnerabilidades mobile 390x844",
+        "issues": [
+          "La tabla principal mantiene ancho interno muy grande (local scroll esperado), con celdas que exceden viewport y lectura limitada en móvil.",
+          "Métricas capturadas (390x844): TABLE left=25 right=1338.8 width=1313.8 (overflow≈948.8), TH Institución left=370 right=475.6 width=105.6 (overflow≈85.6).",
+          "No hubo overflow horizontal global de página (scrollWidth=390), el desborde es interno de la tabla."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration40_vulnerability_scope.py",
+    "/app/test_reports/pytest/pytest_iteration40_vulnerability_scope.xml"
+  ],
+  "action_items": [
+    "Mantener monitoreo UX móvil de tabla en /vulnerabilidades (legibilidad con muchas columnas), sin remover columnas por defecto.",
+    "Si se desea mejorar móvil, evaluar mejoras de presentación dentro del scroll local (ancho mínimo por columna, jerarquía visual, truncado inteligente + tooltip)."
+  ],
+  "critical_code_review_comments": [
+    "server.py continúa como archivo muy grande (>6000 líneas), elevando riesgo de regresiones en filtros/export y mantenimiento.",
+    "DashboardGRC.jsx permanece >1400 líneas; conviene modularizar bloques de filtros, heatmap y modales para reducir acoplamiento."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration40_vulnerability_scope.py",
+    "/app/test_reports/iteration_40.json"
+  ],
+  "success_rate": {
+    "backend": "100% (10/10 pass)",
+    "frontend": "92% (flujos críticos objetivo OK; pendiente mejora de legibilidad móvil en tabla ancha)"
+  },
+  "seed_data_creation": "Se insertaron fixtures temporales TEST40_SCOPE_* en Mongo para validar casos de Cerrado alias/correlación por app y se eliminaron en teardown.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Validado caso real id=d17d8ea8-26b0-4e90-b3c6-c88c0d3084f8 en entorno preview sin mutar datos: IBP+Pendiente excluye, IBE+Pendiente incluye, IBP+Corregido y alias Corregida incluyen. En filtros combinados IBP+IBE+Pendiente devuelve aplicaciones_coincidentes solo IBE; IBP+IBE+Corregido solo IBP. Correlación estatus+resultado_retest por misma app validada (no mezcla entre apps). Export CSV/Excel comparten get_vulnerabilidades y preservan estatus_global=Pendiente con estatus por app (ej. 'IBP: Corregido'). /api/dashboard/data mantiene top_dominios:[] y UI Dashboard GRC no muestra Top5/Carga Combinada.",
+  "rca of the issue": "No se detectaron regresiones funcionales dentro del alcance iteración 40. Hallazgo principal restante es de UX móvil: la tabla de muchas columnas conserva desborde interno esperado por diseño de scroll horizontal, lo que reduce legibilidad en pantallas estrechas aun sin overflow global del documento."
+}

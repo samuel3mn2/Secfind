@@ -1,5 +1,15 @@
 # SecFind — Historial de cambios
 
+## 2026-10-13 — Top Dominios retirado y estatus por aplicación (iteración40)
+- Usuario confirmó la mejora anterior en ambiente local y solicitó retirar Top5Dominios/CargaCombinada, corregir filtro IBP/IBE por estatus individual.
+- Eliminado panel/gráfico/tooltip/imports, omitido su cómputo en `/dashboard/data`, clavelegacy vacía por compatibilidad. Otros paneles preservados.
+- Reproducido caso real: antesIBP+Pending incluía yIBP+Corr excluía; corregido usando resultados por aplicación, sin mutar estado global ni BD.
+- Campo respuesta aplicaciones_coincidentes, etiqueta por aplicación en tabla y detalle, estado global separado. MultiselecciónOR y correlaciónestatus+resultadoRetest en la misma aplicación.
+- CSV/Excel reutilizan consulta lista, exportan estadoindividual y global separado; rutaCSV restaurada. Filtroscancelables y reconsulta tras cambios individuales.
+- Móvil con todos los campos seleccionados en presentación etiquetada sin scrollhorizontal, controles y tabs adaptables; escritorio conservado.
+-10/10pruebas backend, casosIBP/IBE, fixtureslimpiados y snapshotrealintacto; UI1920×800 y390×844 overflow[], campos11/11 y selecciónmóvil aprobados.
+- No nuevascredenciales/integraciones/migraciones. Pendiente validaciónWindowslocal. No se ampliaron reglas del módulo a otros paneles automáticamente.
+
 ## 2026-10-02 — Aplicaciones seleccionadas y estatus GRC (iteración39)
 - Añadido selector múltiple de aplicaciones con búsqueda, incluye Sin aplicación asignada y evita mostrar aplicaciones asociadas no seleccionadas.
 - Nuevo resumen de estatus con multiselección y conteos; etiquetas de estatus por aplicación y línea Estatus: destacada en cada vulnerabilidad del detalle.

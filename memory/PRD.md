@@ -1,13 +1,41 @@
 # SecFind — Gestión de Vulnerabilidades y GRC
 
-Última actualización: **2026-10-02**. Idioma de comunicación y documentación: español.
+Última actualización: **2026-10-13**. Idioma de comunicación y documentación: español.
 
 ## Problema original y usuarios
 Aplicación web para gestionar vulnerabilidades de ciberseguridad y sustituir un flujo de trabajo basado en Excel. Incluye operaciones CRUD sobre hallazgos de pentest, seguimiento de remediación y paneles para presentaciones ejecutivas.
 
 Usuarios: administradores de seguridad, analistas de vulnerabilidades/GRC, responsables de remediación y comités ejecutivos. El usuario principal utiliza una instalación **local en Windows 11**: preservar compatibilidad multiplataforma, rutas Windows y mongodump configurable.
 
-## Solicitud vigente — Selección de aplicaciones y estatus en Dashboard GRC
+## Solicitud vigente — Retirar Top Dominios y corregir estatus por aplicación
+Usuario: «Todo funciona en el ambiente local correcto ahora tenemos algunas mejoras que implementar: 1. Dashboard GRC: Eliminar Top 5 Dominios - Carga Combinada con todo y grafico. 2. El modulo de vulnerabilidades si una vulnerabilidad tiene 2 o mas aplicaciones, por ejemplo la vulnerabilidad: Acceso no autorizado al saldo de cuentas afecta IBP e IBE. En IBP la vulnerabilidad está corregida, pero si filtro la vulnerabilidad por estatus pendiente e IBP me sale Pendiente pero IBP está corregida y pendiente en IBE».
+
+Elección explícita: **Cualquiera coincide** al seleccionar varias aplicaciones. Casos aprobados: IBP+Pendiente→NO; IBE+Pendiente→SÍ; IBP+Corregida→SÍ.
+
+### Implementado y verificado 2026-10-13 (iteración40)
+- Retirado panel completo Top5Dominios/CargaCombinada del Dashboard GRC, junto con gráfico, tooltip e imports correspondientes. `/dashboard/data` ya no ejecuta su cálculo; conserva clave legacy `top_dominios: []`. No se retiraron KPIs, MapaCalor, Pivot ni paneles de riesgo/severidad/aplicaciones/estatus.
+- En el **módulo principal Vulnerabilidades**, aplicación+estatus se evalúan sobre el resultado individual de la misma aplicación, no sobre el estatus global de la vulnerabilidad.
+- Corregido/Corregida→Corregido; Desestimado/Desestimada→Desestimado; resultado individual EnRetest→EnRetest; Vulnerable/Impedimento/Pendiente explícitos→Pendiente. Aplicaciones sin resultado propio heredan el global, conservando EnProceso cuando corresponde. Cerrado también permite consultar aplicaciones Corregidas/Desestimadas.
+- Varias aplicaciones: OR entre aplicaciones, pero estatus y ResultadoRetest deben cumplirse en la **misma** aplicación. No se mezcla IBPcorregida con IBEpendiente para satisfacer filtros cruzados.
+- Sin aplicación seleccionada se conserva la consulta por estatus global. **No se sobrescriben ni migran datos** de estatus/resultados globales o individuales.
+- Lista devuelve campo de lectura `aplicaciones_coincidentes[{aplicacion,estatus,resultado_re_test}]`. Tabla y detalle muestran aplicación+estatus que coincide y, aparte, **Global: ...**. Filtro ofrece Corregido/Desestimado al seleccionar una aplicación.
+- Mismo criterio compartido en CSV/Excel: conjunto igual a la tabla y texto `IBP: Corregido`; columna `estatus_global` disponible al exportar todos los campos. Restaurada rutaCSV ausente y alineados filtros antes divergentes, incluido ResultadoRetest/correcciónparcial en solicitud de exportación.
+- AbortController evita resultados obsoletos al cambiar filtros; tras actualizar resultado por aplicación se reevalúa la tabla. Filtrado individual se realiza antes del límite de10000resultados, leyendo cursor por lotes.
+- Mejorada lectura móvil sin ocultar columnas: tabla con pares etiqueta/valor y todos los campos elegidos, selección de página accesible, controles que envuelven líneas y pestañas del detalle adaptables. Escritorio conserva tabla original.
+
+### Archivos y pruebas
+- `backend/vulnerability_status_scope.py`: modelo y helpers de consulta/mapeo/exportación sin escrituras.
+- `backend/server.py`: integración lista/exportaciones/modelo de respuesta; `backend/routes/dashboard.py`: desactiva cálculoTop5enrespuesta.
+- `frontend/src/pages/Vulnerabilidades.jsx`, `components/vulnerabilities/ApplicationStatusScope.jsx`, `VulnerabilityTable.css`; retiro del panel en `DashboardGRC.jsx`.
+-10/10pruebas backend y regresiónUI. Caso real verificado read-only: id`d17d8ea8-26b0-4e90-b3c6-c88c0d3084f8`, código`VULN_IP_TPC_3`. Snapshot antes/después idéntico; fixtures temporales limpiados por IDs+informe.
+- API y UI verifican IBP+Pendiente excluido, IBE+Pendiente incluido, IBP+Corregido/Corregida incluido; con ambas apps+Pendiente solo IBE consta como coincidencia; global permanecePendiente.
+- Pruebas de correlación Retest/estatus, global sinapps, aliasCerrado, límite tras filtrar, CSV/Excel reales (openpyxl) y TopDominios retirado.
+- Verificación final1920×800 y390×844: overflow[] en tabla y modal,11campos conservados al cambiar de tamaño, seleccionar página móvil funciona. Sesión20261013_144059.
+- Reporte `iteration_40.json`, cierre `iteration_40_followup.md`, regresión `backend/tests/test_iteration40_vulnerability_scope.py`, JUnit `pytest_iteration40_final.xml`. Ruff/compilaciónPython aprobados.
+- Buildfrontend final aprobado55.86s (`iteration_40_final_build.log`), sin errores ni advertencias nuevas en archivos modificados; permanecen avisos heredados de hooks en otros módulos y tamaño del bundle.
+- Pendiente validar en Windows local. No requiere migración, credenciales ni nueva configuración. **No se cambió la semántica de los filtros del Dashboard GRC por aplicación de iteración39**: esta corrección corresponde al módulo principal solicitado.
+
+## Solicitud anterior — Selección de aplicaciones y estatus en Dashboard GRC
 Usuario: «Excelente vista!, algunos puntos de mejoras poder filtrar aplicación por si solo quieren verse algunas seleccionadas especificas y necesito el el estatus de esas vulnerabilidades ya que en el detalle no se muestran(te dejo libertad para eso crea una panel o como entiendas que se vea mejor, pero en el detalle de la vulnerabilidad pon el estatus tambien)».
 
 Alcance aprobado («Aprobado»): selector múltiple de aplicaciones con búsqueda que afecta los paneles; resumen por estatus seleccionable; estatus visible en cada detalle y «Sin estado» cuando falta. Se mantienen activas por defecto; cerradas/corregidas/desestimadas mediante filtro general de estados.
@@ -192,7 +220,7 @@ Compatibilidad: sin `pagina` devuelve la lista legacy, con límite predeterminad
 - La reconciliación automática de contraseña admin sugerida por la guía ampliada **no se implementó**: no forma parte del alcance y podría sobrescribir contraseñas cambiadas por usuarios. Requiere política explícita, no es un fallo del historial.
 
 ## Estado y próximos pasos
-- P0: comprobar selector múltiple de aplicaciones, resumen de estatus y estatus explícito en detalle en Windows local. No hay fallos conocidos bloqueantes de estos flujos GRC.
+- P0: verificar retirada de TopDominios y filtros por aplicación/estatus en Vulnerabilidades en Windows local. El usuario confirmó correcto el funcionamiento local de la mejora anterior de paneles GRC.
 - P1: modularizar gradualmente `server.py`, con regresiones por módulo.
 - P1 separado: evaluar protección frente a intentos fallidos del login. Observación de pruebas fuera del alcance actual, no corregida ni tratada como auditoría de seguridad completa.
 - P2: consolidar dominios duplicados; exportación CSV del historial/detalle filtrado de aplicaciones y leyenda de intensidad Heatmap como propuestas futuras. El indicador de filtros activos ya está implementado en los paneles GRC, no en Pivot.

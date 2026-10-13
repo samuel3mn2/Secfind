@@ -1,10 +1,10 @@
 # SecFind — Prioridades
 
-Actualizado: 2026-10-02.
+Actualizado: 2026-10-13.
 
 ## P0 — Verificación del usuario
-- [ ] Comprobar en Windows local aplicaciones seleccionadas (una/varias), filtro por estatus, etiquetas por aplicación y Estatus: en cada detalle. No requiere migración.
-- [ ] Comprobar en Windows local el nuevo Panel por Nivel de riesgo, multiselección con Severidad, aplicaciones y detalle paginado. No requiere migración.
+- [ ] Comprobar en Windows local TopDominios retirado y casos en módulo Vulnerabilidades: IBP+Pendiente→no, IBE+Pendiente→sí, IBP+Corregido→sí. No requiere migración.
+- [x] Usuario confirmó el funcionamiento correcto de paneles GRC y selectores de la iteración anterior en ambiente local.
 - [ ] Verificar en Windows local Table → Table Heatmap → Table Col Heatmap → Table Row Heatmap → Table en ambos módulos. Deben cambiar colores según valores/global/columna/fila, no las cifras ni la disposición de ejes.
 - [ ] Verificar en Windows local: Dashboard GRC → Análisis Avanzado → Nivel de riesgo → seleccionar → cerrar → Estatus/Estado. Repetir en Vulnerabilidades y Hallazgos.
 - [x] Historial de backups: el usuario confirmó «en el ambiente local todo funciona correctamente» el2026-09-29.
@@ -31,6 +31,12 @@ Actualizado: 2026-10-02.
 - No sincronizar automáticamente contraseñas admin con un seed sin política explícita de rotación; la recomendación genérica del informe35 no es un bug funcional del historial.
 
 ## Completado en la iteración actual
+- [x] Panel Top5Dominios/CargaCombinada retirado del Dashboard, sin alterar restantes paneles.
+- [x] Filtro de Vulnerabilidades por estado de la aplicación seleccionada; OR entreapps y condiciones en una mismaapp.
+- [x] Estado por aplicación y global separados en UI/exportaciones, sin sobrescritura de datos.
+- [x]10/10pruebas backend, regresiónUI y móvil legible conservando todas las columnas elegidas; fixtureslimpiados.
+
+## Completado anteriormente — Selección de aplicaciones y estatus GRC
 - [x] Selector de aplicaciones múltiple con búsqueda y limpieza; restricción de filas a aplicaciones seleccionadas, sin duplicar totales.
 - [x] Resumen de estatus seleccionable, conteos por aplicación y Estatus: destacado en detalle; Sin estado para vacíos reales.
 - [x] Combinación con riesgo/severidad/filtros generales y persistencia en Vistas con compatibilidad hacia atrás.

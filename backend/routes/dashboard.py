@@ -369,7 +369,6 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
         matriz = await _get_matriz_4x4(db, filtros)
         mapa_calor_grc = await _get_mapa_calor_grc(db, filtros)
         panel_severidad = await _get_panel_severidad(db, filtros)
-        top_dominios = await _get_top_dominios(db, filtros)
         
         # Datos separados para Pivot Tables independientes
         datos_vulnerabilidades = await _get_datos_vulnerabilidades_pivot(db, filtros)
@@ -383,7 +382,7 @@ def create_dashboard_router(db, get_current_user: Callable) -> APIRouter:
             "matriz_4x4": matriz,
             "mapa_calor_grc": mapa_calor_grc,
             "panel_severidad": panel_severidad,
-            "top_dominios": top_dominios,
+            "top_dominios": [],  # Clave conservada para clientes anteriores; panel retirado.
             "datos_vulnerabilidades": datos_vulnerabilidades,  # Para Pivot de Vulnerabilidades
             "datos_hallazgos": datos_hallazgos,  # Para Pivot de Hallazgos
             "filtros_aplicados": filtros,

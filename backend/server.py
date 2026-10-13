@@ -18,6 +18,7 @@ import jwt
 from pdf_reports import generate_executive_report, generate_institution_report, generate_vista_comite_report
 from email_service import EmailService, generate_alert_email, generate_weekly_summary_email
 from backup_service import BackupService, BackupScheduler
+from vulnerability_status_scope import ApplicationStatusMatch, find_with_application_scope, global_status_condition, export_application_scope
 from backup_history import BackupLog, BackupHistoryPage, get_history_page, ensure_history_indexes, utc_iso
 
 # GRC Module Routes (Modular Architecture)
@@ -329,6 +330,7 @@ class Vulnerabilidad(VulnerabilidadBase):
     aplicaciones_corregidas: Optional[int] = None
     aplicaciones_total: Optional[int] = None
     tiene_resultados_personalizados: Optional[bool] = None
+    aplicaciones_coincidentes: List[ApplicationStatusMatch] = Field(default_factory=list)
 
 # Report Groups Model
 class GrupoInformesBase(BaseModel):
@@ -3117,23 +3119,8 @@ async def get_vulnerabilidades(
     query = {}
     if severidades:
         query["severidad"] = {"$in": severidades}
-    if estatus_list:
-        # CASO ESPECIAL: "En Retest" busca por resultado_re_test, no por estatus
-        estatus_normales = [e for e in estatus_list if e not in ["En Retest", "Para Re Test"]]
-        estatus_retest = [e for e in estatus_list if e in ["En Retest", "Para Re Test"]]
-        
-        if estatus_normales and estatus_retest:
-            # Buscar por estatus normal O por resultado_re_test = "En Retest"/"Para Re Test"
-            query["$or"] = [
-                {"estatus": {"$in": estatus_normales}},
-                {"resultado_re_test": {"$in": ["En Retest", "Para Re Test"]}}
-            ]
-        elif estatus_retest:
-            # Solo buscar por resultado_re_test = "En Retest" o "Para Re Test" (legacy)
-            query["resultado_re_test"] = {"$in": ["En Retest", "Para Re Test"]}
-        else:
-            # Solo buscar por estatus normales
-            query["estatus"] = {"$in": estatus_normales}
+    if estatus_list and not aplicaciones:
+        query.setdefault("$and", []).append(global_status_condition(estatus_list))
     if instituciones:
         query["institucion"] = {"$in": instituciones}
     if aplicaciones:
@@ -3146,7 +3133,7 @@ async def get_vulnerabilidades(
         query["responsable"] = {"$in": responsables}
     if nivel_riesgo_filter:
         query["nivel_riesgo"] = {"$in": nivel_riesgo_filter}
-    if resultado_retest_filter:
+    if resultado_retest_filter and not aplicaciones:
         query["resultado_re_test"] = {"$in": resultado_retest_filter}
     if años:
         # Multiple years - use $or with regex for each year
@@ -3169,7 +3156,7 @@ async def get_vulnerabilidades(
         else:
             query["$or"] = search_conditions
     
-    vulnerabilidades = await db.vulnerabilidades.find(query, {"_id": 0}).to_list(10000)
+    vulnerabilidades = await find_with_application_scope(db.vulnerabilidades, query, aplicaciones, estatus_list, resultado_retest_filter)
     
     # Enrich with dominio/control names
     controles_ids = list(set(v.get("control_id") for v in vulnerabilidades if v.get("control_id")))
@@ -4944,6 +4931,7 @@ async def fix_retest_bug(
         "affected_ids": affected_ids
     }
 
+@api_router.get("/export/csv")
 async def export_csv(
     request: Request,
     search: Optional[str] = None,
@@ -4954,41 +4942,8 @@ async def export_csv(
     if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
         raise HTTPException(status_code=403, detail="No tiene permisos para exportar")
     
-    # Build query with filters
-    query = {}
-    
-    # Get multi-value params
-    severidades = request.query_params.getlist("severidad")
-    estatus_list = request.query_params.getlist("estatus")
-    instituciones = request.query_params.getlist("institucion")
-    aplicaciones = request.query_params.getlist("aplicacion")
-    informes = request.query_params.getlist("informe_pentest")
-    responsables = request.query_params.getlist("responsable")
-    
-    if severidades:
-        query["severidad"] = {"$in": severidades}
-    if estatus_list:
-        query["estatus"] = {"$in": estatus_list}
-    if instituciones:
-        query["institucion"] = {"$in": instituciones}
-    if aplicaciones:
-        query["aplicaciones"] = {"$in": aplicaciones}
-    if informes:
-        query["nombre_informe_pentest"] = {"$in": informes}
-    if responsables:
-        query["responsables"] = {"$in": responsables}
-    if año and año != "all":
-        query["fecha_hallazgo"] = {"$regex": f"^{año}"}
-    if search:
-        query["$or"] = [
-            {"codigo": {"$regex": search, "$options": "i"}},
-            {"vulnerabilidad": {"$regex": search, "$options": "i"}},
-            {"aplicaciones": {"$regex": search, "$options": "i"}},
-            {"responsables": {"$regex": search, "$options": "i"}},
-            {"institucion": {"$regex": search, "$options": "i"}}
-        ]
-    
-    vulnerabilidades = await db.vulnerabilidades.find(query, {"_id": 0}).to_list(10000)
+    # Usar exactamente los mismos filtros y coincidencias que la tabla.
+    vulnerabilidades = await get_vulnerabilidades(request, search=search, current_user=current_user)
     
     if not vulnerabilidades:
         raise HTTPException(status_code=404, detail="No hay datos para exportar")
@@ -5026,7 +4981,8 @@ async def export_csv(
             vuln["control_codigo"] = controles_map.get(vuln["control_id"], "")
         if vuln.get("riesgo_id"):
             vuln["riesgo_catalogo"] = riesgos_map.get(vuln["riesgo_id"], "")
-    
+        export_application_scope(vuln)
+
     df = pd.DataFrame(vulnerabilidades)
     
     # Remove internal columns
@@ -5087,63 +5043,7 @@ async def export_excel(
     if not current_user.es_admin and not current_user.permisos.vulnerabilidades.ver:
         raise HTTPException(status_code=403, detail="No tiene permisos para exportar")
     
-    # Build query with filters
-    query = {}
-    
-    # Get multi-value params
-    severidades = request.query_params.getlist("severidad")
-    estatus_list = request.query_params.getlist("estatus")
-    instituciones = request.query_params.getlist("institucion")
-    aplicaciones = request.query_params.getlist("aplicacion")
-    informes = request.query_params.getlist("informe_pentest")
-    responsables = request.query_params.getlist("responsable")
-    niveles_riesgo = request.query_params.getlist("nivel_riesgo")
-    proveedores = request.query_params.getlist("proveedor")
-    dominios_filter = request.query_params.getlist("dominio")
-    controles_filter = request.query_params.getlist("control")
-    
-    if severidades:
-        query["severidad"] = {"$in": severidades}
-    if estatus_list:
-        query["estatus"] = {"$in": estatus_list}
-    if instituciones:
-        query["institucion"] = {"$in": instituciones}
-    if aplicaciones:
-        query["aplicaciones"] = {"$in": aplicaciones}
-    if informes:
-        query["nombre_informe_pentest"] = {"$in": informes}
-    if responsables:
-        query["responsable"] = {"$in": responsables}
-    if niveles_riesgo:
-        query["nivel_riesgo"] = {"$in": niveles_riesgo}
-    if proveedores:
-        query["proveedor"] = {"$in": proveedores}
-    if año and año != "all":
-        query["fecha_hallazgo"] = {"$regex": f"^{año}"}
-    if search:
-        query["$or"] = [
-            {"codigo": {"$regex": search, "$options": "i"}},
-            {"vulnerabilidad": {"$regex": search, "$options": "i"}},
-            {"aplicaciones": {"$regex": search, "$options": "i"}},
-            {"responsable": {"$regex": search, "$options": "i"}},
-            {"institucion": {"$regex": search, "$options": "i"}}
-        ]
-    
-    # Handle dominio filter (needs to get dominio IDs first)
-    if dominios_filter:
-        dominio_docs = await db.config_dominios.find({"nombre_dominio": {"$in": dominios_filter}}, {"_id": 0, "id": 1}).to_list(100)
-        dominio_ids_to_filter = [d["id"] for d in dominio_docs]
-        if dominio_ids_to_filter:
-            query["dominio_id"] = {"$in": dominio_ids_to_filter}
-    
-    # Handle control filter (needs to get control IDs first)
-    if controles_filter:
-        control_docs = await db.config_controles.find({"codigo_control": {"$in": controles_filter}}, {"_id": 0, "id": 1}).to_list(200)
-        control_ids_to_filter = [c["id"] for c in control_docs]
-        if control_ids_to_filter:
-            query["control_id"] = {"$in": control_ids_to_filter}
-    
-    vulnerabilidades = await db.vulnerabilidades.find(query, {"_id": 0}).to_list(10000)
+    vulnerabilidades = await get_vulnerabilidades(request, search=search, current_user=current_user)
     
     if not vulnerabilidades:
         raise HTTPException(status_code=404, detail="No hay datos para exportar")
@@ -5209,6 +5109,7 @@ async def export_excel(
         # Eliminar campo temporal
         if "aplicaciones_original" in vuln:
             del vuln["aplicaciones_original"]
+        export_application_scope(vuln)
     df = pd.DataFrame(vulnerabilidades)
     
     # Remove internal columns
