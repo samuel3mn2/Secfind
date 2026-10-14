@@ -1,6 +1,6 @@
 import { STATUS_COLORS } from './constants';
 
-export const StatusBadge = ({ status, count, testId, prominent = false }) => {
+export const StatusBadge = ({ status, count, testId, prominent = false, reason }) => {
   const value = status?.trim() || 'Sin estado';
   const color = STATUS_COLORS[value] || '#a1a1aa';
   return (
@@ -8,6 +8,11 @@ export const StatusBadge = ({ status, count, testId, prominent = false }) => {
       style={{ color, backgroundColor: `${color}14`, borderColor: `${color}55` }}>
       <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden="true" />
       <span className="min-w-0 break-words [overflow-wrap:anywhere]">{value}</span>
+      {reason && (
+        <span data-testid={testId ? `${testId}-reason` : undefined} className="ml-1 rounded border border-current/40 px-1 py-px text-[10px] font-medium uppercase tracking-wide opacity-80">
+          {reason}
+        </span>
+      )}
       {count !== undefined && <strong className="tabular-nums text-zinc-100">{count}</strong>}
     </span>
   );

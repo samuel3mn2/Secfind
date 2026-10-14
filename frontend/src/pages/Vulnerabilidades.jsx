@@ -1139,7 +1139,9 @@ export default function Vulnerabilidades() {
               />
 
               <MultiSelectFilter
-                options={[...new Set([...(options?.estatus || []), ...(filterAplicacion.length ? ['Corregido', 'Desestimado', 'En Retest'] : []), ...filterEstatus].map(value => value === 'Para Re Test' ? 'En Retest' : value))]}
+                options={[...new Set([...(options?.estatus || []), ...(filterAplicacion.length ? ['Cerrado', 'En Retest'] : []), ...filterEstatus]
+                  .map(value => value === 'Para Re Test' ? 'En Retest' : value)
+                  .filter(value => !filterAplicacion.length || !['Corregido', 'Desestimado'].includes(value)))]}
                 selected={filterEstatus}
                 onChange={setFilterEstatus}
                 placeholder="Estatus"

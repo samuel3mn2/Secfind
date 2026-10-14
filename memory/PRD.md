@@ -219,6 +219,13 @@ Compatibilidad: sin `pagina` devuelve la lista legacy, con límite predeterminad
 - Corregida clave `$or` duplicada de `migrate_nivel_riesgo` mediante `$and` de ambos grupos; preserva intención del filtro.
 - La reconciliación automática de contraseña admin sugerida por la guía ampliada **no se implementó**: no forma parte del alcance y podría sobrescribir contraseñas cambiadas por usuarios. Requiere política explícita, no es un fallo del historial.
 
+## 2026-02 — Agrupación "Cerrado" en filtro por aplicación
+- Dropdown de Estatus al filtrar por aplicación muestra "Cerrado" (en vez de "Corregido" y "Desestimado"); el backend expande "Cerrado" a `{Cerrado, Corregido, Desestimado}` en `matching_applications` (ya existía).
+- `StatusBadge` acepta `reason` opcional y lo renderiza como etiqueta compacta junto al estatus.
+- `ApplicationStatusScope` traduce `Corregido`/`Desestimado` → `Cerrado` + motivo visible (`CORREGIDO` o `DESESTIMADO`).
+- Verificación: tests unitarios locales (`matching_applications` escenarios A/B), curl `?aplicacion=API GW&estatus=Cerrado` → 3 vulnerabilidades con `matches=[('API GW','Corregido')]`; screenshot de UI confirma badge "Cerrado CORREGIDO".
+- Archivos: `/app/frontend/src/components/grc-vulnerabilities/StatusBadge.jsx`, `/app/frontend/src/components/vulnerabilities/ApplicationStatusScope.jsx`, `/app/frontend/src/pages/Vulnerabilidades.jsx` (línea del dropdown de estatus).
+
 ## Estado y próximos pasos
 - P0: verificar retirada de TopDominios y filtros por aplicación/estatus en Vulnerabilidades en Windows local. El usuario confirmó correcto el funcionamiento local de la mejora anterior de paneles GRC.
 - P1: modularizar gradualmente `server.py`, con regresiones por módulo.
